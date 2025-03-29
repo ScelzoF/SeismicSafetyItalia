@@ -1,4 +1,3 @@
-
 import requests
 
 SUPABASE_URL = "https://ljrjaehrttxhqejcueqj.supabase.co"
@@ -49,15 +48,13 @@ def invia_segnalazione(localita, tipo_evento, intensita, descrizione):
         return False, f"Errore {response.status_code}: {response.text}"
     return True, "Segnalazione inviata con successo"
 
-
-
 def inserisci_segnalazione(username, contenuto):
     try:
         data = {
             "username": username or "Anonimo",
             "contenuto": contenuto,
         }
-        res = requests.post(f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto", json=data, headers=HEADERS)
+        res = requests.post(f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto", json=data, headers=SUPABASE_HEADERS)
         res.raise_for_status()
         return True, "✅ Segnalazione inviata con successo."
     except Exception as e:
@@ -65,7 +62,7 @@ def inserisci_segnalazione(username, contenuto):
 
 def carica_segnalazioni():
     try:
-        res = requests.get(f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto?select=*", headers=HEADERS)
+        res = requests.get(f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto?select=*", headers=SUPABASE_HEADERS)
         res.raise_for_status()
         return res.json()
     except Exception as e:
