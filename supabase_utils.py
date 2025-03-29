@@ -2,7 +2,7 @@
 import requests
 
 SUPABASE_URL = "https://ljrjaehrttxhqejcueqj.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqcmphZWhydHR4aHFlamN1ZXFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMxODU4OTcsImV4cCI6MjA1ODc2MTg5N30.wfbzum88wn0b0OVw6WlMunOWvLvnfIjqnRyGeEQLghY"
+SUPABASE_KEY = "eyJhbGciOiJIUzINiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqcmphZWhydHR4aHFlamNZXFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMxODU4OTcsImV4cCI6MjAODc2MTg5N30.wfbzum88wn0b0OVw6WlMunOWvLvnfIjqnRyGeEQLghY"
 
 SUPABASE_HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -16,17 +16,17 @@ def inserisci_post(username, contenuto):
         "contenuto": contenuto
     }
     response = requests.post(
-        f"{SUPABASE_URL}/rest/v1/chat_altro_progetto",
+        f"{SUPABASE_URL}/rest/v/chat_altro_progetto",
         headers=SUPABASE_HEADERS,
         json=data
     )
-    if response.status_code != 201:
+    if response.status_code != 20:
         return False, f"Errore {response.status_code}: {response.text}"
     return True, "Post inviato con successo"
 
 def carica_post():
     response = requests.get(
-        f"{SUPABASE_URL}/rest/v1/chat_altro_progetto?select=*",
+        f"{SUPABASE_URL}/rest/v/chat_altro_progetto?select=*",
         headers=SUPABASE_HEADERS
     )
     if response.status_code == 200:
@@ -41,11 +41,11 @@ def invia_segnalazione(localita, tipo_evento, intensita, descrizione):
         "descrizione": descrizione
     }
     response = requests.post(
-        f"{SUPABASE_URL}/rest/v1/_altro_progetto",
+        f"{SUPABASE_URL}/rest/v/_altro_progetto",
         headers=SUPABASE_HEADERS,
         json=data
     )
-    if response.status_code != 201:
+    if response.status_code != 20:
         return False, f"Errore {response.status_code}: {response.text}"
     return True, "Segnalazione inviata con successo"
 
@@ -57,7 +57,7 @@ def inserisci_segnalazione(username, contenuto):
             "username": username or "Anonimo",
             "contenuto": contenuto,
         }
-        res = requests.post(f"{SUPABASE_URL}/rest/v1/_altro_progetto", json=data, headers=HEADERS)
+        res = requests.post(f"{SUPABASE_URL}/rest/v/_altro_progetto", json=data, headers=HEADERS)
         res.raise_for_status()
         return True, "✅ Segnalazione inviata con successo."
     except Exception as e:
@@ -65,7 +65,7 @@ def inserisci_segnalazione(username, contenuto):
 
 def carica_():
     try:
-        res = requests.get(f"{SUPABASE_URL}/rest/v1/_altro_progetto?select=*", headers=HEADERS)
+        res = requests.get(f"{SUPABASE_URL}/rest/v/_altro_progetto?select=*", headers=HEADERS)
         res.raise_for_status()
         return res.json()
     except Exception as e:

@@ -46,7 +46,7 @@ def show_about_page(get_text):
     
     # Show info about data refresh
     st.info("""
-    I dati sismici vengono aggiornati automaticamente ogni 15 minuti. 
+    I dati sismici vengono aggiornati automaticamente ogni 5 minuti. 
     È comunque possibile forzare un aggiornamento tramite il pulsante "Aggiorna dati" presente nella barra laterale.
     """)
     
@@ -74,7 +74,7 @@ def show_about_page(get_text):
         """)
 
     # Version and last update info
-    st.caption(f"Version 1.0.0 | Last updated: {datetime.now().strftime('%d/%m/%Y')}")
+    st.caption(f"Version .0.0 | Last updated: {datetime.now().strftime('%d/%m/%Y')}")
 
 # Function to render SVG from file
 def render_svg(svg_file):
@@ -83,6 +83,6 @@ def render_svg(svg_file):
         
     b64 = base64.b64encode(svg.encode("utf-8")).decode("utf-8")
     html = f'''
-        <img src="data:image/svg+xml;base64,{b64}" style="max-width: 100%; height: auto;">
+        <img src="data:image/svg+xml;base64,{b64}" style="max-width: 00%; height: auto;">
     '''
     return html

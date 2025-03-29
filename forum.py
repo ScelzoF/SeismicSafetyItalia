@@ -15,11 +15,11 @@ def è_contenuto_accettabile(testo):
     return True
 
 def main():
-    st.title("🗣️ Forum della Comunità")
+    st.title("🗣️ 🗣️ Post & Segnalazioni della Comunità")
 
-    tab1, tab2, tab3 = st.tabs(["📢 Forum", "🚨 Segnalazioni", "🔗 Riferimenti"])
+    tab, tab2, tab3 = st.tabs(["📢 Forum", "🚨 Segnalazioni", "🔗 Riferimenti"])
 
-    with tab1:
+    with tab:
         with st.form("nuovo_post"):
             username = st.text_input("👤 Il tuo nome")
             contenuto = st.text_area("💬 Scrivi qualcosa")
@@ -41,8 +41,8 @@ def main():
         if posts_validi:
             blocco = ""
             for post in reversed(posts_validi):
-                blocco += f"👤 <strong>{post['username']}</strong> <small>({post.get('data', '')[:16]})</small><br>{post['contenuto']}<br><br>"
-            st.markdown(f"<div style='padding: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #eef1f5;'>{blocco}</div>", unsafe_allow_html=True)
+                blocco += f"👤 <strong>{post['username']}</strong> <small>({post.get('data', '')[:6]})</small><br>{post['contenuto']}<br><br>"
+            st.markdown(f"<div style='padding: 5px; border: px solid #ccc; border-radius: 8px; background-color: #eeff5;'>{blocco}</div>", unsafe_allow_html=True)
         else:
             st.info("Nessun post valido disponibile.")
 
@@ -68,8 +68,8 @@ def main():
         if _valide:
             blocco = ""
             for s in reversed(_valide):
-                blocco += f"👤 <strong>{s['username']}</strong> <small>({s.get('data', '')[:16]})</small><br>{s['contenuto']}<br><br>"
-            st.markdown(f"<div style='padding: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #fdf2e9;'>{blocco}</div>", unsafe_allow_html=True)
+                blocco += f"👤 <strong>{s['username']}</strong> <small>({s.get('data', '')[:6]})</small><br>{s['contenuto']}<br><br>"
+            st.markdown(f"<div style='padding: 5px; border: px solid #ccc; border-radius: 8px; background-color: #fdf2e9;'>{blocco}</div>", unsafe_allow_html=True)
         else:
             st.info("Nessuna segnalazione disponibile.")
 
