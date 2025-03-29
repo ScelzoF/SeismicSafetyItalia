@@ -1,0 +1,134 @@
+/* Stile personalizzato per l'app di Monitoraggio Sismico */
+
+/* Titoli principali */
+h1, h2, h3 {
+    color: #FF4B4B;
+    font-weight: 700;
+}
+
+/* Stile per i container */
+.css-1d391kg, .css-12oz5g7 {
+    background-color: #ffffff;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+/* Stile per le metriche */
+.css-1xarl3l {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Stile per i pulsanti */
+.stButton>button {
+    background-color: #FF4B4B;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.stButton>button:hover {
+    background-color: #FF6B6B;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Stile per la sidebar */
+.css-1adrfps {
+    background-color: #f0f2f6;
+    border-right: 1px solid #e6e9ef;
+}
+
+/* Migliora tabelle */
+.dataframe {
+    font-size: 14px;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.dataframe th {
+    background-color: #f1f3f5;
+    color: #333;
+    font-weight: 600;
+    text-align: left;
+    padding: 12px 15px;
+    border-bottom: 1px solid #ddd;
+}
+
+.dataframe td {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.dataframe tr:hover {
+    background-color: #f9f9f9;
+}
+
+/* Stile per le card */
+.css-keje6w {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: 15px;
+    margin-bottom: 10px;
+}
+
+/* Stile per espander */
+.streamlit-expanderHeader {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border: none !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    padding: 10px 15px !important;
+    margin-bottom: 5px;
+}
+
+/* Stile per mappe */
+.folium-map {
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+/* Alert e notifiche */
+.stAlert {
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 10px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    padding: 10px 20px;
+    border-radius: 5px 5px 0 0;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #FF4B4B;
+    color: white;
+}
+
+/* Icone e emoji */
+span[data-emoji] {
+    font-size: 1.2em;
+    margin-right: 8px;
+}
+
+/* Footer */
+footer {
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
