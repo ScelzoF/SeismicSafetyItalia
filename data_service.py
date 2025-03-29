@@ -6,10 +6,10 @@ import streamlit as st
 import json
 
 # INGV API endpoint for Italian earthquakes
-INGV_API_URL = "https://webservices.ingv.it/fdsnws/event/1/query"
+INGV_API_URL = "https://webservices.ingv.it/fdsnws/event//query"
 
 # USGS API endpoint for worldwide earthquakes
-USGS_API_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
+USGS_API_URL = "https://earthquake.usgs.gov/fdsnws/event//query"
 
 # Function to fetch earthquake data from INGV (Italian Geological Service)
 def fetch_ingv_data():
@@ -25,10 +25,10 @@ def fetch_ingv_data():
     params = {
         "starttime": start_str,
         "endtime": end_str,
-        "minmag": 1.0,  # Minimum magnitude
+        "minmag": .0,  # Minimum magnitude
         "maxlat": 48.0,
         "minlat": 35.0,  # Latitude range for Italy
-        "maxlon": 19.0,
+        "maxlon": 9.0,
         "minlon": 6.0,   # Longitude range for Italy
         "format": "geojson",  # Changed from "json" to "geojson"
         "limit": 500     # Limit the number of results
@@ -38,7 +38,7 @@ def fetch_ingv_data():
         # Add proper headers for the request
         headers = {
             'Accept': 'application/json',
-            'User-Agent': 'EarthquakeMonitoringApp/1.0'
+            'User-Agent': 'EarthquakeMonitoringApp/.0'
         }
 
         response = requests.get(INGV_API_URL, params=params, headers=headers)
@@ -80,7 +80,7 @@ def fetch_ingv_data():
                 time_val = props.get("time", "")
                 if isinstance(time_val, (int, float)):
                     # If time is provided as Unix timestamp in milliseconds
-                    time_str = datetime.fromtimestamp(time_val/1000).strftime("%Y-%m-%dT%H:%M:%S")
+                    time_str = datetime.fromtimestamp(time_val/000).strftime("%Y-%m-%dT%H:%M:%S")
                 else:
                     # If time is provided as ISO string
                     time_str = time_val
@@ -89,7 +89,7 @@ def fetch_ingv_data():
                     "time": time_str,
                     "magnitude": props.get("mag", 0),
                     "depth": coordinates[2] if len(coordinates) > 2 else 0,
-                    "latitude": coordinates[1] if len(coordinates) > 1 else 0,
+                    "latitude": coordinates[] if len(coordinates) >  else 0,
                     "longitude": coordinates[0] if len(coordinates) > 0 else 0,
                     "location": props.get("place", "Unknown"),
                     "source": "INGV"
@@ -117,10 +117,10 @@ def fetch_usgs_data():
         "format": "geojson",
         "starttime": start_str,
         "endtime": end_str,
-        "minmagnitude": 1.0,
+        "minmagnitude": .0,
         "latitude": 40.85,      # Approximate center of the Campania region
-        "longitude": 14.25,
-        "maxradiuskm": 100,     # 100km radius around the center
+        "longitude": 4.25,
+        "maxradiuskm": 00,     # 00km radius around the center
         "limit": 500
     }
 
@@ -128,7 +128,7 @@ def fetch_usgs_data():
         # Add proper headers for the request
         headers = {
             'Accept': 'application/json',
-            'User-Agent': 'EarthquakeMonitoringApp/1.0'
+            'User-Agent': 'EarthquakeMonitoringApp/.0'
         }
 
         response = requests.get(USGS_API_URL, params=params, headers=headers)
@@ -161,10 +161,10 @@ def fetch_usgs_data():
         features = data.get("features", [])
         if features:
             earthquakes = [{
-                "time": datetime.fromtimestamp(feature["properties"].get("time", 0)/1000).strftime("%Y-%m-%dT%H:%M:%S"),
+                "time": datetime.fromtimestamp(feature["properties"].get("time", 0)/000).strftime("%Y-%m-%dT%H:%M:%S"),
                 "magnitude": feature["properties"].get("mag", 0),
                 "depth": feature["geometry"]["coordinates"][2] if feature.get("geometry") else 0,
-                "latitude": feature["geometry"]["coordinates"][1] if feature.get("geometry") else 0,
+                "latitude": feature["geometry"]["coordinates"][] if feature.get("geometry") else 0,
                 "longitude": feature["geometry"]["coordinates"][0] if feature.get("geometry") else 0,
                 "location": feature["properties"].get("place", "Unknown"),
                 "source": "USGS"
@@ -233,15 +233,15 @@ def filter_area_earthquakes(df, area_name):
     area_bounds = {
         'vesuvio': {
             'lat_min': 40.75, 'lat_max': 40.85,
-            'lon_min': 14.35, 'lon_max': 14.45
+            'lon_min': 4.35, 'lon_max': 4.45
         },
         'campi_flegrei': {
             'lat_min': 40.80, 'lat_max': 40.90,
-            'lon_min': 14.05, 'lon_max': 14.20
+            'lon_min': 4.05, 'lon_max': 4.20
         },
         'ischia': {
             'lat_min': 40.70, 'lat_max': 40.80,
-            'lon_min': 13.85, 'lon_max': 14.00
+            'lon_min': 3.85, 'lon_max': 4.00
         }
     }
 

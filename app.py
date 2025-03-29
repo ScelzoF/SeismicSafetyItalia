@@ -132,7 +132,7 @@ st.subheader(get_text('subtitle'))
 # Check if we need to fetch data
 if st.session_state.earthquake_data is None or (
     st.session_state.last_data_fetch and 
-    datetime.now() - st.session_state.last_data_fetch > timedelta(minutes=15)
+    datetime.now() - st.session_state.last_data_fetch > timedelta(minutes=5)
 ):
     with st.spinner(get_text('updating')):
         st.session_state.earthquake_data = data_service.fetch_earthquake_data()
