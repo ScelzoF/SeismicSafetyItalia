@@ -9,7 +9,7 @@ def show():
 ### 🔍 Obiettivi del progetto
 - Fornire dati in tempo reale su eventi sismici e meteorologici
 - Monitorare l’attività vulcanica nei principali siti italiani
-- Consentire alla popolazione di inviare  utili
+- Consentire alla popolazione di inviare segnalazioni utili
 - Promuovere la prevenzione e la cultura della sicurezza
 
 ---
@@ -18,7 +18,7 @@ def show():
 - 📡 Geolocalizzazione e dati meteo reali
 - 🌋 Analisi multiparametrica dei vulcani attivi
 - 🛰️ Integrazione di fonti ufficiali (INGV, USGS, OpenWeather)
-- 💬 Chat pubblica e sistema di 
+- 💬 Chat pubblica e sistema di segnalazioni
 - 📈 Mappe interattive e aggiornamenti automatici
 
 ---
