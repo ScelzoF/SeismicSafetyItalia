@@ -39,6 +39,6 @@ def chat_pubblica(sb_client):
         else:
             for r in reversed(chat_data):
                 timestamp = r.get("inviato_il", "🕒")
-                st.markdown(f"**{r['utente']}** _({timestamp[:9].replace('T',' ')})_: {r['messaggio']}")
+                st.markdown(f"**{r['utente']}** _({timestamp[:19].replace('T',' ')})_: {r['messaggio']}")
     except Exception as e:
         st.error(f"Errore nel caricamento messaggi: {e}")

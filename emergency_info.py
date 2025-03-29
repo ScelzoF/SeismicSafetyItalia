@@ -8,9 +8,9 @@ def show_emergency_page(get_text):
     st.header("🚨 " + get_text('emergency'))
     
     # Create tabs for different emergency information
-    tab, tab2, tab3 = st.tabs(["📝 Linee Guida", "🚗 Vie di Fuga", "🏥 Punti di Soccorso"])
+    tab1, tab2, tab3 = st.tabs(["📝 Linee Guida", "🚗 Vie di Fuga", "🏥 Punti di Soccorso"])
     
-    with tab:
+    with tab1:
         show_emergency_guidelines()
         
     with tab2:
@@ -99,9 +99,9 @@ def show_emergency_guidelines():
     
     # Official sources
     st.subheader("Fonti ufficiali")
-    col, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
     
-    with col:
+    with col1:
         st.markdown("[Protezione Civile](https://www.protezionecivile.gov.it/it/rischio/rischio-sismico)")
     with col2:
         st.markdown("[INGV](https://www.ingv.it/)")
@@ -113,9 +113,9 @@ def show_evacuation_routes():
     st.subheader("Vie di Fuga e Zone di Evacuazione")
     
     # Create tabs for different areas
-    area_tab, area_tab2 = st.tabs(["🌋 Area Vesuvio", "🔥 Campi Flegrei"])
+    area_tab1, area_tab2 = st.tabs(["🌋 Area Vesuvio", "🔥 Campi Flegrei"])
     
-    with area_tab:
+    with area_tab1:
         st.markdown("""
         ### Piano di evacuazione del Vesuvio
         
@@ -129,12 +129,12 @@ def show_evacuation_routes():
         """)
         
         # Show Vesuvio evacuation map
-        vesuvio_map = folium.Map(location=[40.82, 4.42], zoom_start=, tiles="CartoDB positron")
+        vesuvio_map = folium.Map(location=[40.82, 14.42], zoom_start=11, tiles="CartoDB positron")
         
         # Add zone colored overlays
         folium.Circle(
-            location=[40.85, 4.428],  # Mt. Vesuvius center
-            radius=0000,  # Red zone radius (0km)
+            location=[40.815, 14.428],  # Mt. Vesuvius center
+            radius=10000,  # Red zone radius (10km)
             color='red',
             fill=True,
             fill_opacity=0.2,
@@ -142,19 +142,19 @@ def show_evacuation_routes():
         ).add_to(vesuvio_map)
         
         folium.Circle(
-            location=[40.85, 4.428],  # Mt. Vesuvius center
-            radius=5000,  # Yellow zone radius (5km)
+            location=[40.815, 14.428],  # Mt. Vesuvius center
+            radius=15000,  # Yellow zone radius (15km)
             color='yellow',
             fill=True,
-            fill_opacity=0.,
+            fill_opacity=0.1,
             popup="Zona Gialla - Possibile caduta ceneri"
         ).add_to(vesuvio_map)
         
         # Main evacuation routes
         routes = [
-            {"name": "A3 Napoli-Salerno", "coords": [[40.85, 4.27], [40.65, 4.47]]},
-            {"name": "A6 Napoli-Canosa", "coords": [[40.9, 4.32], [4.05, 4.55]]},
-            {"name": "SS268", "coords": [[40.8, 4.34], [40.79, 4.50]]}
+            {"name": "A3 Napoli-Salerno", "coords": [[40.85, 14.27], [40.65, 14.47]]},
+            {"name": "A16 Napoli-Canosa", "coords": [[40.91, 14.32], [41.05, 14.55]]},
+            {"name": "SS268", "coords": [[40.81, 14.34], [40.79, 14.50]]}
         ]
         
         for route in routes:
@@ -168,11 +168,11 @@ def show_evacuation_routes():
         
         # Meeting points
         meeting_points = [
-            {"name": "Punto di Raccolta Torre del Greco", "location": [40.78, 4.37]},
-            {"name": "Punto di Raccolta Portici", "location": [40.82, 4.35]},
-            {"name": "Punto di Raccolta Ercolano", "location": [40.80, 4.36]},
-            {"name": "Punto di Raccolta San Giorgio", "location": [40.83, 4.33]},
-            {"name": "Punto di Raccolta Somma Vesuviana", "location": [40.87, 4.43]}
+            {"name": "Punto di Raccolta Torre del Greco", "location": [40.78, 14.37]},
+            {"name": "Punto di Raccolta Portici", "location": [40.82, 14.35]},
+            {"name": "Punto di Raccolta Ercolano", "location": [40.80, 14.36]},
+            {"name": "Punto di Raccolta San Giorgio", "location": [40.83, 14.33]},
+            {"name": "Punto di Raccolta Somma Vesuviana", "location": [40.87, 14.43]}
         ]
         
         for point in meeting_points:
@@ -187,7 +187,7 @@ def show_evacuation_routes():
         st.markdown("""
         ### Fasi dell'evacuazione
         
-        . **Fase di attenzione**: aumento dell'attività vulcanica, potenziamento del monitoraggio
+        1. **Fase di attenzione**: aumento dell'attività vulcanica, potenziamento del monitoraggio
         2. **Fase di preallarme**: ulteriore intensificazione dei fenomeni, evacuazione preventiva di ospedali e case di cura
         3. **Fase di allarme**: imminente eruzione, evacuazione completa della zona rossa
         
@@ -213,11 +213,11 @@ def show_evacuation_routes():
         """)
         
         # Show Campi Flegrei evacuation map
-        flegrei_map = folium.Map(location=[40.85, 4.4], zoom_start=, tiles="CartoDB positron")
+        flegrei_map = folium.Map(location=[40.85, 14.14], zoom_start=11, tiles="CartoDB positron")
         
         # Add zone colored overlays
         folium.Circle(
-            location=[40.83, 4.4],  # Solfatara center
+            location=[40.83, 14.14],  # Solfatara center
             radius=8000,  # Red zone radius (8km)
             color='red',
             fill=True,
@@ -226,19 +226,19 @@ def show_evacuation_routes():
         ).add_to(flegrei_map)
         
         folium.Circle(
-            location=[40.83, 4.4],  # Solfatara center
-            radius=2000,  # Yellow zone radius (2km)
+            location=[40.83, 14.14],  # Solfatara center
+            radius=12000,  # Yellow zone radius (12km)
             color='yellow',
             fill=True,
-            fill_opacity=0.,
+            fill_opacity=0.1,
             popup="Zona Gialla - Possibile caduta ceneri"
         ).add_to(flegrei_map)
         
         # Main evacuation routes
         routes = [
-            {"name": "Tangenziale di Napoli", "coords": [[40.85, 4.7], [40.88, 4.25]]},
-            {"name": "Via Domitiana", "coords": [[40.82, 4.05], [40.92, 3.95]]},
-            {"name": "SS7 Via Appia", "coords": [[40.83, 4.2], [40.9, 4.03]]}
+            {"name": "Tangenziale di Napoli", "coords": [[40.85, 14.17], [40.88, 14.25]]},
+            {"name": "Via Domitiana", "coords": [[40.82, 14.05], [40.92, 13.95]]},
+            {"name": "SS7 Via Appia", "coords": [[40.83, 14.12], [40.91, 14.03]]}
         ]
         
         for route in routes:
@@ -252,11 +252,11 @@ def show_evacuation_routes():
         
         # Meeting points
         meeting_points = [
-            {"name": "Punto di Raccolta Pozzuoli", "location": [40.83, 4.]},
-            {"name": "Punto di Raccolta Bacoli", "location": [40.80, 4.07]},
-            {"name": "Punto di Raccolta Monte di Procida", "location": [40.79, 4.05]},
-            {"name": "Punto di Raccolta Quarto", "location": [40.87, 4.5]},
-            {"name": "Punto di Raccolta Bagnoli", "location": [40.8, 4.7]}
+            {"name": "Punto di Raccolta Pozzuoli", "location": [40.83, 14.11]},
+            {"name": "Punto di Raccolta Bacoli", "location": [40.80, 14.07]},
+            {"name": "Punto di Raccolta Monte di Procida", "location": [40.79, 14.05]},
+            {"name": "Punto di Raccolta Quarto", "location": [40.87, 14.15]},
+            {"name": "Punto di Raccolta Bagnoli", "location": [40.81, 14.17]}
         ]
         
         for point in meeting_points:
@@ -291,20 +291,20 @@ def show_emergency_centers():
     st.subheader("Punti di Soccorso e Centri Operativi")
     
     # Create tabs for different areas
-    area_tab, area_tab2 = st.tabs(["🌋 Area Vesuvio", "🔥 Campi Flegrei"])
+    area_tab1, area_tab2 = st.tabs(["🌋 Area Vesuvio", "🔥 Campi Flegrei"])
     
-    with area_tab:
+    with area_tab1:
         # Show Vesuvio emergency centers map
-        vesuvio_em_map = folium.Map(location=[40.82, 4.42], zoom_start=, tiles="CartoDB positron")
+        vesuvio_em_map = folium.Map(location=[40.82, 14.42], zoom_start=11, tiles="CartoDB positron")
         
         # Add emergency centers
         emergency_centers = [
-            {"name": "Ospedale del Mare", "location": [40.86, 4.34], "type": "Ospedale"},
-            {"name": "Ospedale Maresca", "location": [40.78, 4.37], "type": "Ospedale"},
-            {"name": "COC Torre del Greco", "location": [40.78, 4.36], "type": "Centro Operativo"},
-            {"name": "COC Ercolano", "location": [40.80, 4.35], "type": "Centro Operativo"},
-            {"name": "COC Portici", "location": [40.82, 4.34], "type": "Centro Operativo"},
-            {"name": "Protezione Civile Regionale", "location": [40.84, 4.30], "type": "Protezione Civile"}
+            {"name": "Ospedale del Mare", "location": [40.86, 14.34], "type": "Ospedale"},
+            {"name": "Ospedale Maresca", "location": [40.78, 14.37], "type": "Ospedale"},
+            {"name": "COC Torre del Greco", "location": [40.78, 14.36], "type": "Centro Operativo"},
+            {"name": "COC Ercolano", "location": [40.80, 14.35], "type": "Centro Operativo"},
+            {"name": "COC Portici", "location": [40.82, 14.34], "type": "Centro Operativo"},
+            {"name": "Protezione Civile Regionale", "location": [40.84, 14.30], "type": "Protezione Civile"}
         ]
         
         for center in emergency_centers:
@@ -323,11 +323,11 @@ def show_emergency_centers():
         st.subheader("Contatti di emergenza")
         
         emergency_contacts = {
-            "Numero Unico Emergenze": "2",
+            "Numero Unico Emergenze": "112",
             "Protezione Civile Regionale": "800 232525",
-            "INGV - Osservatorio Vesuviano": "08 608",
-            "Prefettura di Napoli": "08 7943",
-            "Croce Rossa Italiana": "800 06550"
+            "INGV - Osservatorio Vesuviano": "081 6108111",
+            "Prefettura di Napoli": "081 7943111",
+            "Croce Rossa Italiana": "800 065510"
         }
         
         # Display contacts as a table
@@ -336,16 +336,16 @@ def show_emergency_centers():
     
     with area_tab2:
         # Show Campi Flegrei emergency centers map
-        flegrei_em_map = folium.Map(location=[40.85, 4.4], zoom_start=, tiles="CartoDB positron")
+        flegrei_em_map = folium.Map(location=[40.85, 14.14], zoom_start=11, tiles="CartoDB positron")
         
         # Add emergency centers
         emergency_centers = [
-            {"name": "Ospedale Santa Maria delle Grazie", "location": [40.83, 4.0], "type": "Ospedale"},
-            {"name": "Ospedale San Paolo", "location": [40.84, 4.9], "type": "Ospedale"},
-            {"name": "COC Pozzuoli", "location": [40.82, 4.2], "type": "Centro Operativo"},
-            {"name": "COC Bacoli", "location": [40.80, 4.08], "type": "Centro Operativo"},
-            {"name": "COC Quarto", "location": [40.87, 4.5], "type": "Centro Operativo"},
-            {"name": "Protezione Civile Regionale", "location": [40.84, 4.30], "type": "Protezione Civile"}
+            {"name": "Ospedale Santa Maria delle Grazie", "location": [40.83, 14.10], "type": "Ospedale"},
+            {"name": "Ospedale San Paolo", "location": [40.84, 14.19], "type": "Ospedale"},
+            {"name": "COC Pozzuoli", "location": [40.82, 14.12], "type": "Centro Operativo"},
+            {"name": "COC Bacoli", "location": [40.80, 14.08], "type": "Centro Operativo"},
+            {"name": "COC Quarto", "location": [40.87, 14.15], "type": "Centro Operativo"},
+            {"name": "Protezione Civile Regionale", "location": [40.84, 14.30], "type": "Protezione Civile"}
         ]
         
         for center in emergency_centers:
@@ -364,12 +364,12 @@ def show_emergency_centers():
         st.subheader("Contatti di emergenza")
         
         emergency_contacts = {
-            "Numero Unico Emergenze": "2",
+            "Numero Unico Emergenze": "112",
             "Protezione Civile Regionale": "800 232525",
-            "INGV - Osservatorio Vesuviano": "08 608",
-            "Osservatorio del Bradisismo": "08 85577",
-            "Prefettura di Napoli": "08 7943",
-            "Croce Rossa Italiana": "800 06550"
+            "INGV - Osservatorio Vesuviano": "081 6108111",
+            "Osservatorio del Bradisismo": "081 8551177",
+            "Prefettura di Napoli": "081 7943111",
+            "Croce Rossa Italiana": "800 065510"
         }
         
         # Display contacts as a table

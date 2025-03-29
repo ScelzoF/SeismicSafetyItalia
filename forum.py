@@ -1,6 +1,6 @@
 
 import streamlit as st
-from supabase_utils import inserisci_post, carica_post, inserisci_segnalazione, carica_segnalazioni
+from supabase_utils import inserisci_post, carica_post, inserisci_segnalazione, carica_
 
 # Filtro AI semplice per contenuti inappropriati
 PAROLE_VIETATE = ["parolaccia", "insulto", "spam", "offesa", "bestemmia"]
@@ -15,9 +15,9 @@ def è_contenuto_accettabile(testo):
     return True
 
 def main():
-    st.title("🗣️ Post &  della Comunità")
+    st.title("🗣️ Forum della Comunità")
 
-    tab1, tab2, tab3 = st.tabs(["📢 Forum", "", "🔗 Riferimenti"])
+    tab1, tab2, tab3 = st.tabs(["📢 Forum", "🚨 Segnalazioni", "🔗 Riferimenti"])
 
     with tab1:
         with st.form("nuovo_post"):
@@ -60,14 +60,14 @@ def main():
                     st.success(messaggio) if successo else st.error(messaggio)
 
         st.divider()
-        st.subheader("📒 Storico segnalazioni")
+        st.subheader("📒 Storico ")
 
-        segnalazioni = carica_segnalazioni()
-        segnalazioni_valide = [s for s in segnalazioni if è_contenuto_accettabile(s.get("contenuto", ""))]
+         = carica_()
+        _valide = [s for s in  if è_contenuto_accettabile(s.get("contenuto", ""))]
 
-        if segnalazioni_valide:
+        if _valide:
             blocco = ""
-            for s in reversed(segnalazioni_valide):
+            for s in reversed(_valide):
                 blocco += f"👤 <strong>{s['username']}</strong> <small>({s.get('data', '')[:16]})</small><br>{s['contenuto']}<br><br>"
             st.markdown(f"<div style='padding: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #fdf2e9;'>{blocco}</div>", unsafe_allow_html=True)
         else:

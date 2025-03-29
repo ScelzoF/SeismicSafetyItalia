@@ -9,20 +9,20 @@ def show():
     st.markdown("In questa sezione trovi informazioni **utili e reali** in caso di emergenza sismica, alluvione o altro evento critico.")
 
     st.subheader("📍 Punti di raccolta e aree sicure")
-    m = folium.Map(location=[4.9028, 2.4964], zoom_start=6)
+    m = folium.Map(location=[41.9028, 12.4964], zoom_start=6)
     points = [
-        {"name": "Protezione Civile Roma", "lat": 4.928, "lon": 2.566},
-        {"name": "Punto raccolta Napoli", "lat": 40.858, "lon": 4.268},
-        {"name": "Punto raccolta Catania", "lat": 37.5079, "lon": 5.0830},
+        {"name": "Protezione Civile Roma", "lat": 41.928, "lon": 12.566},
+        {"name": "Punto raccolta Napoli", "lat": 40.8518, "lon": 14.2681},
+        {"name": "Punto raccolta Catania", "lat": 37.5079, "lon": 15.0830},
     ]
     for p in points:
         folium.Marker(location=[p["lat"], p["lon"]], popup=p["name"], icon=folium.Icon(color="red")).add_to(m)
     st_data = st_folium(m, width=700, height=450)
 
     st.markdown("""
-- **2** - Numero Unico Emergenze
-- **5** - Vigili del Fuoco
-- **8** - Emergenza Sanitaria
+- **112** - Numero Unico Emergenze
+- **115** - Vigili del Fuoco
+- **118** - Emergenza Sanitaria
 - **800 840 840** - Protezione Civile Nazionale
     """)
 
@@ -237,21 +237,21 @@ Vibo Valentia: Piazza Municipio, Parco Urbano""",
     elif evento == "Numeri utili":
         st.subheader("📞 Numeri di Emergenza")
         st.markdown("""\
-- **2** – Numero unico di emergenza
-- **8** – Emergenza sanitaria
-- **5** – Vigili del Fuoco
-- **3** – Polizia
-- **55** – Emergenze ambientali (Corpo Forestale)
-- **522** – Antiviolenza e stalking
+- **112** – Numero unico di emergenza
+- **118** – Emergenza sanitaria
+- **115** – Vigili del Fuoco
+- **113** – Polizia
+- **1515** – Emergenze ambientali (Corpo Forestale)
+- **1522** – Antiviolenza e stalking
 - **800 840 840** – Protezione Civile
-- **800 86 06** – Centro Antiveleni
+- **800 861 016** – Centro Antiveleni
 """)
 
 
     elif evento == "Incendio":
         st.markdown("""🔥 **Cosa fare in caso di incendio:**
 - Allontanati rapidamente dalla zona
-- Avvisa i soccorsi (5)
+- Avvisa i soccorsi (115)
 - Tieni un panno bagnato su naso e bocca se c'è fumo
 - Chiudi le porte dietro di te per rallentare la diffusione del fuoco
 
@@ -263,7 +263,7 @@ Vibo Valentia: Piazza Municipio, Parco Urbano""",
         st.subheader("🔥 Cosa fare in caso di INCENDIO")
         st.markdown("- Allontanarsi immediatamente dalla zona dell’incendio")
         st.markdown("- Coprire naso e bocca con un panno umido")
-        st.markdown("- Segnalare l’incendio al 5")
+        st.markdown("- Segnalare l’incendio al 115")
         st.markdown("#### ❌ Cosa NON fare")
         st.markdown("- Non tentare di spegnere incendi estesi da soli")
         st.markdown("- Non intralciare le vie di fuga")
@@ -324,7 +324,7 @@ Vibo Valentia: Piazza Municipio, Parco Urbano""",
     elif evento == "Emergenza sanitaria":
         st.markdown("""🏥 **Cosa fare in caso di emergenza sanitaria:**
 - Segui le direttive delle autorità sanitarie
-- Se hai sintomi gravi, chiama il numero di emergenza 8
+- Se hai sintomi gravi, chiama il numero di emergenza 118
 - Se possibile, evita di sovraffollare ospedali e pronto soccorso per casi non urgenti
 
 🚫 **Cosa NON fare:**

@@ -41,7 +41,7 @@ def invia_segnalazione(localita, tipo_evento, intensita, descrizione):
         "descrizione": descrizione
     }
     response = requests.post(
-        f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto",
+        f"{SUPABASE_URL}/rest/v1/_altro_progetto",
         headers=SUPABASE_HEADERS,
         json=data
     )
@@ -57,15 +57,15 @@ def inserisci_segnalazione(username, contenuto):
             "username": username or "Anonimo",
             "contenuto": contenuto,
         }
-        res = requests.post(f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto", json=data, headers=HEADERS)
+        res = requests.post(f"{SUPABASE_URL}/rest/v1/_altro_progetto", json=data, headers=HEADERS)
         res.raise_for_status()
         return True, "✅ Segnalazione inviata con successo."
     except Exception as e:
         return False, f"Errore invio segnalazione: {e}"
 
-def carica_segnalazioni():
+def carica_():
     try:
-        res = requests.get(f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto?select=*", headers=HEADERS)
+        res = requests.get(f"{SUPABASE_URL}/rest/v1/_altro_progetto?select=*", headers=HEADERS)
         res.raise_for_status()
         return res.json()
     except Exception as e:
