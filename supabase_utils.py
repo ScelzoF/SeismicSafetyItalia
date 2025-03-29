@@ -1,4 +1,5 @@
 import requests
+from datetime import datetime
 
 SUPABASE_URL = "https://ljrjaehrttxhqejcueqj.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqcmphZWhydHR4aHFlamN1ZXFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMxODU4OTcsImV4cCI6MjA1ODc2MTg5N30.wfbzum88wn0b0OVw6WlMunOWvLvnfIjqnRyGeEQLghY"
@@ -33,19 +34,26 @@ def carica_post():
     return []
 
 def invia_segnalazione(localita, tipo_evento, intensita, descrizione):
+    # Impostiamo la data corrente per il campo "data" nel formato timestamp ISO
+    data_corrente = datetime.now().isoformat()  # formato timestamp ISO
+
     data = {
         "localita": localita,
         "tipo_evento": tipo_evento,
         "intensita": intensita,
-        "descrizione": descrizione
+        "descrizione": descrizione,
+        "data": data_corrente  # aggiungiamo la data
     }
+
     response = requests.post(
         f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto",
         headers=SUPABASE_HEADERS,
         json=data
     )
+
     if response.status_code != 201:
         return False, f"Errore {response.status_code}: {response.text}"
+    
     return True, "Segnalazione inviata con successo"
 
 def inserisci_segnalazione(username, contenuto):
