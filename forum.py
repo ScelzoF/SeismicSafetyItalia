@@ -1,6 +1,6 @@
 
 import streamlit as st
-from supabase_utils import inserisci_post, carica_post, inserisci_segnalazione, carica_segnalazioni
+from supabase_utils import inserisci_post, carica_post  # Only keep the relevant imports
 
 # Filtro AI semplice per contenuti inappropriati
 PAROLE_VIETATE = ["parolaccia", "insulto", "spam", "offesa", "bestemmia"]
