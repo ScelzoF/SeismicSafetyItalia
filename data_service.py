@@ -9,7 +9,7 @@ import json
 INGV_API_URL = "https://webservices.ingv.it/fdsnws/event//query"
 
 # USGS API endpoint for worldwide earthquakes
-USGS_API_URL = "https://earthquake.usgs.gov/fdsnws/event//query"
+USGS_API_URL = "httpsps://earthquake.usgs.gov/fdsnws/event//query"
 
 # Function to fetch earthquake data from INGV (Italian Geological Service)
 def fetch_ingv_data():
