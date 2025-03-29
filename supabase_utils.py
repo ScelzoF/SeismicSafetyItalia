@@ -34,13 +34,17 @@ def carica_post():
     return []
 
 def invia_segnalazione(localita, tipo_evento, intensita, descrizione):
+    # Verifica che intensita sia un intero
+    if not isinstance(intensita, int):
+        return False, "Errore: il campo 'intensita' deve essere un numero intero."
+
     # Impostiamo la data corrente per il campo "data" nel formato timestamp ISO
     data_corrente = datetime.now().isoformat()  # formato timestamp ISO
 
     data = {
         "localita": localita,
         "tipo_evento": tipo_evento,
-        "intensita": intensita,
+        "intensita": intensita,  # intensita deve essere un intero
         "descrizione": descrizione,
         "data": data_corrente  # aggiungiamo la data
     }
