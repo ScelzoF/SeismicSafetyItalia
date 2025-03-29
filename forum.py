@@ -17,8 +17,8 @@ def è_contenuto_accettabile(testo):
 def main():
     st.title("🗣️ Forum della Comunità")
 
-    tab1, tab2, # Hidden Tab
-    # with tab2:  # Commenting out the segnalazioni tab to hide it
+    tab1, tab2,  # Hidden Tab
+    # with tab2:  # Commented out Segnalazioni tab to hide it
     # st.subheader("Segnalazioni e Testimonianze")
     # ... tab3 = st.tabs(["📢 Forum", "🚨 Segnalazioni", "🔗 Riferimenti"])
 
