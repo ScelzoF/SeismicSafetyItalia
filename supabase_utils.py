@@ -1,5 +1,5 @@
+
 import requests
-from datetime import datetime
 
 SUPABASE_URL = "https://ljrjaehrttxhqejcueqj.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxqcmphZWhydHR4aHFlamN1ZXFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMxODU4OTcsImV4cCI6MjA1ODc2MTg5N30.wfbzum88wn0b0OVw6WlMunOWvLvnfIjqnRyGeEQLghY"
@@ -34,31 +34,22 @@ def carica_post():
     return []
 
 def invia_segnalazione(localita, tipo_evento, intensita, descrizione):
-    # Verifica che intensita sia un intero
-    if not isinstance(intensita, int):
-        return False, "Errore: il campo 'intensita' deve essere un numero intero."
-
-    # Impostiamo la data corrente per il campo "data" nel formato timestamp ISO
-    data_corrente = datetime.now().isoformat()  # formato timestamp ISO
-
     data = {
         "localita": localita,
         "tipo_evento": tipo_evento,
-        "intensita": intensita,  # intensita deve essere un intero
-        "descrizione": descrizione,
-        "data": data_corrente  # aggiungiamo la data
+        "intensita": intensita,
+        "descrizione": descrizione
     }
-
     response = requests.post(
-        f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto",
+        f"{SUPABASE_URL}/rest/v1/_altro_progetto",
         headers=SUPABASE_HEADERS,
         json=data
     )
-
     if response.status_code != 201:
         return False, f"Errore {response.status_code}: {response.text}"
-    
     return True, "Segnalazione inviata con successo"
+
+
 
 def inserisci_segnalazione(username, contenuto):
     try:
@@ -66,15 +57,15 @@ def inserisci_segnalazione(username, contenuto):
             "username": username or "Anonimo",
             "contenuto": contenuto,
         }
-        res = requests.post(f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto", json=data, headers=SUPABASE_HEADERS)
+        res = requests.post(f"{SUPABASE_URL}/rest/v1/_altro_progetto", json=data, headers=HEADERS)
         res.raise_for_status()
         return True, "✅ Segnalazione inviata con successo."
     except Exception as e:
         return False, f"Errore invio segnalazione: {e}"
 
-def carica_segnalazioni():
+def carica_():
     try:
-        res = requests.get(f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto?select=*", headers=SUPABASE_HEADERS)
+        res = requests.get(f"{SUPABASE_URL}/rest/v1/_altro_progetto?select=*", headers=HEADERS)
         res.raise_for_status()
         return res.json()
     except Exception as e:

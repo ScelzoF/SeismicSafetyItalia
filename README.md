@@ -6,7 +6,7 @@ Piattaforma interattiva basata su Streamlit per il monitoraggio sismico in tempo
 
 - Visualizzazione dati sismici aggiornati
 - Previsioni e gestione emergenze
-- Sezione community e segnalazioni
+- Sezione community e post
 - Sistema modulare ed espandibile
 
 ## ▶️ Avvio in locale
