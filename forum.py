@@ -15,9 +15,9 @@ def è_contenuto_accettabile(testo):
     return True
 
 def main():
-    st.title("🗣️ Post & Segnalazioni della Comunità")
+    st.title("🗣️ Post &  della Comunità")
 
-    tab1, tab2, tab3 = st.tabs(["📢 Forum", "🚨 Segnalazioni", "🔗 Riferimenti"])
+    tab1, tab2, tab3 = st.tabs(["📢 Forum", "", "🔗 Riferimenti"])
 
     with tab1:
         with st.form("nuovo_post"):
