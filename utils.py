@@ -41,7 +41,7 @@ def show_about_page(get_text):
     
     ### Contatti
     
-    Per , feedback o richieste di supporto, è possibile contattare lo sviluppatore, nella persona di Fabio SCELZO, all'indirizzo email: meteotorre@gmail.com
+    Per segnalazioni, feedback o richieste di supporto, è possibile contattare lo sviluppatore, nella persona di Fabio SCELZO, all'indirizzo email: meteotorre@gmail.com
     """)
     
     # Show info about data refresh
