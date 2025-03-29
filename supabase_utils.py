@@ -70,3 +70,25 @@ def carica_segnalazioni():
         return res.json()
     except Exception as e:
         return []
+
+def inserisci_segnalazione(localita, tipo_evento, ora_evento, data_evento, intensita, descrizione):
+    # Prepare the data to send to Supabase
+    data = {
+        "localita": localita,
+        "tipo_evento": tipo_evento,
+        "ora_evento": str(ora_evento),
+        "data_evento": str(data_evento),
+        "intensita": intensita,
+        "descrizione": descrizione
+    }
+    
+    response = requests.post(
+        f"{SUPABASE_URL}/rest/v1/segnalazioni_altro_progetto",
+        headers=SUPABASE_HEADERS,
+        json=data
+    )
+    
+    if response.status_code != 201:
+        return False, f"Errore {response.status_code}: {response.text}"
+    
+    return True, "Segnalazione inviata con successo."
