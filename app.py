@@ -17,8 +17,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://github.com/ScelzoF/SeismicSafetyItalia/issues',
-        'Report a bug': 'https://github.com/ScelzoF/SeismicSafetyItalia/issues',
         'About': '### Monitoraggio Sismico - Campania\nSviluppato da Fabio SCELZO'
     }
 )
@@ -125,10 +123,17 @@ with st.sidebar:
     # Data source attribution
     st.caption(get_text('data_source'))
     
-    # Sezione donazione PayPal
+    # Sezione donazione PayPal abbellita
     st.markdown("---")
-    st.markdown("### 💖 Supporta il progetto")
-    st.markdown("[☕ Fai una donazione su PayPal](https://www.paypal.com/donate/?business=meteotorre@gmail.com)")
+    st.markdown("""
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 5px solid #0070ba;">
+        <h3 style="color: #0070ba; margin-top: 0;">💖 Sostieni il Progetto</h3>
+        <p style="margin-bottom: 10px;">Se trovi utile questa applicazione, considera una piccola donazione per mantenere il servizio attivo e migliorarlo costantemente.</p>
+        <a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" style="display: inline-block; background-color: #0070ba; color: white; padding: 8px 15px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+            ☕ Offrimi un caffè su PayPal
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Main content area
 st.title("🌋 " + get_text('title'))
@@ -153,7 +158,76 @@ elif page == "emergency":
 elif page == "community":
     forum.main()
 elif page == "about":
-    utils.show_about_page(get_text)
+    # Modifica qui per la sezione about
+    st.header("ℹ️ Informazioni sul Progetto")
+    
+    st.subheader("🌋 Monitoraggio Sismico - Campania")
+    st.markdown("""
+    Un'applicazione per il monitoraggio in tempo reale dell'attività sismica nella regione Campania, 
+    con particolare attenzione alle aree del Vesuvio e dei Campi Flegrei.
+    """)
+    
+    st.markdown("---")
+    
+    # Sezione sullo sviluppatore
+    st.subheader("👨‍💻 Lo Sviluppatore")
+    
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        # Placeholder per un'eventuale foto
+        st.markdown("![Fabio Scelzo](https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y)")
+    
+    with col2:
+        st.markdown("""
+        ### Fabio Scelzo
+        
+        Nato nel 1973, Fabio ha coltivato sin dall'infanzia una profonda passione per l'elettronica e l'informatica, 
+        che è rimasta costante attraverso gli anni, evolvendo insieme alle tecnologie.
+        
+        Esperto di sviluppo software e appassionato di monitoraggio ambientale, ha creato questa piattaforma per 
+        fornire uno strumento utile alla comunità, combinando competenze tecniche e interesse per il territorio.
+        
+        Attualmente vive a **Torre Annunziata**, una città ricca di storia e tradizioni nella provincia di Napoli.
+        """)
+    
+    st.markdown("---")
+    
+    # Sezione su Torre Annunziata
+    st.subheader("🏙️ Torre Annunziata: Una Città tra Storia e Mare")
+    
+    st.markdown("""
+    **Torre Annunziata** è una pittoresca città costiera situata ai piedi del Vesuvio, affacciata sul suggestivo Golfo di Napoli. 
+    Con una storia che affonda le radici nell'antica Roma, la città conserva ancora i resti dell'antica *Oplontis*, una delle ville suburbane 
+    sepolte dall'eruzione del Vesuvio nel 79 d.C. e oggi patrimonio UNESCO insieme a Pompei ed Ercolano.
+    
+    ### Tradizione e Industria
+    
+    La città è rinomata per la sua storica tradizione nella produzione della pasta. I pastifici di Torre Annunziata, 
+    favoriti dalle pure acque sorgive provenienti dal Sarno e dal particolare microclima, hanno rappresentato per secoli un'eccellenza mondiale. 
+    L'arte della pasta trova qui uno dei suoi luoghi d'origine, con tecniche tramandate di generazione in generazione.
+    
+    ### Mare e Territorio
+    
+    Con le sue spiagge di sabbia nera vulcanica, Torre Annunziata offre un paesaggio unico dove il blu del mare incontra 
+    la maestosità del Vesuvio. Il lungomare, recentemente riqualificato, è diventato un punto di ritrovo per residenti e turisti.
+    
+    ### Cultura e Sport
+    
+    Nel panorama sportivo, la città è rappresentata con orgoglio dal **Savoia Calcio**, storica squadra fondata nel 1908, che ha vissuto 
+    momenti di gloria nel calcio italiano. I colori bianco e nero della squadra sono un simbolo identitario forte per la comunità locale.
+    
+    La città vanta inoltre un ricco patrimonio culturale, con manifestazioni folkloristiche che tramandano tradizioni secolari, 
+    e una gastronomia che rispecchia la migliore tradizione culinaria campana.
+    """)
+    
+    st.markdown("---")
+    
+    st.markdown("""
+    ### Contatti
+    
+    📧 Email: meteotorre@gmail.com
+    """)
 
 # Check for significant earthquakes and show alert if notifications are enabled
 if st.session_state.notification_enabled and st.session_state.earthquake_data is not None:
