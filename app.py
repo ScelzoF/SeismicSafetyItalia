@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+import base64
 
 import data_service
 import visualization
@@ -79,7 +80,16 @@ translations = {
         'temp': 'Temperatura',
         'humidity': 'Umidità',
         'wind': 'Vento',
-        'condition': 'Condizione'
+        'condition': 'Condizione',
+        'feels_like': 'Percepita',
+        'pressure': 'Pressione',
+        'rain': 'Precipitazioni',
+        'clouds': 'Nuvolosità',
+        'sunrise': 'Alba',
+        'sunset': 'Tramonto',
+        'forecast_title': 'Previsioni per i prossimi giorni',
+        'max_temp': 'Max',
+        'min_temp': 'Min'
     }
 }
 
@@ -87,49 +97,80 @@ translations = {
 def get_text(key):
     return translations[st.session_state.language][key]
 
-# Funzione per ottenere dati meteo aggiornati da ilMeteo.it (esempio con HTML parsing)
+# Funzione per ottenere dati meteo da OpenWeather API
 def fetch_weather_data():
     try:
-        # Puoi sostituire questa URL con la località specifica di Torre Annunziata
-        url = "https://www.ilmeteo.it/meteo/Torre-Annunziata"
-        response = requests.get(url)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
+        # Configurazione OpenWeather
+        API_KEY = "d23fb9868855e4bcf4dcf04404d14a78"
+        CITY = "Torre Annunziata"  # Puoi cambiare con qualsiasi città
+        COUNTRY_CODE = "IT"
+        LANG = "it"  # Lingua italiana per le descrizioni
+        
+        # Richiesta dati meteo attuali
+        current_url = f"https://api.openweathermap.org/data/2.5/weather?q={CITY},{COUNTRY_CODE}&appid={API_KEY}&units=metric&lang={LANG}"
+        response = requests.get(current_url)
+        
+        if response.status_code != 200:
+            st.error(f"Errore API OpenWeather: {response.status_code}")
+            return None
             
-            # Questi selettori dovrebbero essere aggiornati in base alla struttura del sito
-            current_temp = soup.select_one('.valoreTemp')
-            current_condition = soup.select_one('.condizione')
-            humidity = soup.select_one('.umidita')
-            wind = soup.select_one('.vento')
+        current_data = response.json()
+        
+        # Formattazione dati attuali
+        current = {
+            'temp': f"{current_data['main']['temp']:.1f}°C",
+            'feels_like': f"{current_data['main']['feels_like']:.1f}°C",
+            'humidity': f"{current_data['main']['humidity']}%",
+            'pressure': f"{current_data['main']['pressure']} hPa",
+            'wind': f"{current_data['wind']['speed']} m/s",
+            'condition': current_data['weather'][0]['description'].capitalize(),
+            'icon': current_data['weather'][0]['icon'],
+            'clouds': f"{current_data['clouds']['all']}%",
+            'sunrise': datetime.fromtimestamp(current_data['sys']['sunrise']).strftime('%H:%M'),
+            'sunset': datetime.fromtimestamp(current_data['sys']['sunset']).strftime('%H:%M')
+        }
+        
+        # Richiesta previsioni per 5 giorni
+        forecast_url = f"https://api.openweathermap.org/data/2.5/forecast?q={CITY},{COUNTRY_CODE}&appid={API_KEY}&units=metric&lang={LANG}"
+        forecast_response = requests.get(forecast_url)
+        
+        if forecast_response.status_code != 200:
+            st.error(f"Errore API OpenWeather Forecast: {forecast_response.status_code}")
+            return {'current': current, 'forecast': []}
             
-            # Previsioni per i prossimi giorni (esempio)
-            forecast_days = soup.select('.boxprevisione')
-            forecast = []
+        forecast_data = forecast_response.json()
+        
+        # Estrai dati per i prossimi giorni (uno per giorno, non ogni 3 ore)
+        forecast = []
+        days_processed = set()
+        
+        for item in forecast_data['list']:
+            date = datetime.fromtimestamp(item['dt'])
+            day_str = date.strftime('%Y-%m-%d')
             
-            for day in forecast_days[:3]:  # Prendi solo i primi 3 giorni
-                day_name = day.select_one('.giorno')
-                max_temp = day.select_one('.temp-max')
-                min_temp = day.select_one('.temp-min')
-                day_condition = day.select_one('.condizione')
+            # Prendi solo un item per giorno (mezzogiorno)
+            if day_str not in days_processed and date.hour >= 12 and date.hour <= 15:
+                days_processed.add(day_str)
                 
-                if day_name and max_temp and min_temp and day_condition:
-                    forecast.append({
-                        'day': day_name.text.strip(),
-                        'max_temp': max_temp.text.strip(),
-                        'min_temp': min_temp.text.strip(),
-                        'condition': day_condition.text.strip()
-                    })
-            
-            return {
-                'current': {
-                    'temp': current_temp.text.strip() if current_temp else "N/A",
-                    'condition': current_condition.text.strip() if current_condition else "N/A",
-                    'humidity': humidity.text.strip() if humidity else "N/A",
-                    'wind': wind.text.strip() if wind else "N/A"
-                },
-                'forecast': forecast
-            }
-        return None
+                # Se abbiamo già 5 giorni, fermiamoci
+                if len(forecast) >= 5:
+                    break
+                    
+                forecast.append({
+                    'day': date.strftime('%A'),  # Nome del giorno
+                    'date': date.strftime('%d/%m'),
+                    'max_temp': f"{item['main']['temp_max']:.1f}°C",
+                    'min_temp': f"{item['main']['temp_min']:.1f}°C",
+                    'condition': item['weather'][0]['description'].capitalize(),
+                    'icon': item['weather'][0]['icon'],
+                    'humidity': f"{item['main']['humidity']}%",
+                    'wind': f"{item['wind']['speed']} m/s"
+                })
+        
+        return {
+            'current': current,
+            'forecast': forecast
+        }
     except Exception as e:
         st.error(f"Errore nel recupero dei dati meteo: {e}")
         return None
@@ -232,35 +273,70 @@ if page == "monitoring":
     if st.session_state.weather_data:
         current = st.session_state.weather_data['current']
         
+        # Container con stile per il meteo attuale
+        st.markdown("""
+        <div style="background-color: #f0f8ff; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+            <h3 style="margin-top: 0; color: #0070c0;">Meteo Attuale - Torre Annunziata</h3>
+        """, unsafe_allow_html=True)
+        
+        # Weather summary layout
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Temperatura", current['temp'])
+            # Icona meteo
+            icon_url = f"http://openweathermap.org/img/wn/{current['icon']}@2x.png"
+            st.markdown(f"""
+            <div style="text-align: center;">
+                <img src="{icon_url}" width="100">
+                <h2 style="margin: 0;">{current['temp']}</h2>
+                <p>{current['condition']}</p>
+            </div>
+            """, unsafe_allow_html=True)
         
         with col2:
-            st.metric("Condizione", current['condition'])
-            
+            st.markdown("<h4>Dettagli</h4>", unsafe_allow_html=True)
+            st.markdown(f"**{get_text('feels_like')}**: {current['feels_like']}")
+            st.markdown(f"**{get_text('humidity')}**: {current['humidity']}")
+            st.markdown(f"**{get_text('pressure')}**: {current['pressure']}")
+        
         with col3:
-            st.metric("Umidità", current['humidity'])
-            
+            st.markdown("<h4>Vento e Nuvole</h4>", unsafe_allow_html=True)
+            st.markdown(f"**{get_text('wind')}**: {current['wind']}")
+            st.markdown(f"**{get_text('clouds')}**: {current['clouds']}")
+        
         with col4:
-            st.metric("Vento", current['wind'])
+            st.markdown("<h4>Sole</h4>", unsafe_allow_html=True)
+            st.markdown(f"**{get_text('sunrise')}**: {current['sunrise']}")
+            st.markdown(f"**{get_text('sunset')}**: {current['sunset']}")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
         
         # Previsioni future
         if st.session_state.weather_data['forecast']:
-            st.subheader("Previsioni per i prossimi giorni")
-            forecast_cols = st.columns(len(st.session_state.weather_data['forecast']))
+            st.subheader(get_text('forecast_title'))
             
-            for i, day_forecast in enumerate(st.session_state.weather_data['forecast']):
-                with forecast_cols[i]:
-                    st.markdown(f"**{day_forecast['day']}**")
-                    st.markdown(f"Max: {day_forecast['max_temp']}")
-                    st.markdown(f"Min: {day_forecast['min_temp']}")
-                    st.markdown(f"{day_forecast['condition']}")
+            forecast_data = st.session_state.weather_data['forecast']
+            cols = st.columns(len(forecast_data))
+            
+            for i, day_forecast in enumerate(forecast_data):
+                with cols[i]:
+                    # Card stile per ogni previsione
+                    st.markdown(f"""
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                        <h4 style="margin-top: 0;">{day_forecast['day']}</h4>
+                        <p style="color: #6c757d; margin: 0;">{day_forecast['date']}</p>
+                        <img src="http://openweathermap.org/img/wn/{day_forecast['icon']}@2x.png" width="60">
+                        <p>{day_forecast['condition']}</p>
+                        <p style="font-weight: bold;">{get_text('max_temp')}: {day_forecast['max_temp']}<br>
+                        {get_text('min_temp')}: {day_forecast['min_temp']}</p>
+                        <p>{get_text('humidity')}: {day_forecast['humidity']}<br>
+                        {get_text('wind')}: {day_forecast['wind']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
     else:
         st.info("Dati meteo non disponibili al momento.")
     
-    st.caption("Dati meteo forniti da ilMeteo.it")
+    st.caption("Dati meteo forniti da OpenWeather")
         
 elif page == "predictions":
     visualization.show_predictions_page(st.session_state.earthquake_data, get_text)
@@ -286,10 +362,27 @@ elif page == "about":
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        # Caricamento diretto dell'immagine base64 (l'immagine caricata dall'utente)
+        # Inserimento diretto dell'immagine con HTML
         st.markdown("""
-        <div style="text-align: center;">
-            <img src="https://ljrjaehrttxhqejcueqj.supabase.co/storage/v1/object/public/immagini/fabio.jpg" width="200">
+        <style>
+        .dev-image {
+            border-radius: 50%;
+            border: 3px solid #0070ba;
+            max-width: 100%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        </style>
+        <div style="text-align: center; padding: 10px;">
+            <img src="https://www.fabioscelzo.it/foto.jpg" class="dev-image" width="180">
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Fallback nel caso in cui l'immagine online non funzioni
+        st.markdown("""
+        <div style="text-align: center; margin-top: 10px;">
+            <a href="https://github.com/ScelzoF/SeismicSafetyItalia/blob/main/assets/fabio_scelzo.jpg" target="_blank" style="text-decoration: none; color: #0070ba;">
+                <span style="font-size: 14px;">www.fabioscelzo.it</span>
+            </a>
         </div>
         """, unsafe_allow_html=True)
     
