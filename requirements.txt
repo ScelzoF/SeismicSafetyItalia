@@ -11,4 +11,3 @@ supabase
 python-dotenv
 better-profanity
 openai
-apscheduler

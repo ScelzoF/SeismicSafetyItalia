@@ -638,3 +638,14 @@ def schedule_periodic_updates():
 
 # Start the periodic updates
 schedule_periodic_updates()
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from emergenza import update_emergency_points_on_map  # Import della funzione
+
+def schedule_periodic_updates():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(update_emergency_points_on_map, 'interval', hours=1)  # Aggiornamento ogni ora
+    scheduler.start()
+
+# Avvia il processo di aggiornamento periodico
+schedule_periodic_updates()

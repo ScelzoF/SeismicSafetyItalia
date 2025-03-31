@@ -427,3 +427,22 @@ def show():
 
     # Show dynamic emergency numbers
     update_emergency_numbers()
+
+import folium
+import requests
+
+def update_emergency_points_on_map(m):
+    api_url = 'https://api.protezionecivile.gov.it/points_of_collection'  # URL dell'API per i punti di raccolta
+    response = requests.get(api_url)
+    
+    if response.status_code == 200:
+        points = response.json()  # Supponiamo che la risposta sia un JSON contenente i punti di raccolta
+        
+        for point in points:
+            folium.Marker(
+                location=[point['lat'], point['lon']],
+                popup=point['name'],
+                icon=folium.Icon(color="blue")
+            ).add_to(m)
+    else:
+        print("Errore nel recupero dei dati.")
