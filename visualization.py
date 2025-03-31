@@ -378,8 +378,15 @@ def show_monitoring_page(earthquake_data, get_text):
             """)
 
     with tab4:
-        st.subheader(get_text('recent_earthquakes'))
-        show_earthquake_table(earthquake_data, get_text)
+        # Import the process_data function from monitoraggio
+from monitoraggio import process_data
+
+# Call the process_data function to display seismic monitoring data
+def main():
+    process_data()
+
+if __name__ == "__main__":
+    main()
 
 # Function to display the interactive earthquake map
 def show_map(df, area, get_text):
