@@ -5,3 +5,4 @@ requests
 pandas
 folium
 plotly
+streamlit_folium
