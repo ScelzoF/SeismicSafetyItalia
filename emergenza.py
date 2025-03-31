@@ -446,3 +446,60 @@ def update_emergency_points_on_map(m):
             ).add_to(m)
     else:
         print("Errore nel recupero dei dati.")
+
+import requests
+import time
+import json
+
+# Function to fetch INGV data with retry and fallback on USGS
+def fetch_ingv_data_with_fallback():
+    api_url_ingv = "https://webservices.ingv.it/fdsnws/event/1/query?format=geojson"
+    api_url_usgs = "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson"
+
+    retries = 3  # Retry attempts for INGV
+    for _ in range(retries):
+        try:
+            response = requests.get(api_url_ingv)
+            response.raise_for_status()  # Check if there are HTTP errors
+            return response.json()  # Return data if the request is successful
+        except requests.exceptions.RequestException as e:
+            print(f"Error with INGV: {e}")
+            time.sleep(5)  # Wait for 5 seconds before retrying
+
+    # If INGV fails, fallback to USGS
+    print("Falling back to USGS data...")
+    try:
+        response = requests.get(api_url_usgs)
+        response.raise_for_status()  # Check if there are HTTP errors
+        return response.json()  # Return data from USGS
+    except requests.exceptions.RequestException as e:
+        print(f"Error with USGS: {e}")
+        return None  # Return None if both APIs fail
+
+# Function to cache data
+def cache_data(data, cache_file):
+    with open(cache_file, 'w') as file:
+        json.dump(data, file)
+
+# Function to load data from cache
+def load_from_cache(cache_file):
+    if os.path.exists(cache_file):
+        with open(cache_file, 'r') as file:
+            return json.load(file)
+    return None
+
+# Check if the data is in the cache
+cache_file = '/mnt/data/earthquake_cache.json'
+data = load_from_cache(cache_file)
+
+if not data:
+    print("Data not found in cache, fetching from services...")
+    data = fetch_ingv_data_with_fallback()
+    if data:
+        cache_data(data, cache_file)  # Store the fetched data in cache
+
+# Continue with the use of data
+if data:
+    print(f"Retrieved {len(data['features'])} seismic events.")
+else:
+    print("Unable to retrieve data.")
