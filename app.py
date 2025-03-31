@@ -3,6 +3,8 @@ import streamlit as st
 import time
 from datetime import datetime, timedelta
 import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 
 import data_service
 import visualization
@@ -38,6 +40,10 @@ if 'debug_mode' not in st.session_state:
     st.session_state.debug_mode = False
 if 'debug_info' not in st.session_state:
     st.session_state.debug_info = {}
+if 'weather_data' not in st.session_state:
+    st.session_state.weather_data = None
+if 'last_weather_fetch' not in st.session_state:
+    st.session_state.last_weather_fetch = None
 
 # Translation dictionary
 translations = {
@@ -67,13 +73,66 @@ translations = {
         'api_status': 'Stato API',
         'data_stats': 'Statistiche dati',
         'close': 'Chiudi',
-        'seismic_activity': 'Attività sismica'
+        'seismic_activity': 'Attività sismica',
+        'weather': 'Meteo',
+        'weather_forecast': 'Previsioni Meteo',
+        'temp': 'Temperatura',
+        'humidity': 'Umidità',
+        'wind': 'Vento',
+        'condition': 'Condizione'
     }
 }
 
 # Function to get translated text
 def get_text(key):
     return translations[st.session_state.language][key]
+
+# Funzione per ottenere dati meteo aggiornati da ilMeteo.it (esempio con HTML parsing)
+def fetch_weather_data():
+    try:
+        # Puoi sostituire questa URL con la località specifica di Torre Annunziata
+        url = "https://www.ilmeteo.it/meteo/Torre-Annunziata"
+        response = requests.get(url)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Questi selettori dovrebbero essere aggiornati in base alla struttura del sito
+            current_temp = soup.select_one('.valoreTemp')
+            current_condition = soup.select_one('.condizione')
+            humidity = soup.select_one('.umidita')
+            wind = soup.select_one('.vento')
+            
+            # Previsioni per i prossimi giorni (esempio)
+            forecast_days = soup.select('.boxprevisione')
+            forecast = []
+            
+            for day in forecast_days[:3]:  # Prendi solo i primi 3 giorni
+                day_name = day.select_one('.giorno')
+                max_temp = day.select_one('.temp-max')
+                min_temp = day.select_one('.temp-min')
+                day_condition = day.select_one('.condizione')
+                
+                if day_name and max_temp and min_temp and day_condition:
+                    forecast.append({
+                        'day': day_name.text.strip(),
+                        'max_temp': max_temp.text.strip(),
+                        'min_temp': min_temp.text.strip(),
+                        'condition': day_condition.text.strip()
+                    })
+            
+            return {
+                'current': {
+                    'temp': current_temp.text.strip() if current_temp else "N/A",
+                    'condition': current_condition.text.strip() if current_condition else "N/A",
+                    'humidity': humidity.text.strip() if humidity else "N/A",
+                    'wind': wind.text.strip() if wind else "N/A"
+                },
+                'forecast': forecast
+            }
+        return None
+    except Exception as e:
+        st.error(f"Errore nel recupero dei dati meteo: {e}")
+        return None
 
 # Sidebar for navigation and settings
 with st.sidebar:
@@ -114,6 +173,11 @@ with st.sidebar:
         with st.spinner(get_text('updating')):
             st.session_state.earthquake_data = data_service.fetch_earthquake_data()
             st.session_state.last_data_fetch = datetime.now()
+            
+            # Aggiorna anche i dati meteo
+            st.session_state.weather_data = fetch_weather_data()
+            st.session_state.last_weather_fetch = datetime.now()
+            
             st.rerun()
     
     # Last update timestamp
@@ -151,6 +215,53 @@ if st.session_state.earthquake_data is None or (
 # Display the selected page content
 if page == "monitoring":
     visualization.show_monitoring_page(st.session_state.earthquake_data, get_text)
+    
+    # Aggiungiamo widget meteo
+    st.subheader("🌤️ " + get_text('weather'))
+    
+    # Fetch weather data if not available or outdated
+    if st.session_state.weather_data is None or (
+        st.session_state.last_weather_fetch and 
+        datetime.now() - st.session_state.last_weather_fetch > timedelta(hours=1)
+    ):
+        with st.spinner("Aggiornamento dati meteo..."):
+            st.session_state.weather_data = fetch_weather_data()
+            st.session_state.last_weather_fetch = datetime.now()
+    
+    # Display weather data
+    if st.session_state.weather_data:
+        current = st.session_state.weather_data['current']
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Temperatura", current['temp'])
+        
+        with col2:
+            st.metric("Condizione", current['condition'])
+            
+        with col3:
+            st.metric("Umidità", current['humidity'])
+            
+        with col4:
+            st.metric("Vento", current['wind'])
+        
+        # Previsioni future
+        if st.session_state.weather_data['forecast']:
+            st.subheader("Previsioni per i prossimi giorni")
+            forecast_cols = st.columns(len(st.session_state.weather_data['forecast']))
+            
+            for i, day_forecast in enumerate(st.session_state.weather_data['forecast']):
+                with forecast_cols[i]:
+                    st.markdown(f"**{day_forecast['day']}**")
+                    st.markdown(f"Max: {day_forecast['max_temp']}")
+                    st.markdown(f"Min: {day_forecast['min_temp']}")
+                    st.markdown(f"{day_forecast['condition']}")
+    else:
+        st.info("Dati meteo non disponibili al momento.")
+    
+    st.caption("Dati meteo forniti da ilMeteo.it")
+        
 elif page == "predictions":
     visualization.show_predictions_page(st.session_state.earthquake_data, get_text)
 elif page == "emergency":
@@ -175,8 +286,12 @@ elif page == "about":
     col1, col2 = st.columns([1, 2])
     
     with col1:
-        # Placeholder per un'eventuale foto
-        st.markdown("![Fabio Scelzo](https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y)")
+        # Caricamento diretto dell'immagine base64 (l'immagine caricata dall'utente)
+        st.markdown("""
+        <div style="text-align: center;">
+            <img src="https://ljrjaehrttxhqejcueqj.supabase.co/storage/v1/object/public/immagini/fabio.jpg" width="200">
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("""
@@ -246,8 +361,6 @@ def main():
 if __name__ == "__main__":
     main()
 
-# Aggiungiamo la visualizzazione del meteo
-import meteo
-
-# Chiamata alla funzione show per mostrare la sezione meteo
-meteo.show()
+# Rimuoviamo la chiamata al meteo originale poiché l'abbiamo integrato
+# import meteo
+# meteo.show()
