@@ -1,0 +1,12 @@
+streamlit
+pandas
+numpy
+requests
+beautifulsoup4
+plotly
+folium
+streamlit-folium
+streamlit-js-eval
+supabase
+python-dotenv
+better-profanity
