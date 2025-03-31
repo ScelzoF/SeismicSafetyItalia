@@ -8,6 +8,15 @@ from better_profanity import profanity
 import string
 from collections import defaultdict
 import requests
+import os
+import openai
+from dotenv import load_dotenv
+
+# Carica le variabili d'ambiente
+load_dotenv()
+
+# Configura OpenAI
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Configurazione avanzata del sistema di logging
 logging.basicConfig(
@@ -334,6 +343,41 @@ def extract_and_check_urls(text):
     
     return suspicious_urls
 
+# Funzione per controllare con OpenAI
+def check_with_openai(text, user_id=None):
+    if not text or text.strip() == "":
+        return False, None
+    
+    try:
+        logger.info(f"Invio richiesta a OpenAI Moderation API per: '{text[:50]}...'")
+        response = openai.Moderation.create(input=text)
+        results = response["results"][0]
+        
+        # Se il contenuto è flaggato come inappropriato
+        if results["flagged"]:
+            # Ottieni le categorie specifiche
+            categories = results["categories"]
+            flagged_categories = [cat for cat, flagged in categories.items() if flagged]
+            
+            # Ottieni i punteggi di categoria
+            scores = results["category_scores"]
+            highest_score = 0
+            highest_category = ""
+            
+            for category, score in scores.items():
+                if score > highest_score and categories[category]:
+                    highest_score = score
+                    highest_category = category
+            
+            logger.warning(f"OpenAI ha rilevato contenuto inappropriato: {flagged_categories}")
+            return True, f"Contenuto bloccato: OpenAI ha rilevato {highest_category} (confidence: {highest_score:.2f})"
+        
+        return False, None
+    except Exception as e:
+        logger.error(f"Errore durante la verifica con OpenAI: {e}")
+        # Fallback ai metodi locali in caso di errore
+        return False, None
+
 # Funzione per rilevare spam e pattern di phishing
 def check_phishing(text, user_id=None):
     if not text or text.strip() == "":
@@ -481,6 +525,23 @@ def filter_message(message, user_id=None, context=None):
                 "category": "profanity_direct"
             }
     
+    # Prova a usare OpenAI se possibile
+    try:
+        is_inappropriate, openai_reason = check_with_openai(message, user_id)
+        if is_inappropriate:
+            logger.warning(f"Messaggio bloccato da OpenAI: {openai_reason}")
+            print(f"[DEBUG] OpenAI ha bloccato: {openai_reason}")
+            return "Questo messaggio è stato bloccato dal sistema di moderazione AI.", {
+                "original": message,
+                "reason": openai_reason,
+                "user_id": user_id,
+                "timestamp": datetime.now().isoformat(),
+                "category": "openai_moderation"
+            }
+    except Exception as e:
+        logger.error(f"Errore nel controllo OpenAI: {e}")
+        # Continua con i controlli locali
+    
     # 1. Verifica phishing (priorità alta)
     is_phishing, phishing_reason = check_phishing(message, user_id)
     if is_phishing:
@@ -564,6 +625,22 @@ def moderate_long_content(content, title=None, author_id=None):
                 "timestamp": datetime.now().isoformat(),
                 "category": "profanity_direct"
             }
+    
+    # Prova a usare OpenAI se possibile
+    try:
+        is_inappropriate, openai_reason = check_with_openai(full_content, author_id)
+        if is_inappropriate:
+            logger.warning(f"Contenuto lungo bloccato da OpenAI: {openai_reason}")
+            return "Questo contenuto è stato bloccato dal sistema di moderazione AI.", {
+                "original": full_content,
+                "reason": openai_reason,
+                "author_id": author_id,
+                "timestamp": datetime.now().isoformat(),
+                "category": "openai_moderation"
+            }
+    except Exception as e:
+        logger.error(f"Errore nel controllo OpenAI per contenuto lungo: {e}")
+        # Continua con i controlli locali
     
     # Usa la stessa funzione di moderazione usata per i messaggi
     result, info = filter_message(full_content, author_id)

@@ -10,3 +10,4 @@ streamlit-js-eval
 supabase
 python-dotenv
 better-profanity
+openai
