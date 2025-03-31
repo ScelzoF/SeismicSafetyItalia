@@ -627,3 +627,14 @@ if __name__ == "__main__":
 # Rimuoviamo la chiamata al meteo originale poiché l'abbiamo integrato
 # import meteo
 # meteo.show()
+from apscheduler.schedulers.background import BackgroundScheduler
+
+# Function to start periodic updates for emergency data
+def schedule_periodic_updates():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(update_emergency_points_on_map, 'interval', hours=1)  # Update every hour
+    scheduler.add_job(update_emergency_numbers, 'interval', hours=1)  # Update every hour
+    scheduler.start()
+
+# Start the periodic updates
+schedule_periodic_updates()

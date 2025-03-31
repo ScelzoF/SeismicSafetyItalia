@@ -377,3 +377,53 @@ Vibo Valentia: Piazza Municipio, Parco Urbano""",
         st.markdown("- Sintonizzarsi su canali ufficiali")
         st.markdown("#### ❌ Cosa NON fare")
         st.markdown("- Non uscire per curiosare")
+
+import requests
+import folium
+from streamlit_folium import st_folium
+
+# Function to fetch dynamically updated points of collection from an external API
+def fetch_dynamically_updated_points():
+    api_url = 'https://api.protezionecivile.gov.it/points_of_collection'  # Example URL, modify with real one
+    response = requests.get(api_url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return []
+
+# Function to update the map with emergency collection points
+def update_emergency_points_on_map(m):
+    points = fetch_dynamically_updated_points()
+    if points:
+        for point in points:
+            folium.Marker(
+                location=[point['lat'], point['lon']], 
+                popup=point['name'],
+                icon=folium.Icon(color="blue")
+            ).add_to(m)
+
+# Function to fetch dynamic emergency numbers
+def fetch_dynamic_emergency_numbers():
+    api_url = 'https://api.protezionecivile.gov.it/emergency_numbers'  # Example URL, modify with real one
+    response = requests.get(api_url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {"112": "Emergenza Generale", "118": "Emergenza Sanitaria"}
+
+# Function to update emergency numbers on the UI
+def update_emergency_numbers():
+    emergency_numbers = fetch_dynamic_emergency_numbers()
+    st.markdown(f"**112** - {emergency_numbers.get('112', 'Emergenza Generale')}")
+    st.markdown(f"**118** - {emergency_numbers.get('118', 'Emergenza Sanitaria')}")
+
+# Main function to display the emergency section
+def show():
+    st.header("🆘 EMERGENZA - Cosa Fare e Dove Andare")
+    st.markdown("In questa sezione trovi informazioni **utili e reali** in caso di emergenza sismica.")
+    m = folium.Map(location=[41.9028, 12.4964], zoom_start=6)  # Initial map
+    update_emergency_points_on_map(m)  # Add dynamic collection points
+    st_data = st_folium(m, width=700, height=450)
+
+    # Show dynamic emergency numbers
+    update_emergency_numbers()
