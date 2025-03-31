@@ -615,11 +615,11 @@ if st.session_state.notification_enabled and st.session_state.earthquake_data is
             st.toast(f"⚠️ {get_text('magnitude')}: {eq['magnitude']} - {eq['location']}")
 
 # Import the process_data function from monitoraggio
-from monitoraggio import process_data
+# from monitoraggio import process_data
 
 # Call the process_data function to display seismic monitoring data
 # def main():
-    process_data()
+#    process_data()
 
 if __name__ == "__main__":
     main()
