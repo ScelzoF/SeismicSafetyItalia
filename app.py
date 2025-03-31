@@ -608,11 +608,11 @@ elif page == "about":
     """)
 
 # Check for significant earthquakes and show alert if notifications are enabled
-if st.session_state.notification_enabled and st.session_state.earthquake_data is not None:
-    significant_eq = data_service.get_significant_earthquakes(st.session_state.earthquake_data)
-    if not significant_eq.empty:
-        for _, eq in significant_eq.iterrows():
-            st.toast(f"⚠️ {get_text('magnitude')}: {eq['magnitude']} - {eq['location']}")
+# if st.session_state.notification_enabled and st.session_state.earthquake_data is not None:
+#    significant_eq = data_service.get_significant_earthquakes(st.session_state.earthquake_data)
+#    if not significant_eq.empty:
+#        for _, eq in significant_eq.iterrows():
+#            st.toast(f"⚠️ {get_text('magnitude')}: {eq['magnitude']} - {eq['location']}")
 
 # Import the process_data function from monitoraggio
 from monitoraggio import process_data
