@@ -1,13 +1,6 @@
+
 streamlit
-pandas
-numpy
+apscheduler
 requests
-beautifulsoup4
-plotly
+pandas
 folium
-streamlit-folium
-streamlit-js-eval
-supabase
-python-dotenv
-better-profanity
-openai
