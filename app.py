@@ -4,12 +4,33 @@ import time
 from datetime import datetime, timedelta
 import pandas as pd
 import requests
+import locale
 
 import data_service
 import visualization
 import emergency_info
 import forum
 import utils
+
+# Impostiamo la localizzazione italiana per i nomi dei giorni
+try:
+    locale.setlocale(locale.LC_TIME, 'it_IT.UTF-8')  # Linux/macOS
+except:
+    try:
+        locale.setlocale(locale.LC_TIME, 'Italian_Italy')  # Windows
+    except:
+        pass  # Se fallisce, useremo una mappatura manuale
+
+# Mappatura manuale inglese-italiano per i giorni della settimana
+giorni_settimana = {
+    'Monday': 'Lunedì',
+    'Tuesday': 'Martedì',
+    'Wednesday': 'Mercoledì',
+    'Thursday': 'Giovedì',
+    'Friday': 'Venerdì',
+    'Saturday': 'Sabato',
+    'Sunday': 'Domenica'
+}
 
 # Configure page settings
 st.set_page_config(
@@ -93,6 +114,10 @@ translations = {
 def get_text(key):
     return translations[st.session_state.language][key]
 
+# Funzione per tradurre i nomi dei giorni in italiano
+def traduci_giorno(giorno_en):
+    return giorni_settimana.get(giorno_en, giorno_en)
+
 # Funzione per ottenere dati meteo da OpenWeather API
 def fetch_weather_data():
     try:
@@ -152,9 +177,13 @@ def fetch_weather_data():
                 # Se abbiamo già 5 giorni, fermiamoci
                 if len(forecast) >= 5:
                     break
+                
+                # Ottieni il nome del giorno in inglese e traducilo in italiano
+                day_name_en = date.strftime('%A')
+                day_name_it = traduci_giorno(day_name_en)
                     
                 forecast.append({
-                    'day': date.strftime('%A'),  # Nome del giorno
+                    'day': day_name_it,  # Nome del giorno tradotto in italiano
                     'date': date.strftime('%d/%m'),
                     'temp_max': f"{item['main']['temp_max']:.1f}°C",
                     'temp_min': f"{item['main']['temp_min']:.1f}°C",
@@ -213,7 +242,7 @@ def get_mock_weather_data():
                 'icon': '01d'
             },
             {
-                'day': (current_date + timedelta(days=2)).strftime('%A'),
+                'day': traduci_giorno((current_date + timedelta(days=2)).strftime('%A')),
                 'date': (current_date + timedelta(days=2)).strftime('%d/%m'),
                 'temp_max': '23°C',
                 'temp_min': '17°C',
@@ -223,7 +252,7 @@ def get_mock_weather_data():
                 'icon': '02d'
             },
             {
-                'day': (current_date + timedelta(days=3)).strftime('%A'),
+                'day': traduci_giorno((current_date + timedelta(days=3)).strftime('%A')),
                 'date': (current_date + timedelta(days=3)).strftime('%d/%m'),
                 'temp_max': '22°C',
                 'temp_min': '16°C',
@@ -233,7 +262,7 @@ def get_mock_weather_data():
                 'icon': '03d'
             },
             {
-                'day': (current_date + timedelta(days=4)).strftime('%A'),
+                'day': traduci_giorno((current_date + timedelta(days=4)).strftime('%A')),
                 'date': (current_date + timedelta(days=4)).strftime('%d/%m'),
                 'temp_max': '21°C',
                 'temp_min': '15°C',
@@ -511,26 +540,19 @@ elif page == "about":
         # URL raw dell'immagine su GitHub
         img_url = "https://raw.githubusercontent.com/ScelzoF/SeismicSafetyItalia/main/assets/fabio_scelzo.jpg"
         
-        # Aggiungiamo stile all'immagine con HTML e mostriamo SOLO con HTML
+        # Utilizziamo un riquadro rettangolare (non rotondo) senza bordi arrotondati
         st.markdown("""
         <style>
-        .dev-image {
-            border-radius: 50%;
-            border: 3px solid #0070ba;
+        .profile-image {
             max-width: 100%;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border: 1px solid #ddd;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
         </style>
         <div style="text-align: center; padding: 10px;">
-            <img src="https://raw.githubusercontent.com/ScelzoF/SeismicSafetyItalia/main/assets/fabio_scelzo.jpg" class="dev-image" width="180">
+            <img src="https://raw.githubusercontent.com/ScelzoF/SeismicSafetyItalia/main/assets/fabio_scelzo.jpg" class="profile-image" width="180">
         </div>
         """, unsafe_allow_html=True)
-        
-        # Rimuoviamo questo fallback che causava la doppia immagine
-        # try:
-        #     st.image(img_url, width=180)
-        # except:
-        #     st.markdown("👨‍💻")
     
     with col2:
         st.markdown("""
@@ -540,7 +562,9 @@ elif page == "about":
         che è rimasta costante attraverso gli anni, evolvendo insieme alle tecnologie.
         
         Esperto di sviluppo software e appassionato di monitoraggio ambientale, ha creato questa piattaforma per 
-        fornire uno strumento utile alla comunità, combinando competenze tecniche e interesse per il territorio.
+        fornire uno strumento utile alla comunità, combinando competenze tecniche e interesse per il territorio. 
+        Lo sviluppo è stato potenziato dall'utilizzo delle moderne tecnologie di Intelligenza Artificiale, 
+        che hanno contribuito a migliorarne le funzionalità e l'interfaccia utente.
         
         Attualmente vive a **Torre Annunziata**, una città ricca di storia e tradizioni nella provincia di Napoli.
         """)
