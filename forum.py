@@ -1,4 +1,3 @@
-
 import streamlit as st
 from supabase_utils import inserisci_post, carica_post
 import re
@@ -6,6 +5,9 @@ from better_profanity import profanity
 from collections import defaultdict
 import time
 import string
+
+# Importiamo la funzione di moderazione avanzata
+from chat_pubblica import filter_message
 
 class ModeratorAI:
     def __init__(self):
@@ -52,6 +54,14 @@ class ModeratorAI:
         return True, "Contenuto valido"
 
     def check_content(self, text, username):
+        # NUOVA FUNZIONE: Usa il sistema di moderazione avanzato
+        moderated_message, moderation_info = filter_message(text, username)
+        
+        # Se il sistema di moderazione avanzato ha bloccato il messaggio
+        if moderated_message != text or moderation_info is not None:
+            reason = moderation_info.get('reason', 'Contenuto non appropriato') if moderation_info else "Contenuto non appropriato"
+            return False, reason
+            
         # Controllo lunghezza
         if len(text) < 3 or len(text) > 1000:
             return False, "Lunghezza del testo non valida (min 3, max 1000 caratteri)"
