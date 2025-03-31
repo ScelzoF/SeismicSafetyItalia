@@ -621,8 +621,8 @@ if st.session_state.notification_enabled and st.session_state.earthquake_data is
 # def main():
 #    process_data()
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#    main()
 
 # Rimuoviamo la chiamata al meteo originale poiché l'abbiamo integrato
 # import meteo
