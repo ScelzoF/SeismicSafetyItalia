@@ -511,7 +511,7 @@ elif page == "about":
         # URL raw dell'immagine su GitHub
         img_url = "https://raw.githubusercontent.com/ScelzoF/SeismicSafetyItalia/main/assets/fabio_scelzo.jpg"
         
-        # Aggiungiamo stile all'immagine con HTML
+        # Aggiungiamo stile all'immagine con HTML e mostriamo SOLO con HTML
         st.markdown("""
         <style>
         .dev-image {
@@ -526,11 +526,11 @@ elif page == "about":
         </div>
         """, unsafe_allow_html=True)
         
-        # Fallback a Streamlit native image loading
-        try:
-            st.image(img_url, width=180)
-        except:
-            st.markdown("👨‍💻")
+        # Rimuoviamo questo fallback che causava la doppia immagine
+        # try:
+        #     st.image(img_url, width=180)
+        # except:
+        #     st.markdown("👨‍💻")
     
     with col2:
         st.markdown("""
