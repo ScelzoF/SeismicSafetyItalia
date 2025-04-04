@@ -11,6 +11,8 @@ INGV_URL = "https://webservices.ingv.it/fdsnws/event/1/query?format=geojson&minl
 USGS_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson"
 
 def fetch_earthquake_data():
+    if "current_source" not in st.session_state:
+        st.session_state.current_source = "INGV"
     try:
         # Prova a usare INGV se attivo o se USGS fallisce
         if st.session_state.current_source == "INGV":
