@@ -1,3 +1,20 @@
+
+import streamlit as st
+from seo_tools import inject_meta_tags, show_robots_txt, show_sitemap_xml
+
+# Iniettiamo meta tag all'avvio
+inject_meta_tags()
+
+# Controlla se è una richiesta SEO (robots.txt o sitemap.xml)
+page = st.query_params.get("page", [None])[0]
+if page == "robots":
+    show_robots_txt()
+    st.stop()
+elif page == "sitemap":
+    show_sitemap_xml()
+    st.stop()
+
+
 import os
 import streamlit as st
 import time
