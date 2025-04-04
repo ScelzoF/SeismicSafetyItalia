@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 import locale
+st.set_page_config(
+
 
 import time
 st.write("🟡 Inizio fetch dati...")
@@ -16,35 +18,6 @@ except Exception as e:
     st.error(f"❌ Errore nel caricamento dati: {e}")
 
 
-
-import data_service
-import visualization
-import emergency_info
-import forum
-import utils
-
-# Impostiamo la localizzazione italiana per i nomi dei giorni
-try:
-    locale.setlocale(locale.LC_TIME, 'it_IT.UTF-8')  # Linux/macOS
-except:
-    try:
-        locale.setlocale(locale.LC_TIME, 'Italian_Italy')  # Windows
-    except:
-        pass  # Se fallisce, useremo una mappatura manuale
-
-# Mappatura manuale inglese-italiano per i giorni della settimana
-giorni_settimana = {
-    'Monday': 'Lunedì',
-    'Tuesday': 'Martedì',
-    'Wednesday': 'Mercoledì',
-    'Thursday': 'Giovedì',
-    'Friday': 'Venerdì',
-    'Saturday': 'Sabato',
-    'Sunday': 'Domenica'
-}
-
-# Configure page settings
-st.set_page_config(
     page_title="Monitoraggio Sismico - Campania",
     page_icon="🌋",
     layout="wide",
