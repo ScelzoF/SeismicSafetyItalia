@@ -105,3 +105,8 @@ def calculate_earthquake_statistics(df):
             'avg_depth': 0,
             'daily_counts': {}
         }
+
+
+def filter_area_earthquakes(df, area_name):
+    if df is None or df.empty:
+        return pd.DataFrame()
