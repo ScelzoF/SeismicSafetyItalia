@@ -59,7 +59,9 @@ def fetch_from_ingv():
             "longitude": coords[0],
             "depth": coords[2]
         })
-    return pd.DataFrame(data)
+    df = return pd.DataFrame(data)
+    df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
+    return df
 
 def fetch_from_usgs():
     response = requests.get(USGS_URL, timeout=5)
@@ -79,7 +81,9 @@ def fetch_from_usgs():
             "longitude": coords[0],
             "depth": coords[2]
         })
-    return pd.DataFrame(data)
+    df = return pd.DataFrame(data)
+    df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
+    return df
 
 def get_significant_earthquakes(df, magnitude_threshold=2.5):
     if df.empty:
