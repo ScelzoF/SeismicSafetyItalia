@@ -85,3 +85,13 @@ def get_significant_earthquakes(df, magnitude_threshold=2.5):
     if df.empty:
         return pd.DataFrame()
     return df[df["magnitude"] >= magnitude_threshold]
+
+def calculate_earthquake_statistics(df):
+    if df is None or df.empty:
+        return {
+            'count': 0,
+            'avg_magnitude': 0,
+            'max_magnitude': 0,
+            'avg_depth': 0,
+            'daily_counts': {}
+        }
