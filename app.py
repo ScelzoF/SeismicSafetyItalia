@@ -43,6 +43,11 @@ st.set_page_config(
     }
 )
 
+import orario
+ora = orario.get_orario()
+st.sidebar.write(f"UTC: {ora['utc']}")
+st.sidebar.write(f"Italia: {ora['italia']} ({ora['diff']})")
+
 # Carica stile CSS personalizzato
 css_path = os.path.join(os.path.dirname(__file__), 'streamlit', 'style.css')
 with open(css_path) as f:
