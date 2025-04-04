@@ -107,6 +107,9 @@ def calculate_earthquake_statistics(df):
         }
 
 
+    if df is None or df.empty:
+        return pd.DataFrame()
+
 def filter_area_earthquakes(df, area):
     if df is None or df.empty:
         return pd.DataFrame()
@@ -124,5 +127,4 @@ def filter_area_earthquakes(df, area):
 
     keywords = area_keywords.get(area.lower(), [])
     mask = df['location'].str.lower().apply(lambda x: any(k in x for k in keywords))
-    return df[mask]    if df is None or df.empty:
-        return pd.DataFrame()
+    return df[mask]
