@@ -291,25 +291,3 @@ def calculate_earthquake_statistics(df):
         'avg_depth': df['depth'].mean(),
         'daily_counts': daily_counts
     }
-
-def fetch_earthquake_data():
-    # Inizializza sorgente se non esiste
-    if "source" not in st.session_state:
-        st.session_state.source = None
-
-    try:
-        df = fetch_ingv_data()
-        if st.session_state.source != "INGV":
-            st.session_state.source = "INGV"
-            st.info("✅ Dati sismici forniti da INGV (Italia)")
-        return df
-    except Exception as e:
-        try:
-            df = fetch_usgs_data()
-            if st.session_state.source != "USGS":
-                st.session_state.source = "USGS"
-                st.warning("⚠️ Dati INGV non disponibili. Uso dati USGS (mondiali)")
-            return df
-        except Exception as e:
-            st.error("❌ Errore nel recupero dei dati sismici da entrambe le fonti.")
-            return pd.DataFrame()

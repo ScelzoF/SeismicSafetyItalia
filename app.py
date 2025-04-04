@@ -1,27 +1,39 @@
+import os
 import streamlit as st
+import time
+from datetime import datetime, timedelta
 import pandas as pd
 import requests
-import json
-import time
-from datetime import datetime
+import locale
 
 import data_service
+import visualization
+import emergency_info
+import forum
+import utils
 
-st.set_page_config(
-    page_title="Monitoraggio Sismico - Campania",
-    page_icon="🌋",
-    layout="wide"
-)
-
-# DEBUG: Mostra stato caricamento dati
-st.write("🟡 Inizio fetch dati...")
+# Impostiamo la localizzazione italiana per i nomi dei giorni
 try:
-    if "earthquake_data" not in st.session_state:
-        st.session_state.earthquake_data = data_service.fetch_earthquake_data()
-    st.success("✅ Dati caricati")
-except Exception as e:
-    st.error(f"❌ Errore nel caricamento dati: {e}")
+    locale.setlocale(locale.LC_TIME, 'it_IT.UTF-8')  # Linux/macOS
+except:
+    try:
+        locale.setlocale(locale.LC_TIME, 'Italian_Italy')  # Windows
+    except:
+        pass  # Se fallisce, useremo una mappatura manuale
 
+# Mappatura manuale inglese-italiano per i giorni della settimana
+giorni_settimana = {
+    'Monday': 'Lunedì',
+    'Tuesday': 'Martedì',
+    'Wednesday': 'Mercoledì',
+    'Thursday': 'Giovedì',
+    'Friday': 'Venerdì',
+    'Saturday': 'Sabato',
+    'Sunday': 'Domenica'
+}
+
+# Configure page settings
+st.set_page_config(
     page_title="Monitoraggio Sismico - Campania",
     page_icon="🌋",
     layout="wide",
@@ -269,14 +281,6 @@ def get_mock_weather_data():
 
 # Sidebar for navigation and settings
 with st.sidebar:
-
-    st.markdown("---")
-    st.markdown("### ℹ️ Info sorgente dati")
-    source = st.session_state.get("source", "N/D")
-    st.info(f"Sorgente attiva: **{source}**")
-
-    now_utc = datetime.utcnow().strftime("%d/%m/%Y %H:%M UTC")
-    st.caption(f"🕒 Orario server: {now_utc}")
     st.title("🌋 " + get_text('title'))
     
     # Language selector
