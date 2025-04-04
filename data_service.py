@@ -1,4 +1,3 @@
-
 import requests
 import pandas as pd
 from datetime import datetime
@@ -86,3 +85,6 @@ def get_significant_earthquakes(df, magnitude_threshold=2.5):
     if df.empty:
         return pd.DataFrame()
     return df[df["magnitude"] >= magnitude_threshold]
+
+filter_area_earthquakes
+calculate_earthquake_statistics
