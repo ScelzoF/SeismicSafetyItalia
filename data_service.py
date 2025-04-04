@@ -107,6 +107,22 @@ def calculate_earthquake_statistics(df):
         }
 
 
-def filter_area_earthquakes(df, area_name):
+def filter_area_earthquakes(df, area):
     if df is None or df.empty:
+        return pd.DataFrame()
+
+    area_keywords = {
+        'vesuvio': ['vesuvio', 'napoli', 'torre del greco', 'torre annunziata', 'portici', 'ercolano'],
+        'campi_flegrei': ['pozzuoli', 'bacoli', 'campi flegrei', 'agnano', 'fuorigrotta'],
+        'ischia': ['ischia'],
+        'sannio': ['benevento', 'sannio', 'guardia', 'san bartolomeo', 'circello'],
+        'cilento': ['cilento', 'sapri', 'vallo della lucania'],
+        'irpinia': ['avellino', 'irpinia', 'lioni', 'grottaminarda'],
+        'salerno': ['salerno', 'cava de tirreni', 'agropoli'],
+        'caserta': ['caserta', 'sessa aurunca', 'aversa'],
+    }
+
+    keywords = area_keywords.get(area.lower(), [])
+    mask = df['location'].str.lower().apply(lambda x: any(k in x for k in keywords))
+    return df[mask]    if df is None or df.empty:
         return pd.DataFrame()
