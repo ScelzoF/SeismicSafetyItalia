@@ -59,7 +59,9 @@ def fetch_from_ingv():
             "longitude": coords[0],
             "depth": coords[2]
         })
-    df = return pd.DataFrame(data)
+    df = df = pd.DataFrame(data)
+    df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
+    return df
     df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
     return df
 
@@ -81,7 +83,9 @@ def fetch_from_usgs():
             "longitude": coords[0],
             "depth": coords[2]
         })
-    df = return pd.DataFrame(data)
+    df = df = pd.DataFrame(data)
+    df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
+    return df
     df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
     return df
 
