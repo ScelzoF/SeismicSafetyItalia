@@ -96,7 +96,6 @@ def get_significant_earthquakes(df, magnitude_threshold=2.5):
         return pd.DataFrame()
     return df[df["magnitude"] >= magnitude_threshold]
 
-def calculate_earthquake_statistics(df):
     if df is None or df.empty:
         return {
             'count': 0,
@@ -128,3 +127,21 @@ def filter_area_earthquakes(df, area):
     keywords = area_keywords.get(area.lower(), [])
     mask = df['location'].str.lower().apply(lambda x: any(k in x for k in keywords))
     return df[mask]
+
+def calculate_earthquake_statistics(df):
+    if df is None or df.empty:
+        return {
+            'count': 0,
+            'average_magnitude': 0,
+            'max_magnitude': 0,
+            'min_magnitude': 0,
+            'last_event_time': None
+        }
+
+    return {
+        'count': len(df),
+        'average_magnitude': df["magnitude"].mean(),
+        'max_magnitude': df["magnitude"].max(),
+        'min_magnitude': df["magnitude"].min(),
+        'last_event_time': df["time"].max()
+    }
