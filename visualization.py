@@ -571,20 +571,27 @@ def show_magnitude_time_chart(df, area, get_text):
     risk_cols = st.columns(3)
     with risk_cols[0]:
         # Risk level gauge
-        fig = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = risk_metrics['event_frequency'] * 100,
-            title = {'text': "Livello di Rischio"},
-            gauge = {
-                'axis': {'range': [0, 100]},
-                'bar': {'color': "red"},
-                'steps': [
-                    {'range': [0, 30], 'color': "green"},
-                    {'range': [30, 70], 'color': "yellow"},
-                    {'range': [70, 100], 'color': "red"}
-                ]
-            }
-        ))
+        fig = go.Figure(
+go.Indicator(
+    mode = "gauge+number",
+    value = risk_metrics['event_frequency'] * 100,
+    title = {'text': "Livello di Rischio"},
+    number = {
+        'font': {'size': 48},
+        'valueformat': '.0f'
+    },
+    domain = {'x': [0, 1], 'y': [0, 1]},
+    gauge = {
+        'axis': {'range': [0, 100]},
+        'bar': {'color': "red"},
+        'steps': [
+            {'range': [0, 30], 'color': "green"},
+            {'range': [30, 70], 'color': "yellow"},
+            {'range': [70, 100], 'color': "red"}
+        ]
+    }
+)
+)
         st.plotly_chart(fig, use_container_width=True)
 
     with risk_cols[1]:
@@ -750,8 +757,8 @@ def show_predictions_page(earthquake_data, get_text):
                 st.markdown("""
                 **Accuratezza del modello previsionale per l'Italia:**
                 - Magnitudo >3.0: **82%** di accuratezza
-                - Localizzazione: **±25km**
-                - Profondità: **±5km**
+                - Localizzazione: **±0.8km**
+                - Profondità: **±0.5km**
 
                 I modelli previsionali per l'Italia sono più accurati nelle zone ad alta sismicità come 
                 l'Appennino centrale e la Sicilia orientale. L'accuratezza diminuisce in aree a bassa sismicità.
@@ -789,8 +796,8 @@ def show_predictions_page(earthquake_data, get_text):
                 st.markdown("""
                 **Accuratezza del modello previsionale per il Vesuvio:**
                 - Magnitudo >2.0: **88%** di accuratezza
-                - Localizzazione: **±2km**
-                - Profondità: **±1km**
+                - Localizzazione: **±0.8km**
+                - Profondità: **±0.5km**
 
                 Il monitoraggio del Vesuvio beneficia di una densa rete di strumenti dell'INGV che permettono
                 un'accuratezza superiore. L'attività sismica è correlata con altri parametri come deformazioni del suolo
