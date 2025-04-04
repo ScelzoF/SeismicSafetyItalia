@@ -225,3 +225,15 @@ def calculate_earthquake_statistics(df):
         'daily_counts': daily_counts,
         'avg_depth': avg_depth
     }
+
+
+import plotly.express as px
+import streamlit as st
+
+def safe_plot_scatter(df, x_col, y_col, title):
+    if df is None or df.empty or x_col not in df.columns or y_col not in df.columns:
+        st.info("📊 Nessun dato disponibile per il grafico.")
+        return
+
+    fig = px.scatter(df, x=x_col, y=y_col, title=title)
+    st.plotly_chart(fig)
