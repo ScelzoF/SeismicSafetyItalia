@@ -170,9 +170,6 @@ def calculate_earthquake_statistics(df):
         'daily_counts': daily_counts
     }
 
-from collections import Counter
-
-def calculate_earthquake_statistics(df):
     if df is None or df.empty:
         return {
             'count': 0,
@@ -191,6 +188,37 @@ def calculate_earthquake_statistics(df):
     return {
         'count': len(df),
         'average_magnitude': df["magnitude"].mean(),
+        'max_magnitude': df["magnitude"].max(),
+        'min_magnitude': df["magnitude"].min(),
+        'last_event_time': df["time"].max(),
+        'daily_counts': daily_counts,
+        'avg_depth': avg_depth
+    }
+
+from collections import Counter
+
+def calculate_earthquake_statistics(df):
+    if df is None or df.empty:
+        return {
+            'count': 0,
+            'average_magnitude': 0,
+            'avg_magnitude': 0,
+            'max_magnitude': 0,
+            'min_magnitude': 0,
+            'last_event_time': None,
+            'daily_counts': {},
+            'avg_depth': 0
+        }
+
+    df["date"] = df["time"].dt.date
+    daily_counts = dict(Counter(df["date"]))
+    avg_depth = df["depth"].mean() if "depth" in df.columns else 0
+    avg_mag = df["magnitude"].mean()
+
+    return {
+        'count': len(df),
+        'average_magnitude': avg_mag,
+        'avg_magnitude': avg_mag,
         'max_magnitude': df["magnitude"].max(),
         'min_magnitude': df["magnitude"].min(),
         'last_event_time': df["time"].max(),
