@@ -5,6 +5,12 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 import locale
+import data_service
+
+# Recupera dati all'avvio per inizializzare la sorgente
+if "earthquake_data" not in st.session_state:
+    st.session_state.earthquake_data = data_service.fetch_earthquake_data()
+
 
 import data_service
 import visualization
