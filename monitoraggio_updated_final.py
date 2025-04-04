@@ -1,3 +1,18 @@
+from dati_sismici import carica_dati, get_fonte_attuale
+import streamlit as st
+
+
+df = carica_dati()
+fonte = get_fonte_attuale()
+
+if fonte == "INGV":
+    st.sidebar.success("✅ Dati sismici forniti da INGV (Istituto Nazionale di Geofisica e Vulcanologia)")
+elif fonte == "USGS":
+    st.sidebar.warning("⚠️ INGV non è temporaneamente raggiungibile. Dati attualmente forniti da USGS (U.S. Geological Survey)")
+else:
+    st.sidebar.error("❌ Nessuna fonte dati disponibile al momento")
+
+
 
 import streamlit as st
 import pandas as pd
