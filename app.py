@@ -281,6 +281,16 @@ def get_mock_weather_data():
 
 # Sidebar for navigation and settings
 with st.sidebar:
+
+# Mostra la sorgente dati e l'orario server nella sidebar
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### ℹ️ Info sorgente dati")
+    source = st.session_state.get("source", "N/D")
+    st.info(f"Sorgente attiva: **{source}**")
+
+    now_utc = datetime.utcnow().strftime("%d/%m/%Y %H:%M UTC")
+    st.caption(f"🕒 Orario server: {now_utc}")
     st.title("🌋 " + get_text('title'))
     
     # Language selector
