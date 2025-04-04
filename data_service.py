@@ -61,6 +61,7 @@ def fetch_from_ingv():
         })
     df = df = pd.DataFrame(data)
     df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
+    df["source"] = "USGS"
     return df
     df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
     return df
@@ -85,6 +86,7 @@ def fetch_from_usgs():
         })
     df = df = pd.DataFrame(data)
     df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
+    df["source"] = "USGS"
     return df
     df["formatted_time"] = df["time"].dt.strftime("%d/%m/%Y %H:%M:%S")
     return df
