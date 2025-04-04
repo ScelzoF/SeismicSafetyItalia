@@ -13,10 +13,6 @@ else:
     st.sidebar.error("❌ Nessuna fonte dati disponibile al momento")
 
 
-from dati_sismici import carica_dati, get_fonte_attuale
-import streamlit as st
-
-
 df = carica_dati()
 fonte = get_fonte_attuale()
 
@@ -77,4 +73,3 @@ def show():
                     temp = forecast['main']['temp']
                     description = forecast['weather'][0]['description']
                     st.write(f"{date}: {temp}°C, {description}")
-
