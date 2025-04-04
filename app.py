@@ -282,8 +282,6 @@ def get_mock_weather_data():
 # Sidebar for navigation and settings
 with st.sidebar:
 
-# Mostra la sorgente dati e l'orario server nella sidebar
-with st.sidebar:
     st.markdown("---")
     st.markdown("### ℹ️ Info sorgente dati")
     source = st.session_state.get("source", "N/D")
