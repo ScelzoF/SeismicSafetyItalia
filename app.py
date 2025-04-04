@@ -1,14 +1,19 @@
-import os
 import streamlit as st
-import time
-from datetime import datetime, timedelta
 import pandas as pd
 import requests
-import locale
-st.set_page_config(
-
-
+import json
 import time
+from datetime import datetime
+
+import data_service
+
+st.set_page_config(
+    page_title="Monitoraggio Sismico - Campania",
+    page_icon="🌋",
+    layout="wide",
+)
+
+# DEBUG: Mostra stato caricamento dati
 st.write("🟡 Inizio fetch dati...")
 try:
     if "earthquake_data" not in st.session_state:
@@ -16,7 +21,6 @@ try:
     st.success("✅ Dati caricati")
 except Exception as e:
     st.error(f"❌ Errore nel caricamento dati: {e}")
-
 
     page_title="Monitoraggio Sismico - Campania",
     page_icon="🌋",
