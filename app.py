@@ -10,7 +10,7 @@ import data_service
 st.set_page_config(
     page_title="Monitoraggio Sismico - Campania",
     page_icon="🌋",
-    layout="wide",
+    layout="wide"
 )
 
 # DEBUG: Mostra stato caricamento dati
