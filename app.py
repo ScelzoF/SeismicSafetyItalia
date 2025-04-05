@@ -1,14 +1,5 @@
 import os
 import streamlit as st
-st.markdown("""
-    <style>
-        section[data-testid="stSidebar"] div:first-child {
-            padding-top: 0rem;
-            margin-top: -1rem;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 import time
 from datetime import datetime, timedelta
 import pandas as pd
