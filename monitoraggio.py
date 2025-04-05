@@ -32,7 +32,8 @@ def process_data():
     st.warning('✅ DEBUG: process_data è stata eseguita!')
 
     from fallback_wrapper import get_sismic_data
-    df, fonte = get_sismic_data(show_debug=True)
+        show_debug = st.sidebar.checkbox('Mostra dettagli tecnici')
+df, fonte = get_sismic_data(show_debug=show_debug)
     if not df.empty:
         st.info(fonte)
         st.dataframe(df)
@@ -77,7 +78,8 @@ def process_data():
 
 
 # Dati sismici con fallback INGV → USGS
-df, fonte = get_sismic_data(show_debug=True)
+    show_debug = st.sidebar.checkbox('Mostra dettagli tecnici')
+df, fonte = get_sismic_data(show_debug=show_debug)
 
 if not df.empty:
     st.info(fonte)
