@@ -11,25 +11,33 @@ def show():
         st.error("🔑 Chiave API OpenWeather mancante nei secrets.")
         return
 
-    metodo = st.radio("🔍 Metodo:", ["📍 Usa posizione attuale", "🏙️ Inserisci città"])
+    metodo = st.radio("🔍 Metodo:", ["📍 Usa posizione attuale", "🏙️ Seleziona o inserisci città"])
 
     if metodo == "📍 Usa posizione attuale":
-        # Tentiamo di ottenere la posizione tramite JavaScript
-        coords = streamlit_js_eval(js_expressions='navigator.geolocation.getCurrentPosition((pos) => ({lat: pos.coords.latitude, lon: pos.coords.longitude}), (err) => ({error: err.message}))', key="geo")
-        
+        coords = streamlit_js_eval(
+            js_expressions='navigator.geolocation.getCurrentPosition((pos) => ({lat: pos.coords.latitude, lon: pos.coords.longitude}), (err) => ({error: err.message}))',
+            key="geo"
+        )
         if coords and "lat" in coords and "lon" in coords:
             url = f"https://api.openweathermap.org/data/2.5/weather?lat={coords['lat']}&lon={coords['lon']}&appid={API_KEY}&units=metric&lang=it"
         elif coords and "error" in coords:
-            st.warning(f"Geolocalizzazione non disponibile: {coords['error']}. Per favore, inserisci manualmente la tua città.")
-            metodo = "🏙️ Inserisci città"  # fallback al metodo di inserimento città
+            st.warning(f"Geolocalizzazione non disponibile: {coords['error']}.")
+            return
         else:
-            st.warning("Geolocalizzazione non disponibile. Per favore, inserisci manualmente la tua città.")
-            metodo = "🏙️ Inserisci città"  # fallback al metodo di inserimento città
+            st.warning("Geolocalizzazione non disponibile.")
+            return
 
-    if metodo == "🏙️ Inserisci città":
-        città = st.text_input("Inserisci città", value="Napoli")
+    elif metodo == "🏙️ Seleziona o inserisci città":
+        comuni = ["Napoli", "Roma", "Milano", "Catania", "Palermo", "Torino", "Firenze", "Altro (manuale)"]
+        scelta = st.selectbox("📍 Seleziona una città", comuni)
+        if scelta == "Altro (manuale)":
+            città = st.text_input("✍️ Inserisci città", value="Napoli")
+        else:
+            città = scelta
+
         if not città:
             return
+
         url = f"https://api.openweathermap.org/data/2.5/weather?q={città}&appid={API_KEY}&units=metric&lang=it"
 
     try:
@@ -45,9 +53,7 @@ def show():
         st.metric("🌬️ Vento", f"{data['wind']['speed']} m/s")
         st.info(f"📌 Descrizione: {data['weather'][0]['description'].capitalize()}")
 
-        # Messaggio di avviso per previsioni meteo
         st.warning("⚠️ Le previsioni meteo sono fornite da OpenWeather e potrebbero non essere completamente accurate o aggiornate in tempo reale.")
-        st.info("Suggerimento: Per una corretta geolocalizzazione, esegui l'app su HTTPS (ad esempio tramite Streamlit Sharing).")
-        
+        st.info("Suggerimento: Per una corretta geolocalizzazione, esegui l'app su HTTPS (es. Streamlit Cloud).")
     except Exception as e:
         st.error(f"Errore nel recupero meteo: {e}")

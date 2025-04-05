@@ -39,7 +39,7 @@ def show_monitoring_page(earthquake_data, get_text):
 
         # Render Vesuvius SVG image
         from utils import render_svg
-        col1, col2 = st.columns([1, 2])
+        col1, col2 = st.columns([1, 1])
         with col1:
             render_svg('assets/vesuvio.svg')
 
@@ -262,7 +262,7 @@ def show_monitoring_page(earthquake_data, get_text):
         flegrei_data = data_service.filter_area_earthquakes(earthquake_data, 'campi_flegrei')
 
         # Render Campi Flegrei SVG image
-        col1, col2 = st.columns([1, 2])
+        col1, col2 = st.columns([1, 1])
         with col1:
             render_svg('assets/campi_flegrei.svg')
 
