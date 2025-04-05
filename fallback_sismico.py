@@ -4,7 +4,7 @@ import requests
 from datetime import datetime
 import streamlit as st
 
-@st.cache_data(ttl=15, show_spinner=False)
+@st.cache_data(ttl=5, show_spinner=False)
 def fetch_ingv_data():
     try:
         url = "https://webservices.ingv.it/fdsnws/event/1/query"
@@ -12,7 +12,7 @@ def fetch_ingv_data():
             "format": "geojson",
             "starttime": datetime.utcnow().date().isoformat() + "T00:00:00"
         }
-        resp = requests.get(url, params=params, timeout=5)
+        resp = requests.get(url, params=params, timeout=4)
         resp.raise_for_status()
         features = resp.json().get("features", [])
         eventi = []
@@ -32,7 +32,7 @@ def fetch_ingv_data():
     except Exception:
         return pd.DataFrame()
 
-@st.cache_data(ttl=15, show_spinner=False)
+@st.cache_data(ttl=5, show_spinner=False)
 def fetch_usgs_data():
     try:
         url = "https://earthquake.usgs.gov/fdsnws/event/1/query"
@@ -45,7 +45,7 @@ def fetch_usgs_data():
             "maxradiuskm": 100,
             "limit": 500
         }
-        resp = requests.get(url, params=params, timeout=5)
+        resp = requests.get(url, params=params, timeout=4)
         resp.raise_for_status()
         features = resp.json().get("features", [])
         eventi = []
