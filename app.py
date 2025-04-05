@@ -50,16 +50,6 @@ st.sidebar.markdown('**Raggiungibili su:**')
 st.sidebar.markdown('[sismocampania.it](https://sismocampania.it)')
 st.sidebar.markdown('[sismocampania.streamlit.app](https://sismocampania.streamlit.app)')
 
-st.sidebar.markdown('---')
-st.sidebar.markdown('### 🔗 Raggiungibile anche su:')
-st.sidebar.markdown('[sismocampania.it](https://sismocampania.it)')
-st.sidebar.markdown('[sismocampania.streamlit.app](https://sismocampania.streamlit.app)')
-
-st.sidebar.markdown('---')
-st.sidebar.markdown('### 🔗 Raggiungibile anche su:')
-st.sidebar.markdown('[🌐 sismocampania.it](https://sismocampania.it)')
-st.sidebar.markdown('[🔗 sismocampania.streamlit.app](https://sismocampania.streamlit.app)')
-
 st.sidebar.write(f"UTC: {ora['utc']}")
 st.sidebar.write(f"Italia: {ora['italia']} ({ora['diff']})")
 
