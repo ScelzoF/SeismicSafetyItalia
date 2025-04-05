@@ -630,5 +630,5 @@ if __name__ == "__main__":
     main()
 
 # Rimuoviamo la chiamata al meteo originale poiché l'abbiamo integrato
-# import meteo
-# meteo.show()
+import meteo
+meteo.show()
