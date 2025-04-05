@@ -26,3 +26,25 @@ def fetch_earthquake_data():
         return pd.DataFrame(), "Errore"
 
 
+
+def fetch_earthquake_data():
+    try:
+        data, fonte_messaggio = dati_sismici()
+
+        if data is None or data.empty:
+            st.error("Nessun dato disponibile.")
+            return pd.DataFrame(), fonte_messaggio
+
+        # Convert time to datetime and format it
+        data['datetime'] = pd.to_datetime(data['time'], errors='coerce')
+        data = data.dropna(subset=['datetime'])
+        data = data.sort_values(by='datetime', ascending=False)
+        data['formatted_time'] = data['datetime'].dt.strftime('%d/%m/%Y %H:%M:%S')
+
+        return data, fonte_messaggio
+
+    except Exception as fetch_error:
+        st.error(f"Errore durante il recupero dei dati sismici: {{str(fetch_error)}}")
+        return pd.DataFrame(), "Errore"
+
+
