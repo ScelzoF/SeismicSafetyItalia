@@ -3,12 +3,12 @@ import pandas as pd
 import streamlit as st
 from monitoraggio_fallback import dati_sismici
 
-def get_sismic_data():
+def get_sismic_data(show_debug=False):
     try:
-        df, fonte = dati_sismici()
+        df, fonte = dati_sismici(show_debug=show_debug)
 
         if df is None or df.empty:
-            return pd.DataFrame(), "⚠️ Nessun dato disponibile."
+            return pd.DataFrame(), fonte
 
         df['datetime'] = pd.to_datetime(df['time'], errors='coerce')
         df = df.dropna(subset=['datetime'])
@@ -17,5 +17,7 @@ def get_sismic_data():
 
         return df, fonte
     except Exception as e:
-        st.error(f"Errore fallback: {e}")
-        return pd.DataFrame(), "⚠️ Errore nel recupero dei dati."
+        errore = f"⚠️ Errore durante il recupero dei dati: {e}"
+        if show_debug:
+            st.error(errore)
+        return pd.DataFrame(), errore
