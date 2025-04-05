@@ -29,6 +29,16 @@ def fetch_usgs_data():
 
 # Function to process and combine data from INGV and USGS
 def process_data():
+
+    from fallback_wrapper import get_sismic_data
+    df, fonte = get_sismic_data()
+    if not df.empty:
+        st.info(fonte)
+        st.dataframe(df)
+    else:
+        st.warning("⚠️ Nessun dato disponibile al momento.")
+    return
+
     # Choose data source
     data_source = st.selectbox("Scegli la fonte dei dati", ["INGV", "USGS"])
     
