@@ -147,9 +147,9 @@ def show_monitoring_page(earthquake_data, get_text):
             labels={"x": "Tempo", "y": f"{sensor_option} ({unit})"}
         )
 
-        st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Add sensor status and metadata
         with st.expander("Stato sensori e metadata"):
@@ -364,9 +364,9 @@ st.markdown('</div>', unsafe_allow_html=True)
             labels={"x": "Tempo", "y": f"{param_option} ({unit})"}
         )
 
-        st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Add sensor status information
         with st.expander("Stato Sensori"):
@@ -505,7 +505,7 @@ def show_earthquake_table(df, get_text):
 
     # Show the data table
     st.dataframe(display_df, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # Function to show a chart of earthquake magnitudes over time
 def show_magnitude_time_chart(df, area, get_text):
@@ -533,9 +533,9 @@ def show_magnitude_time_chart(df, area, get_text):
     )
 
     # Show the chart
-    st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Calculate stats before using them
     stats = calculate_earthquake_statistics(df)
@@ -552,9 +552,9 @@ st.markdown('</div>', unsafe_allow_html=True)
         fig = px.imshow(deformation_data,
                        labels=dict(color="mm/anno"),
                        title="Deformazione del suolo")
-        st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("""
         **Interpretazione:**
@@ -572,9 +572,9 @@ st.markdown('</div>', unsafe_allow_html=True)
         fig = px.line(x=dates, y=displacement,
                      labels={'x': 'Data', 'y': 'Spostamento (cm)'},
                      title="Trend di deformazione")
-        st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Add Enhanced Risk Analysis
     st.subheader("🎯 Analisi del Rischio Avanzata")
@@ -603,18 +603,18 @@ go.Indicator(
     }
 )
 )
-        st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     with risk_cols[1]:
         # Frequency distribution
         events_per_day = list(stats['daily_counts'].values())
         fig = go.Figure(data=[go.Histogram(x=events_per_day, nbinsx=10)])
         fig.update_layout(title="Distribuzione Eventi Giornalieri")
-        st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     with risk_cols[2]:
         # Risk factors breakdown
@@ -631,9 +631,9 @@ st.markdown('</div>', unsafe_allow_html=True)
                   marker_color=['blue', 'red', 'green', 'orange'])
         ])
         fig.update_layout(title="Fattori di Rischio")
-        st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Add Risk Calendar with enhanced interactivity
     st.subheader("📅 Calendario del Rischio")
@@ -697,9 +697,9 @@ st.markdown('</div>', unsafe_allow_html=True)
         xaxis_showgrid=True
     )
 
-    st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Calculate recent and older counts
     recent_dates = [k for k in stats['daily_counts'].keys() 
@@ -801,9 +801,9 @@ def show_predictions_page(earthquake_data, get_text):
                     }
                 ))
                 fig.update_layout(height=200, margin=dict(l=20, r=20, t=30, b=20))
-                st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         show_trend_analysis(earthquake_data, "Italy", get_text)
 
@@ -842,9 +842,9 @@ st.markdown('</div>', unsafe_allow_html=True)
                     }
                 ))
                 fig.update_layout(height=200, margin=dict(l=20, r=20, t=30, b=20))
-                st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         vesuvio_data = data_service.filter_area_earthquakes(earthquake_data, 'vesuvio')
         if vesuvio_data.empty:
@@ -887,9 +887,9 @@ st.markdown('</div>', unsafe_allow_html=True)
                     }
                 ))
                 fig.update_layout(height=200, margin=dict(l=20, r=20, t=30, b=20))
-                st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         flegrei_data = data_service.filter_area_earthquakes(earthquake_data, 'campi_flegrei')
         if flegrei_data.empty:
@@ -979,9 +979,9 @@ def show_trend_analysis(df, area, get_text):
         title="Indicatori di Rischio"
     )
 
-    st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Prepare data for daily events chart
     if stats['daily_counts']:
@@ -1004,9 +1004,9 @@ st.markdown('</div>', unsafe_allow_html=True)
             hovermode="x"
         )
 
-        st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Depth vs Magnitude scatter plot
     fig = px.scatter(
@@ -1024,9 +1024,9 @@ st.markdown('</div>', unsafe_allow_html=True)
         yaxis_title=get_text('magnitude'),
     )
 
-    st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
-st.plotly_chart(fig, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; justify-content:center">', unsafe_allow_html=True)
+            st.plotly_chart(fig, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
     # Consigli specifici in base al livello di rischio
     st.subheader("Consigli per la popolazione")
