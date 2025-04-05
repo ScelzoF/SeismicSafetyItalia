@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://esempio.github.io/sismocampania-seo/sitemap.xml
