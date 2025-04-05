@@ -1,3 +1,5 @@
+from fallback_wrapper import get_sismic_data
+
 
 import streamlit as st
 import pandas as pd
@@ -99,3 +101,14 @@ def show():
     # Mappa centrata sull'Italia se geolocalizzazione disponibile
     if coords and "lat" in coords and "lon" in coords:
         st.map(pd.DataFrame([coords]), zoom=5)
+
+
+
+# Dati sismici con fallback INGV → USGS
+df, fonte = get_sismic_data()
+
+if not df.empty:
+    st.info(fonte)
+    st.dataframe(df)
+else:
+    st.warning("⚠️ Nessun dato disponibile al momento.")
