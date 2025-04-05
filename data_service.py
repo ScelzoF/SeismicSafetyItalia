@@ -21,6 +21,8 @@ def fetch_earthquake_data():
 
         return data, fonte_messaggio
 
-    except Exception as e:
-        st.error(f"Errore durante il recupero dei dati sismici: {str(e)}")
+    except Exception as fetch_error:
+        st.error(f"Errore durante il recupero dei dati sismici: {str(fetch_error)}")
         return pd.DataFrame(), "Errore"
+
+
