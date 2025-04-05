@@ -29,6 +29,7 @@ def fetch_usgs_data():
 
 # Function to process and combine data from INGV and USGS
 def process_data():
+    st.warning('✅ DEBUG: process_data è stata eseguita!')
 
     from fallback_wrapper import get_sismic_data
     df, fonte = get_sismic_data()
