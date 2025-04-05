@@ -304,7 +304,7 @@ with st.sidebar:
         format_func=lambda x: get_text(x),
         label_visibility="collapsed"
     )
-    
+    <meta name="google-site-verification" content="2qf7zJqWyrLQQsDdC2Cidgud_vld5QuAhzOIJhwIoHI" />
     # Notification toggle
     st.checkbox(
         get_text('enable_notifications'),
