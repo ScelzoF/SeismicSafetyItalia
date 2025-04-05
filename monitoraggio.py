@@ -1,3 +1,4 @@
+from fallback_wrapper import get_sismic_data
 
 import streamlit as st
 import pandas as pd
@@ -61,3 +62,14 @@ def process_data():
     # Create and display a plotly chart with unique ID
     fig = px.line(df, x="Data/Ora UTC", y="Magnitudo", title="📈 Media Magnitudo Giornaliera")
     st.plotly_chart(fig, use_container_width=True, key="unique_magnitude_chart")
+
+
+
+# Dati sismici con fallback INGV → USGS
+df, fonte = get_sismic_data()
+
+if not df.empty:
+    st.info(fonte)
+    st.dataframe(df)
+else:
+    st.warning("⚠️ Nessun dato disponibile al momento.")

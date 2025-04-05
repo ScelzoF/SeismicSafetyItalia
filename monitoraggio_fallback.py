@@ -12,14 +12,11 @@ try:
 except ImportError:
     usgs = None
 
-# Stato della fonte attiva
 FONTE_ATTIVA = {"fonte": "INGV", "ultimo_check": time.time()}
 
 def dati_sismici():
     global FONTE_ATTIVA
-
     try:
-        # Prova a ottenere dati da INGV
         data = ingv.dati_sismici()
         if FONTE_ATTIVA["fonte"] != "INGV":
             logging.info("Fonte INGV ripristinata.")
