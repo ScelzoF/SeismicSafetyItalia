@@ -75,7 +75,6 @@ def process_data():
 
 
 # Dati sismici con fallback INGV → USGS
-    show_debug = st.sidebar.checkbox('Mostra dettagli tecnici')
 df, fonte = get_sismic_data(show_debug=show_debug)
 
 if not df.empty:
