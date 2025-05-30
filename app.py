@@ -637,3 +637,34 @@ if __name__ == "__main__":
 # Rimuoviamo la chiamata al meteo originale poiché l'abbiamo integrato
 import meteo
 meteo.show()
+
+# === KEEP-ALIVE ===
+import streamlit.components.v1 as components
+
+components.html("""
+<script>
+setInterval(() => {
+    fetch("/_stcore/health");
+}, 60000); // ogni 60 secondi
+</script>
+""", height=0)
+
+import time
+if 'last_ping' not in st.session_state:
+    st.session_state['last_ping'] = time.time()
+
+if time.time() - st.session_state['last_ping'] > 60:
+    st.session_state['last_ping'] = time.time()
+    _ = st.empty()
+
+
+# === SUPABASE AUTO REFRESH ===
+try:
+    import time
+    if 'last_refresh' in st.session_state and time.time() - st.session_state['last_refresh'] > 3000:
+        new_session = supabase.auth.refresh_session(st.session_state['refresh_token'])
+        st.session_state['access_token'] = new_session.access_token
+        st.session_state['refresh_token'] = new_session.refresh_token
+        st.session_state['last_refresh'] = time.time()
+except Exception as e:
+    st.warning(f"Errore nel refresh della sessione: {e}")
