@@ -680,7 +680,7 @@ go.Indicator(
         xaxis_showgrid=True
     )
 
-    st.plotly_chart(fig, use_container_width=True, key="magnitude_time_chart")
+    st.plotly_chart(fig, use_container_width=True)
 
     # Calculate recent and older counts
     recent_dates = [k for k in stats['daily_counts'].keys() 
