@@ -309,20 +309,38 @@ def multi_ai_consensus(area: str, data_ctx: dict) -> dict:
 
     results["elapsed_s"] = round(time.time() - t0, 1)
 
-    # Genera consensus da GPT (sintetizza le 3 risposte)
+    def _clean(text: str) -> str:
+        """Rimuove titoli markdown e tronca a max 5 frasi."""
+        if not text:
+            return text
+        lines = [l for l in text.splitlines() if not l.strip().startswith("#")]
+        cleaned = " ".join(" ".join(lines).split())
+        sentences = cleaned.split(". ")
+        return ". ".join(sentences[:6]).strip()
+
+    # Normalizza le risposte
+    for key in ("gpt", "claude", "gemini"):
+        if results[key]:
+            results[key] = _clean(results[key])
+
+    # Filtra risposte valide (non messaggi di errore)
+    _err_prefixes = ("[", "GPT non", "Claude non", "Gemini non", "non disponibile")
     responses_available = [
         r for r in [results["gpt"], results["claude"], results["gemini"]]
-        if r and not r.startswith("[") and not r.startswith("GPT") and not r.startswith("Claude") and not r.startswith("Gemini")
+        if r and len(r) > 30 and not any(r.startswith(p) for p in _err_prefixes)
     ]
+    results["n_responses"] = len(responses_available)
+
     if len(responses_available) >= 2:
         consensus_prompt = (
-            f"Questi sono 3 pareri di esperti AI sull'area sismica {area}:\n\n"
+            f"Questi sono {len(responses_available)} pareri di esperti AI sull'area sismica {area}:\n\n"
             + "\n\n---\n\n".join(
                 [f"Parere {i+1}: {r}" for i, r in enumerate(responses_available)]
             )
             + "\n\nSintetizza in 3-4 frasi un consenso scientifico autorevole, "
-            "indicando eventuali punti di accordo e divergenza tra i pareri. "
-            "Scrivi in italiano, stile comunicato ufficiale."
+            "indicando punti di accordo e eventuali divergenze tra i pareri. "
+            "Scrivi in italiano, stile comunicato ufficiale. "
+            "NON usare titoli, elenchi puntati o formattazione markdown."
         )
         results["consensus"] = _ask_gpt(consensus_prompt, system=_SYSTEM_PROMPT)
     elif responses_available:

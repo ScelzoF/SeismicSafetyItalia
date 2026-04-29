@@ -967,7 +967,7 @@ border-radius:10px;padding:10px 4px;background:#fff;">
                 f"<div style='background:linear-gradient(135deg,#f8f0ff 0%,#fff 100%);"
                 f"border:2px solid #6f42c1;border-radius:12px;padding:20px;"
                 f"font-size:15px;line-height:1.7;color:#333;'>"
-                f"<b style='color:#6f42c1;'>🧠 Sintesi consensuale (GPT-5 su 3 pareri):</b><br><br>"
+                f"<b style='color:#6f42c1;'>🧠 Sintesi consensuale (GPT-4o su {mai_result.get('n_responses', 3)} pareri):</b><br><br>"
                 f"{consensus}</div>",
                 unsafe_allow_html=True,
             )
