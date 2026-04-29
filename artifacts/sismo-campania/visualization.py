@@ -840,7 +840,7 @@ def _show_italia_tab(df, get_text):
 
     _plot_daily_activity(df)
     _show_risk_calendar(df, area_name="Italia", plot_key="italia")
-    _show_ingv_news()
+    _show_ingv_news(area="all")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1165,6 +1165,7 @@ def _show_vesuvio_tab(df, get_text):
     _section_divider(_gt("official_monitoring"))
     _show_ingv_official_links("vesuvio")
     _render_pdf_download_button("vesuvio")
+    _show_ingv_news(area="vesuvio")
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     _show_risk_calendar(vesuvio_data if not vesuvio_data.empty else df,
@@ -1462,7 +1463,7 @@ Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi er
     _section_divider(_gt("official_monitoring"))
     _show_ingv_official_links("flegrei")
     _render_pdf_download_button("campi_flegrei")
-    _show_ingv_news()
+    _show_ingv_news(area="cf")
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     _show_risk_calendar(flegrei_data if not flegrei_data.empty else df,
@@ -2463,18 +2464,66 @@ def _show_area_analytics(df, area_name):
         st.caption(_gt("data_update_caption"))
 
 
-def _show_ingv_news():
-    news = fetch_ingv_news(max_items=5)
+def _show_ingv_news(area: str = "all"):
+    """
+    Mostra le ultime notizie INGV OV scraped dalla homepage ufficiale.
+
+    area: "cf" | "vesuvio" | "ischia" | "all"
+    Le notizie hanno immagini, date, titoli e link reali.
+    """
+    _AREA_MAP = {"cf": "cf", "flegrei": "cf", "vesuvio": "vesuvio", "ischia": "ischia", "all": "all"}
+    _filter = _AREA_MAP.get(area, "all")
+    news = fetch_ingv_news(max_items=8, area_filter=_filter)
+    # fallback: se nessuna per area, mostra quelle generali
+    if not news and _filter != "all":
+        news = fetch_ingv_news(max_items=5, area_filter="all")
     if not news:
         return
-    with st.expander("📰 Ultime notizie INGV", expanded=False):
-        for item in news:
-            st.markdown(f"**[{item['title']}]({item['link']})**")
-            if item["date"]:
-                st.caption(f"📅 {item['date']}")
-            if item["description"]:
-                st.markdown(f"_{item['description']}..._")
-            st.divider()
+    _label_map = {
+        "cf": "Campi Flegrei",
+        "vesuvio": "Vesuvio",
+        "ischia": "Ischia",
+        "all": "INGV OV",
+    }
+    with st.expander(
+        f"📰 Ultime notizie {_label_map.get(_filter,'INGV OV')} — Osservatorio Vesuviano",
+        expanded=False,
+    ):
+        st.caption("Dati estratti in tempo reale dalla homepage www.ov.ingv.it · aggiornamento ogni ora")
+        cols_per_row = 2
+        rows = [news[i : i + cols_per_row] for i in range(0, len(news), cols_per_row)]
+        for row in rows:
+            cols = st.columns(cols_per_row)
+            for col, item in zip(cols, row):
+                with col:
+                    if item.get("image_url"):
+                        try:
+                            st.markdown(
+                                f"<a href='{item['link']}' target='_blank' rel='noopener'>"
+                                f"<img src='{item['image_url']}' style='width:100%;border-radius:6px;"
+                                f"margin-bottom:4px;object-fit:cover;max-height:140px;' /></a>",
+                                unsafe_allow_html=True,
+                            )
+                        except Exception:
+                            pass
+                    st.markdown(
+                        f"**[{item['title']}]({item['link']})**",
+                        help="Apri articolo sul sito INGV OV",
+                    )
+                    meta_parts = []
+                    if item.get("date"):
+                        meta_parts.append(f"📅 {item['date']}")
+                    if item.get("hits"):
+                        meta_parts.append(f"👁 {item['hits']} visite")
+                    cats_nice = [c.replace("cat-news-","").replace("cat-","") for c in item.get("categories",[])]
+                    if cats_nice:
+                        meta_parts.append(" · ".join(cats_nice))
+                    if meta_parts:
+                        st.caption(" · ".join(meta_parts))
+        st.markdown(
+            "[→ Tutte le notizie INGV OV](https://www.ov.ingv.it/index.php/it/news-ov)",
+            unsafe_allow_html=False,
+        )
 
 
 def _link_row(icon_label, href, link_text):

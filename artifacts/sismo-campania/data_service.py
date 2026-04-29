@@ -590,46 +590,81 @@ def calculate_earthquake_statistics(df):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def fetch_ingv_news(max_items=5):
-    """Ultime notizie INGV da RSS — con fallback multi-URL."""
-    news_items = []
-    urls_to_try = [
-        "https://www.ingv.it/index.php?format=feed&type=rss",
-        "https://www.ov.ingv.it/index.php/it/news-ov?format=feed&type=rss",
-        "https://www.ov.ingv.it/index.php/it/?format=feed&type=rss",
-        "https://www.ingv.it/it/?format=feed&type=rss",
-    ]
-    headers = {"User-Agent": "SeismicSafetyItalia/2.0",
-               "Accept": "application/rss+xml, application/xml, text/xml"}
-    for url in urls_to_try:
-        try:
-            resp = requests.get(url, timeout=3, headers=headers, allow_redirects=False)
-            if resp.status_code != 200:
+def fetch_ingv_news(max_items: int = 8, area_filter: str = "all") -> list:
+    """
+    Ultime notizie INGV OV — scraping HTML dalla homepage www.ov.ingv.it.
+
+    La homepage usa Joomla con un blocco <ul class="rga"> che espone ogni
+    news come <li class="mix cat-news[-cf|-ves|-ischia]"> con data-attributes
+    strutturati (data-date, data-author, data-hits) e immagini reali.
+
+    I feed RSS Joomla del sito non sono funzionanti (302/empty).
+
+    Args:
+        max_items:   numero massimo di risultati da restituire.
+        area_filter: "cf" | "vesuvio" | "ischia" | "all"
+    Returns:
+        Lista di dict con chiavi:
+          title, link, date (YYYY-MM-DD), image_url, categories, hits
+    """
+    try:
+        from bs4 import BeautifulSoup
+        import re as _re
+        resp = requests.get(
+            "https://www.ov.ingv.it/",
+            timeout=8,
+            headers={"User-Agent": "SeismicSafetyItalia/2.0 (monitoring)"},
+            allow_redirects=True,
+        )
+        if resp.status_code != 200:
+            return []
+        soup = BeautifulSoup(resp.text, "html.parser")
+        # The news block is a <ul id="rga-NN"> inside .module-news
+        ul = soup.find("ul", id=_re.compile(r"^rga-"))
+        if ul is None:
+            return []
+        items = ul.find_all("li", class_=_re.compile(r"\bmix\b"))
+        news = []
+        for li in items:
+            classes = li.get("class", [])
+            cats = [c for c in classes if c.startswith("cat-")]
+            # area filter
+            if area_filter == "cf" and not any("cf" in c or "flegrei" in c for c in cats):
                 continue
-            content = resp.content
-            if not content or len(content) < 100:
+            if area_filter == "vesuvio" and not any("ves" in c for c in cats):
                 continue
-            root = ET.fromstring(content)
-            channel = root.find("channel")
-            if channel is None:
+            if area_filter == "ischia" and not any("ischia" in c for c in cats):
                 continue
-            for item in channel.findall("item")[:max_items]:
-                title_el = item.find("title")
-                link_el  = item.find("link")
-                date_el  = item.find("pubDate")
-                desc_el  = item.find("description")
-                if title_el is not None and title_el.text:
-                    news_items.append({
-                        "title": title_el.text.strip(),
-                        "link": (link_el.text or "https://www.ingv.it").strip(),
-                        "date": (date_el.text or "")[:16],
-                        "description": ((desc_el.text or "").strip())[:200]
-                    })
-            if news_items:
-                break
-        except Exception:
-            continue
-    return news_items
+            raw_date = li.get("data-date", "")[:10]  # "2025-10-02"
+            hits = li.get("data-hits", "0")
+            title_a = li.find("a", class_="mix-title")
+            if title_a is None:
+                title_a = li.find("h3", recursive=True)
+                if title_a:
+                    title_a = title_a.find("a")
+            if title_a is None:
+                continue
+            title = title_a.get_text(strip=True)
+            href = title_a.get("href", "")
+            if href and not href.startswith("http"):
+                href = "https://www.ov.ingv.it" + href
+            img_el = li.find("img")
+            img_url = ""
+            if img_el:
+                img_url = img_el.get("src") or img_el.get("data-src", "")
+                if img_url and not img_url.startswith("http"):
+                    img_url = "https://www.ov.ingv.it" + img_url
+            news.append({
+                "title":      title,
+                "link":       href,
+                "date":       raw_date,
+                "image_url":  img_url,
+                "categories": cats,
+                "hits":       int(hits) if str(hits).isdigit() else 0,
+            })
+        return news[:max_items]
+    except Exception:
+        return []
 
 
 def compute_hourly_distribution(df):
