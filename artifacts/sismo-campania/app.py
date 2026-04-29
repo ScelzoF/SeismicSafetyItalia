@@ -377,7 +377,7 @@ box-shadow:0 3px 10px rgba(255,210,0,.4);">
 <table style="width:100%;border-collapse:collapse;">
   <tr>
     <td style="color:#adb5bd;padding:3px 6px 3px 0;white-space:nowrap;font-weight:600;">👤 Intestatario</td>
-    <td style="padding:3px 0;font-weight:700;">Saverio Morano</td>
+    <td style="padding:3px 0;font-weight:700;">Andrea Scelzo</td>
   </tr>
   <tr>
     <td style="color:#adb5bd;padding:3px 6px 3px 0;white-space:nowrap;font-weight:600;">💳 N° Carta</td>
