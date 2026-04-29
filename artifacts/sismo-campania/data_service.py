@@ -224,58 +224,159 @@ _VOLCANIC_BOUNDS = {
 }
 
 
-@st.cache_data(ttl=10800, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_earthquake_data_for_ml_area(area_key: str, days: int = 90) -> "pd.DataFrame":
     """
-    Fetch INGV su finestra 90 giorni per aree vulcaniche campane.
-    Box allargato rispetto a filter_area_earthquakes, soglia M0.0.
-    Cache TTL 3 ore per non appesantire l'API.
+    Dati sismici multi-sorgente per SISMAI — finestra 90 giorni.
+    Sorgenti (parallele):
+      • INGV FDSNWS: 90 giorni, area specifica, M≥0.0   (primario)
+      • GOSSIP-OV:   7 giorni, rete locale OV (micro-eventi non in INGV FDSN)
+      • EMSC:        7 giorni, eventi M≥0.5 Italia (cross-validazione europea)
+    Deduplicazione identica a fetch_earthquake_data() — priorità INGV>GOSSIP-OV>EMSC.
+    Cache TTL 1h per essere aggiornato quanto basta senza pesare sull'API.
     """
     bounds = _VOLCANIC_BOUNDS.get(area_key)
     if not bounds:
         return pd.DataFrame()
-    try:
-        end_time = datetime.utcnow().replace(second=0, microsecond=0)
-        start_time = end_time - timedelta(days=days)
-        params = {
-            "starttime": start_time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "endtime":   end_time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "minmag": 0.0,
-            "format": "geojson",
-            "limit": 5000,
-            **bounds,
-        }
-        headers = {"Accept": "application/json", "User-Agent": "SeismicSafetyItalia/2.0"}
-        resp = _retry_get(INGV_API_URL, params=params, headers=headers, timeout=20)
-        if resp.status_code != 200 or not resp.text:
+
+    def _fetch_ingv_area() -> pd.DataFrame:
+        try:
+            end_time   = datetime.utcnow().replace(second=0, microsecond=0)
+            start_time = end_time - timedelta(days=days)
+            params = {
+                "starttime": start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "endtime":   end_time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "minmag": 0.0,
+                "format": "geojson",
+                "limit": 5000,
+                **bounds,
+            }
+            resp = _retry_get(
+                INGV_API_URL, params=params,
+                headers={"Accept": "application/json", "User-Agent": "SeismicSafetyItalia/2.0"},
+                timeout=20,
+            )
+            if resp.status_code != 200 or not resp.text:
+                return pd.DataFrame()
+            rows = []
+            for ev in resp.json().get("features", []):
+                props  = ev.get("properties", {})
+                coords = (ev.get("geometry") or {}).get("coordinates", [0, 0, 0])
+                tv = props.get("time", "")
+                ts = (datetime.utcfromtimestamp(tv / 1000).strftime("%Y-%m-%dT%H:%M:%S")
+                      if isinstance(tv, (int, float)) else str(tv))
+                rows.append({
+                    "time":      ts,
+                    "magnitude": float(props.get("mag") or 0),
+                    "depth":     float(coords[2]) if len(coords) > 2 else 0.0,
+                    "latitude":  float(coords[1]) if len(coords) > 1 else 0.0,
+                    "longitude": float(coords[0]) if len(coords) > 0 else 0.0,
+                    "location":  str(props.get("place") or "Sconosciuta"),
+                    "source":    "INGV",
+                })
+            return pd.DataFrame(rows) if rows else pd.DataFrame()
+        except Exception:
             return pd.DataFrame()
-        data = resp.json()
-        rows = []
-        for event in data.get("features", []):
-            props  = event.get("properties", {})
-            coords = (event.get("geometry") or {}).get("coordinates", [0, 0, 0])
-            time_val = props.get("time", "")
-            if isinstance(time_val, (int, float)):
-                time_str = datetime.utcfromtimestamp(time_val / 1000).strftime("%Y-%m-%dT%H:%M:%S")
-            else:
-                time_str = str(time_val)
-            rows.append({
-                "time":      time_str,
-                "magnitude": float(props.get("mag") or 0),
-                "depth":     float(coords[2]) if len(coords) > 2 else 0.0,
-                "latitude":  float(coords[1]) if len(coords) > 1 else 0.0,
-                "longitude": float(coords[0]) if len(coords) > 0 else 0.0,
-                "location":  str(props.get("place") or "Sconosciuta"),
-                "source":    "INGV",
-            })
-        df = pd.DataFrame(rows)
-        if not df.empty:
-            df["datetime"] = pd.to_datetime(df["time"], errors="coerce")
-            df = df.dropna(subset=["datetime"])
-            df = df.sort_values("datetime", ascending=False)
-        return df
-    except Exception:
+
+    def _fetch_gossip_area() -> pd.DataFrame:
+        """GOSSIP-OV filtrato per bounding box area."""
+        try:
+            df = _fetch_gossip_raw()
+            if df.empty:
+                return pd.DataFrame()
+            return df[
+                (df["latitude"]  >= bounds["minlat"]) & (df["latitude"]  <= bounds["maxlat"]) &
+                (df["longitude"] >= bounds["minlon"]) & (df["longitude"] <= bounds["maxlon"])
+            ].copy()
+        except Exception:
+            return pd.DataFrame()
+
+    def _fetch_emsc_area() -> pd.DataFrame:
+        """EMSC 7 giorni filtrato per bounding box area."""
+        try:
+            end_time   = datetime.utcnow().replace(second=0, microsecond=0)
+            start_time = end_time - timedelta(days=7)
+            params = {
+                "format": "json",
+                "start":  start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "end":    end_time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "minmag": 0.5,
+                "minlat": bounds["minlat"], "maxlat": bounds["maxlat"],
+                "minlon": bounds["minlon"], "maxlon": bounds["maxlon"],
+                "limit":  300,
+            }
+            resp = _retry_get(
+                "https://www.seismicportal.eu/fdsnws/event/1/query",
+                params=params,
+                headers={"Accept": "application/json", "User-Agent": "SeismicSafetyItalia/2.0"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            if resp.status_code != 200 or not resp.text:
+                return pd.DataFrame()
+            rows = []
+            for feat in resp.json().get("features", []):
+                props  = feat.get("properties", {})
+                coords = (feat.get("geometry") or {}).get("coordinates", [0, 0, 0])
+                t      = props.get("time") or props.get("lastupdate", "")
+                if not t:
+                    continue
+                rows.append({
+                    "time":      str(t)[:19],
+                    "magnitude": float(props.get("mag") or 0),
+                    "depth":     float(coords[2]) if len(coords) > 2 else 0.0,
+                    "latitude":  float(coords[1]) if len(coords) > 1 else 0.0,
+                    "longitude": float(coords[0]) if len(coords) > 0 else 0.0,
+                    "location":  str(props.get("flynn_region") or props.get("place") or "Sconosciuta"),
+                    "source":    "EMSC",
+                })
+            return pd.DataFrame(rows) if rows else pd.DataFrame()
+        except Exception:
+            return pd.DataFrame()
+
+    # Fetch parallelo
+    ingv_df   = pd.DataFrame()
+    gossip_df = pd.DataFrame()
+    emsc_df   = pd.DataFrame()
+
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        futures = {
+            ex.submit(_fetch_ingv_area):   "ingv",
+            ex.submit(_fetch_gossip_area): "gossip",
+            ex.submit(_fetch_emsc_area):   "emsc",
+        }
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                res = future.result()
+                if not res.empty:
+                    if name == "ingv":
+                        ingv_df = res
+                    elif name == "gossip":
+                        gossip_df = res
+                    else:
+                        emsc_df = res
+            except Exception:
+                pass
+
+    combined = pd.concat([ingv_df, gossip_df, emsc_df], ignore_index=True)
+    if combined.empty:
         return pd.DataFrame()
+
+    combined["datetime"] = pd.to_datetime(combined["time"], errors="coerce")
+    combined = combined.dropna(subset=["datetime"])
+
+    # Deduplicazione: priorità INGV > GOSSIP-OV > EMSC
+    _src_order = {"INGV": 0, "GOSSIP-OV": 1, "EMSC": 2}
+    combined["_src_rank"] = combined["source"].map(lambda s: _src_order.get(s, 9))
+    combined["_lat_r"] = combined["latitude"].round(1)
+    combined["_lon_r"] = combined["longitude"].round(1)
+    combined["_mag_r"] = combined["magnitude"].round(1)
+    combined["_ts_r"]  = combined["datetime"].dt.round("60s")
+    combined = (combined.sort_values("_src_rank")
+                        .drop_duplicates(subset=["_lat_r", "_lon_r", "_mag_r", "_ts_r"])
+                        .drop(columns=["_src_rank", "_lat_r", "_lon_r", "_mag_r", "_ts_r"])
+                        .sort_values("datetime", ascending=False))
+    return combined.reset_index(drop=True)
 
 
 @st.cache_data(ttl=900, show_spinner=False)

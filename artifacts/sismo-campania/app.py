@@ -628,7 +628,7 @@ elif page == "ai_assistant":
         st.markdown("### ©️ SISMAI — Sistema Integrato Sismico Multi-AI")
         st.markdown(
             "Modello ensemble **RandomForest + Poisson-Gutenberg-Richter + Omori-Utsu** "
-            "con feature live: sismicità INGV/USGS · pressione atmosferica (base+vetta) · "
+            "con feature live: sismicità INGV/GOSSIP-OV/EMSC · pressione atmosferica (base+vetta) · "
             "temperatura · bollettino INGV OV · GPS deformazione · 90 giorni di storico."
         )
 
@@ -680,13 +680,16 @@ elif page == "ai_assistant":
                         f"margin:2px 3px;'>{name} {status}{count}</span>"
                     )
 
+                def _n(src: str) -> int:
+                    return int(sismai_df[sismai_df["source"] == src].shape[0]) if src in _src_active else 0
+
                 badges_html = (
                     "<div style='margin-bottom:8px;'>"
-                    + _src_badge("INGV", "INGV" in _src_active, int((_src_active and sismai_df[sismai_df["source"]=="INGV"].shape[0]) if "INGV" in _src_active else 0))
-                    + _src_badge("EMSC", "EMSC" in _src_active, int(sismai_df[sismai_df["source"]=="EMSC"].shape[0]) if "EMSC" in _src_active else 0)
-                    + _src_badge("GOSSIP-OV", "GOSSIP-OV" in _src_active, int(sismai_df[sismai_df["source"]=="GOSSIP-OV"].shape[0]) if "GOSSIP-OV" in _src_active else 0)
-                    + _src_badge("USGS", "USGS" in _src_active, int(sismai_df[sismai_df["source"]=="USGS"].shape[0]) if "USGS" in _src_active else 0)
+                    + _src_badge("INGV", "INGV" in _src_active, _n("INGV"))
+                    + _src_badge("GOSSIP-OV", "GOSSIP-OV" in _src_active, _n("GOSSIP-OV"))
+                    + _src_badge("EMSC", "EMSC" in _src_active, _n("EMSC"))
                     + _src_badge("Open-Meteo", _meteo_live)
+                    + _src_badge("Bollettino OV", bool((st.session_state.get("bulletin_live_cache") or {}).get("_scraped")))
                     + "</div>"
                 )
                 st.markdown(
@@ -910,7 +913,7 @@ border-radius:10px;padding:10px 4px;background:#fff;">
             )
             st.caption(
                 f"Analisi generata il {mai_result.get('timestamp','—')} · "
-                f"Dati: INGV/USGS/EMSC · AI: OpenAI + Anthropic + Google · "
+                f"Dati: INGV/GOSSIP-OV/EMSC · AI: OpenAI + Anthropic + Google · "
                 f"Nessuna risposta è una previsione scientifica certificata."
             )
         else:
@@ -991,7 +994,7 @@ dal 2000 ad oggi</b>, costantemente aggiornato</li>
 </div>
 <div style="font-size:14px;color:#333;line-height:1.7;">
 Mentre il sistema INGV/Stanford si concentra sull'<b>identificazione di eventi nascosti nel rumore
-sismico</b> (machine learning su segnali raw), <b>SISMAI</b> usa i cataloghi INGV/USGS già filtrati
+sismico</b> (machine learning su segnali raw), <b>SISMAI</b> usa i cataloghi INGV/GOSSIP-OV/EMSC già filtrati
 per fare <b>previsioni probabilistiche del rischio</b> nei 7 giorni successivi, integrando:
 <br><br>
 <b>RandomForest</b> (feature temporali sismiche) &nbsp;+&nbsp;
