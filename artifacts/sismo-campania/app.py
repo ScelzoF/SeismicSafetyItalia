@@ -40,6 +40,25 @@ giorni_settimana = {
     'Sunday': 'Domenica'
 }
 
+@st.dialog("💳 Dati per donazione PostePay")
+def _show_postepay_dialog():
+    st.markdown("Invia direttamente tramite **bonifico** o **ricarica carta**.")
+    st.divider()
+    col1, col2 = st.columns([1, 2])
+    col1.markdown("**👤 Intestatario**")
+    col2.markdown("Andrea Scelzo")
+    col1.markdown("**💳 N° Carta**")
+    col2.code("5333 1759 3373 3088")
+    col1.markdown("**🏦 IBAN**")
+    col2.code("IT30 B360 8105 1382 9282 0692 842")
+    st.divider()
+    st.caption(
+        "📌 Nessun codice fiscale richiesto online. "
+        "Ricarica mensile automatica: attivabile dall'app Postepay / Poste Italiane. "
+        "Bonifico gratuito da altra PostePay Evolution."
+    )
+
+
 # Configure page settings
 st.set_page_config(
     page_title="Monitoraggio Sismico - Campania",
@@ -365,26 +384,31 @@ style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e
 padding:9px 14px;text-decoration:none;border-radius:8px;
 box-shadow:0 3px 10px rgba(255,210,0,.4);">
 <span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
-</a>
-<details style="margin-top:8px;">
-<summary style="cursor:pointer;list-style:none;display:block;text-align:center;
-background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.25);
-padding:8px 14px;border-radius:8px;color:#f1faee;font-size:13px;font-weight:700;">
-💳 Dona con PostePay
-</summary>
-<div style="margin-top:8px;font-size:12px;line-height:1.9;">
-<span style="color:#adb5bd;font-weight:600;">👤 Intestatario</span><br>
-<strong style="color:#f1faee;">Andrea Scelzo</strong><br><br>
-<span style="color:#adb5bd;font-weight:600;">💳 N° Carta</span><br>
-<code style="color:#ffd200;font-size:13px;letter-spacing:.08em;">5333 1759 3373 3088</code><br><br>
-<span style="color:#adb5bd;font-weight:600;">🏦 IBAN (Evolution)</span><br>
-<code style="color:#ffd200;font-size:11px;letter-spacing:.04em;">IT30 B360 8105 1382 9282 0692 842</code><br><br>
-<span style="color:#adb5bd;font-size:10px;">Nessun CF richiesto · Ricarica mensile dall'app Postepay · Bonifico gratuito da altra Evolution</span>
-</div>
-</details>
-</div>""",
+</a></div>""",
         unsafe_allow_html=True,
     )
+    # CSS per uniformare il pulsante PostePay al riquadro giallo
+    st.markdown(
+        """<style>
+div[data-testid="stSidebarContent"] div.stButton:last-of-type > button {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #f1faee;
+    font-weight: 700;
+    font-size: 13px;
+    width: 100%;
+    border-radius: 8px;
+    margin-top: 6px;
+}
+div[data-testid="stSidebarContent"] div.stButton:last-of-type > button:hover {
+    background: rgba(255,255,255,0.16);
+    border-color: #e8a800;
+}
+</style>""",
+        unsafe_allow_html=True,
+    )
+    if st.button("💳 Dona con PostePay", key="btn_postepay", use_container_width=True):
+        _show_postepay_dialog()
 
 # Main content area
 st.title("🌋 " + get_text('title'))
