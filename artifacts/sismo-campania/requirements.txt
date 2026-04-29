@@ -7,9 +7,13 @@ plotly
 folium
 streamlit-folium
 streamlit-js-eval
+supabase
 python-dotenv
 better-profanity
 openai
+anthropic
+trafilatura
+g4f
 scikit-learn
 pytz
 matplotlib
@@ -19,5 +23,3 @@ geopy
 pydeck
 pillow
 branca
-streamlit-autorefresh
-trafilatura
