@@ -475,10 +475,12 @@ elif page == "predictions":
     visualization.show_predictions_page(st.session_state.earthquake_data, get_text)
 
 elif page == "ai_assistant":
+    import ml_forecast_service
     st.header("🤖 Assistente AI Sismico")
     st.markdown(
         "Analisi avanzata basata su modelli AI/ML sui dati live INGV. "
-        "Usa la chat per domande in linguaggio naturale, oppure consulta le analisi automatiche."
+        "**SISMAI** integra RandomForest + Poisson-G-R + Omori-Utsu con pressione atmosferica live. "
+        "Include la ricerca INGV OV + Stanford (Science 2025)."
     )
 
     eq_data = st.session_state.earthquake_data
@@ -507,9 +509,10 @@ elif page == "ai_assistant":
         pattern_isc = ai_analysis.classify_seismic_pattern(isc_df, "ischia")        if isc_df is not None and not isc_df.empty else {}
         bvalue_isc  = ai_analysis.compute_gutenberg_richter(isc_df, "ischia")        if isc_df is not None and not isc_df.empty else {}
 
-    # ── Tab CF / Vesuvio / Ischia / Chat AI ──────────────────────────────────
-    tab_cf, tab_ves, tab_isc, tab_chat = st.tabs(
-        ["🔴 Campi Flegrei", "🌋 Vesuvio", "🏝️ Ischia", "🤖 Chat AI"]
+    # ── Tab CF / Vesuvio / Ischia / SISMAI / Chat AI ──────────────────────────
+    tab_cf, tab_ves, tab_isc, tab_sismai, tab_ingv, tab_chat = st.tabs(
+        ["🔴 Campi Flegrei", "🌋 Vesuvio", "🏝️ Ischia",
+         "🔮 SISMAI", "🔬 Ricerca INGV AI", "🤖 Chat AI"]
     )
 
     with tab_cf:
@@ -540,6 +543,232 @@ elif page == "ai_assistant":
         else:
             st.caption(f"Basata su {len(isc_df)} eventi INGV/USGS nell'ultimo periodo")
             _render_ai_panel(anomaly_isc, pattern_isc, bvalue_isc, None)
+
+    # ── SISMAI ────────────────────────────────────────────────────────────────
+    with tab_sismai:
+        st.markdown("### ©️ SISMAI — Sistema Integrato Sismico Multi-AI")
+        st.markdown(
+            "Modello ensemble **RandomForest + Poisson-Gutenberg-Richter + Omori-Utsu** "
+            "con feature live: sismicità INGV/USGS · pressione atmosferica (base+vetta) · "
+            "temperatura · bollettino INGV OV Vesuvio · GPS deformazione."
+        )
+
+        sismai_area = st.selectbox(
+            "Area di previsione SISMAI",
+            ["Campi Flegrei", "Vesuvio", "Ischia"],
+            key="sismai_area_sel",
+        )
+        sismai_df_map = {
+            "Campi Flegrei": cf_df,
+            "Vesuvio":       ves_df,
+            "Ischia":        isc_df,
+        }
+        sismai_df = sismai_df_map.get(sismai_area)
+
+        if sismai_df is None or sismai_df.empty:
+            st.warning(f"⚠️ Nessun dato sismico disponibile per la previsione ({sismai_area}).")
+        else:
+            with st.spinner(f"🔮 SISMAI in esecuzione per {sismai_area}..."):
+                atm = ml_forecast_service.fetch_atmospheric_features(sismai_area)
+                fc  = ml_forecast_service.run_ml_forecast(
+                    sismai_df, area=sismai_area, horizon=7,
+                    with_ai_narrative=True, atm=atm,
+                )
+
+            if fc.get("error"):
+                st.warning(f"⚠️ {fc['error']}")
+            else:
+                # Pressione atmosferica live
+                atm_data = fc.get("atm", {})
+                p_base   = atm_data.get("pressure_base", 0)
+                p_vetta  = atm_data.get("pressure_vetta", None)
+                p_delta  = atm_data.get("pressure_delta", 0)
+                temp_b   = atm_data.get("temp_base", 0)
+
+                st.markdown("#### 🌡️ Dati meteorologici live (feature SISMAI)")
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Pressione base", f"{p_base:.1f} hPa")
+                if p_vetta:
+                    m2.metric("Pressione vetta", f"{p_vetta:.1f} hPa")
+                    m3.metric("Δ Pressione", f"{p_delta:.1f} hPa")
+                else:
+                    m2.metric("Pressione delta", f"{p_delta:.1f} hPa")
+                    m3.metric("Fonte meteo", "Open-Meteo")
+                m4.metric("Temperatura base", f"{temp_b:.1f} °C")
+
+                st.markdown("#### 🔮 Previsione rischio sismico — prossimi 7 giorni")
+                cols_fc = st.columns(7)
+                days = fc.get("days", [])
+                for i, day in enumerate(days[:7]):
+                    with cols_fc[i]:
+                        date_str = str(day["date"])[-5:]  # MM-DD
+                        rl = day["risk_level"]
+                        color = day["color"]
+                        label = day["label"]
+                        conf  = day["confidence"]
+                        st.markdown(
+                            f"""<div style="text-align:center;border:2px solid {color};
+border-radius:10px;padding:10px 4px;background:#fff;">
+<div style="font-size:11px;color:#666;">{date_str}</div>
+<div style="font-size:17px;font-weight:800;color:{color};">{label}</div>
+<div style="font-size:11px;color:#888;">{conf*100:.0f}%</div>
+</div>""",
+                            unsafe_allow_html=True,
+                        )
+
+                # Metriche modello
+                st.markdown("#### 📊 Parametri modello ensemble")
+                mc1, mc2, mc3, mc4 = st.columns(4)
+                mc1.metric("Accuratezza CV", f"{fc.get('cv_score',0)*100:.1f}%")
+                mc2.metric("Peso RandomForest", f"{fc.get('weight_rf',0)*100:.0f}%")
+                mc3.metric("Peso Poisson-GR", f"{fc.get('weight_poisson',0)*100:.0f}%")
+                mc4.metric("Giorni training", f"{fc.get('n_train',0)}")
+
+                # Top features
+                top_feats = fc.get("top_features", [])
+                if top_feats:
+                    st.markdown("#### 🏆 Feature più importanti nel modello")
+                    feat_labels = {
+                        "n_7d": "Sismicità 7 giorni",
+                        "n_3d": "Sismicità 3 giorni",
+                        "n_14d": "Sismicità 14 giorni",
+                        "energy_7d": "Energia sismica 7gg",
+                        "maxmag_7d": "Magnitudo max 7gg",
+                        "days_since_sig": "Giorni dall'ultimo M≥3",
+                        "pressure_base": "Pressione atmosferica base",
+                        "pressure_delta": "Δ Pressione base-vetta",
+                        "temp_base": "Temperatura base",
+                        "log_energy": "Log energia totale",
+                    }
+                    feat_cols = st.columns(min(len(top_feats), 5))
+                    for i, (fname, fval) in enumerate(top_feats[:5]):
+                        with feat_cols[i]:
+                            label = feat_labels.get(fname, fname.replace("_", " "))
+                            st.metric(label, f"{fval*100:.1f}%")
+
+                # Narrativa AI
+                narrative = fc.get("ai_narrative", "")
+                if narrative:
+                    st.markdown("#### 💬 Analisi AI del forecast")
+                    st.info(narrative)
+
+                st.caption(
+                    "⚠️ SISMAI è un sistema statistico sperimentale. "
+                    "Non sostituisce i comunicati ufficiali INGV/DPC. "
+                    "Nessun sistema può prevedere i terremoti con certezza."
+                )
+
+    # ── Ricerca INGV AI ───────────────────────────────────────────────────────
+    with tab_ingv:
+        st.markdown("### 🔬 Ricerca AI per la Sismologia — INGV OV + Stanford")
+
+        # Card principale research
+        st.markdown("""
+<div style="border:2px solid #0d6efd;border-radius:14px;padding:24px;margin-bottom:20px;
+background:linear-gradient(135deg,#f0f4ff 0%,#fff 100%);">
+<div style="font-size:13px;font-weight:700;color:#0d6efd;letter-spacing:.08em;
+text-transform:uppercase;margin-bottom:10px;">
+📰 Studio pubblicato su Science — Aprile 2025
+</div>
+<div style="font-size:20px;font-weight:800;color:#1a1a2e;margin-bottom:12px;line-height:1.3;">
+Intelligenza Artificiale per il Monitoraggio della Sismicità ai Campi Flegrei
+</div>
+<div style="font-size:14px;color:#333;line-height:1.7;">
+<b>Collaborazione internazionale:</b> Doer School of Sustainability – Stanford University &nbsp;·&nbsp;
+INGV Osservatorio Vesuviano (Napoli) &nbsp;·&nbsp; Università degli Studi di Napoli Federico II
+<br><br>
+L'AI ha analizzato le tracce sismiche registrate <b>dal 2022 a marzo 2025</b> dalla fitta rete
+sismica dell'Osservatorio Vesuviano, identificando i terremoti che caratterizzano l'attuale
+<i>unrest</i> vulcanico dei Campi Flegrei.
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+        # Risultati chiave
+        col_r1, col_r2 = st.columns(2)
+        with col_r1:
+            st.markdown("""
+<div style="border:2px solid #198754;border-radius:12px;padding:18px;height:100%;background:#fff;">
+<div style="font-size:13px;font-weight:700;color:#198754;text-transform:uppercase;margin-bottom:8px;">
+🔍 Risultati principali
+</div>
+<ul style="font-size:14px;color:#333;line-height:1.9;margin:0;padding-left:18px;">
+<li>Rilevati e localizzati oltre <b>54.000 terremoti nascosti</b> nel rumore sismico</li>
+<li>La maggior parte di magnitudo molto bassa, <b>mai catalogati</b> prima</li>
+<li>La caldera dei Campi Flegrei è in <i>unrest</i> dal 2005, con forte aumento recente di sismicità,
+sollevamento del suolo e attività fumarolica</li>
+<li>Definite le <b>faglie che delimitano la zona di sollevamento</b> nella caldera</li>
+<li>Mappato il sistema di faglie superficiali nella <b>zona idrotermale</b> di Solfatara/Pisciarelli</li>
+</ul>
+</div>
+""", unsafe_allow_html=True)
+
+        with col_r2:
+            st.markdown("""
+<div style="border:2px solid #fd7e14;border-radius:12px;padding:18px;height:100%;background:#fff;">
+<div style="font-size:13px;font-weight:700;color:#fd7e14;text-transform:uppercase;margin-bottom:8px;">
+🤖 Software AI in sviluppo all'OV
+</div>
+<ul style="font-size:14px;color:#333;line-height:1.9;margin:0;padding-left:18px;">
+<li>Software sviluppato all'Università di Stanford, istruito sul <b>catalogo sismico OV
+dal 2000 ad oggi</b>, costantemente aggiornato</li>
+<li>Permette di <b>identificare e localizzare terremoti in tempo quasi-reale</b> (near real-time)</li>
+<li>Consente di seguire l'evoluzione della sismicità in maniera <b>automatica</b></li>
+<li>Attualmente <b>in fase di test</b> presso l'Osservatorio Vesuviano</li>
+<li>Strumento fondamentale per la <b>mitigazione del rischio</b> ai Campi Flegrei</li>
+</ul>
+</div>
+""", unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Confronto con SISMAI
+        st.markdown("""
+<div style="border:2px solid #6f42c1;border-radius:12px;padding:18px;margin-bottom:16px;background:#fff;">
+<div style="font-size:13px;font-weight:700;color:#6f42c1;text-transform:uppercase;margin-bottom:8px;">
+🔮 SISMAI in questa app — approccio complementare
+</div>
+<div style="font-size:14px;color:#333;line-height:1.7;">
+Mentre il sistema INGV/Stanford si concentra sull'<b>identificazione di eventi nascosti nel rumore
+sismico</b> (machine learning su segnali raw), <b>SISMAI</b> usa i cataloghi INGV/USGS già filtrati
+per fare <b>previsioni probabilistiche del rischio</b> nei 7 giorni successivi, integrando:
+<br><br>
+<b>RandomForest</b> (feature temporali sismiche) &nbsp;+&nbsp;
+<b>Poisson-Gutenberg-Richter</b> (statistica frequenza-magnitudo) &nbsp;+&nbsp;
+<b>Omori-Utsu</b> (decadimento aftershock) &nbsp;+&nbsp;
+<b>Pressione atmosferica live</b> (base+vetta, Open-Meteo) &nbsp;+&nbsp;
+<b>GPS deformazione</b> (RITE/NGL) &nbsp;+&nbsp;
+<b>Bollettino INGV OV</b> (CO₂, fumarole, radon)
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+        # Link
+        st.markdown("#### 🔗 Risorse ufficiali")
+        lc1, lc2, lc3 = st.columns(3)
+        with lc1:
+            st.link_button(
+                "📰 Articolo INGV OV",
+                "https://www.ov.ingv.it/index.php/it/news-ov/28-news-ct/338-grazie-allintelligenza-artificiale-un-aiuto-per-il-monitoraggio-della-sismicita-dei-campi-flegrei",
+                use_container_width=True,
+            )
+        with lc2:
+            st.link_button(
+                "🌐 INGV Osservatorio Vesuviano",
+                "https://www.ov.ingv.it",
+                use_container_width=True,
+            )
+        with lc3:
+            st.link_button(
+                "📡 Bollettino Sorveglianza INGV",
+                "https://www.ov.ingv.it/index.php/it/monitoraggio-e-infrastrutture/bollettini-comunicati-e-reportage/bollettino-di-sorveglianza-campi-flegrei",
+                use_container_width=True,
+            )
+
+        st.caption(
+            "Fonte: INGV Osservatorio Vesuviano · Stanford Doer School of Sustainability · "
+            "Università degli Studi di Napoli Federico II · Science (2025)"
+        )
 
     with tab_chat:
         ai_chat.show_ai_chat(

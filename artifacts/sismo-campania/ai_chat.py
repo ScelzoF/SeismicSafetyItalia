@@ -446,10 +446,25 @@ _LANG_TABLE_HEADERS = {
     "de": "| GEBIET | INGV-WARNUNG | AKTUELLE DATEN (7 TAGE) | ERKANNTE ANOMALIEN |",
 }
 
+_INGV_STANFORD_RESEARCH = """
+RICERCA INGV OV + STANFORD (Science 2025) — Campi Flegrei:
+• Studio pubblicato su Science (rivista peer-reviewed di massimo livello).
+• Collaborazione: Doer School of Sustainability Stanford + INGV Osservatorio Vesuviano + Univ. Federico II Napoli.
+• L'IA ha analizzato le tracce sismiche 2022–marzo 2025 dalla rete sismica OV (fitta rete di stazioni).
+• Risultato: identificati e localizzati oltre 54.000 terremoti nascosti nel rumore sismico.
+• La maggior parte erano di magnitudo molto bassa, precedentemente non rilevati.
+• L'IA ha definito le faglie che delimitano la zona di sollevamento nella caldera e il sistema
+  di faglie superficiali nella zona idrotermale di Solfatara e Pisciarelli.
+• È in fase di test all'OV un software per l'identificazione e localizzazione dei terremoti
+  in tempo quasi-reale (near real-time) — strumento fondamentale per mitigazione del rischio.
+• Link INGV: https://www.ov.ingv.it/news-ct/338
+"""
+
 _SYSTEM_PROMPT_TEMPLATE = """Sei un assistente intelligente e versatile per la Campania.
-Hai due specializzazioni principali:
+Hai tre specializzazioni principali:
   1. Sismologia e vulcanologia (Vesuvio, Campi Flegrei, Ischia) — con dati INGV live
   2. Meteo in tempo reale per la Campania — con dati Open-Meteo live
+  3. Ricerca AI in sismologia — inclusa la ricerca INGV OV + Stanford (Science 2025)
 
 Rispondi SEMPRE e SOLO in {lang_name}, qualunque sia la lingua dell'utente.
 
@@ -461,6 +476,16 @@ COMPORTAMENTO:
 - Non costringere mai la risposta nel tema sismico/meteo se la domanda non lo richiede.
 - Non dire "non dispongo di dati" se la domanda è di cultura generale: in quel caso rispondi
   con la tua conoscenza.
+- Se ti chiedono della ricerca INGV/Stanford, spiegane i risultati usando le informazioni nel contesto.
+
+CONOSCENZA RICERCA AI INGV (Science 2025):
+{ingv_research}
+
+SISMAI — Sistema Integrato Sismico Multi-AI (usato in questa app):
+• Modello ensemble RandomForest + Poisson-Gutenberg-Richter + Omori-Utsu.
+• Feature live: sismicità INGV/USGS, pressione atmosferica (base+vetta), temperatura,
+  bollettino INGV OV (CO2, fumarole, radon), GPS deformazione.
+• Ispirato ai metodi della ricerca INGV/Stanford.
 
 REGOLE PER DATI LIVE:
 1. Per domande sismiche: usa i dati INGV/USGS forniti nel contesto — non inventare numeri.
@@ -476,7 +501,11 @@ FORMATO TABELLA (quando usi tabelle markdown e la domanda è sismica):
 def _build_system_prompt(lang: str) -> str:
     lang_name = _LANG_NAMES.get(lang, "italiano")
     table_header = _LANG_TABLE_HEADERS.get(lang, _LANG_TABLE_HEADERS["it"])
-    return _SYSTEM_PROMPT_TEMPLATE.format(lang_name=lang_name, table_header=table_header)
+    return _SYSTEM_PROMPT_TEMPLATE.format(
+        lang_name=lang_name,
+        table_header=table_header,
+        ingv_research=_INGV_STANFORD_RESEARCH,
+    )
 
 
 # ── UI principale ─────────────────────────────────────────────────────────────
@@ -531,18 +560,18 @@ def show_ai_chat(earthquake_data=None, bulletin_cf=None, bulletin_ves=None,
     # ── Domande suggerite (visibili solo quando chat vuota e nessun chip attivo) ─
     if not st.session_state.ai_messages and "_ai_pending" not in st.session_state:
         suggestions = {
-            "it": ["C'è rischio sismico oggi?", "Domani piove a Napoli?",
-                   "Cos'è il bradisismo?", "Allerta Campi Flegrei?",
-                   "Ultime scosse INGV?"],
-            "en": ["Is there seismic risk today?", "Will it rain tomorrow?",
-                   "What is bradyseism?", "Campi Flegrei alert level?",
-                   "Latest INGV earthquakes?"],
-            "fr": ["Y a-t-il un risque sismique?", "Pleuvra-t-il demain?",
-                   "Qu'est-ce que le bradyséisme?", "Niveau alerte CF?",
-                   "Derniers séismes INGV?"],
-            "es": ["¿Hay riesgo sísmico hoy?", "¿Lloverá mañana?",
-                   "¿Qué es el bradisismo?", "¿Alerta Campi Flegrei?",
-                   "¿Últimos sismos INGV?"],
+            "it": ["C'è rischio sismico oggi?", "Cos'è il bradisismo?",
+                   "Spiega la ricerca INGV+Stanford", "Allerta Campi Flegrei?",
+                   "Cosa rileva il SISMAI?"],
+            "en": ["Is there seismic risk today?", "What is bradyseism?",
+                   "Explain the INGV+Stanford research", "Campi Flegrei alert level?",
+                   "What does SISMAI detect?"],
+            "fr": ["Y a-t-il un risque sismique?", "Qu'est-ce que le bradyséisme?",
+                   "Expliquer la recherche INGV+Stanford", "Niveau alerte CF?",
+                   "Que détecte SISMAI?"],
+            "es": ["¿Hay riesgo sísmico hoy?", "¿Qué es el bradisismo?",
+                   "Explica la investigación INGV+Stanford", "¿Alerta Campi Flegrei?",
+                   "¿Qué detecta SISMAI?"],
         }
         sug_list = suggestions.get(lang, suggestions["it"])
         st.markdown("<p style='font-size:13px;color:#666;margin-bottom:6px;'>💡 <b>Prova a chiedere:</b></p>",

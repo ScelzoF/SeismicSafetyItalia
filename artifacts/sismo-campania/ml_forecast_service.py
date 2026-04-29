@@ -1,27 +1,36 @@
 """
-ml_forecast_service.py — Ensemble ML + Poisson + AI narrative
-==============================================================
-Pipeline in tre livelli:
+ml_forecast_service.py — SISMAI Ensemble ML + Poisson + AI narrative
+=====================================================================
+Pipeline in quattro livelli (SISMAI — Sistema Integrato Sismico Multi-AI):
 
 LIVELLO 1 — RandomForest (sklearn)
   Feature engineering su finestre temporali INGV/USGS reali:
   conteggi rolling 1/3/7/14 gg, magnitudo media/max, energia sismica,
   b-value rolling (G-R MLE), encoding ciclico temporale, giorni dall'
-  ultimo evento significativo (M≥3). Target: rischio giornaliero (0/1/2).
+  ultimo evento significativo (M≥3), pressione atmosferica base+vetta,
+  temperatura. Target: rischio giornaliero (0/1/2).
   Validazione con TimeSeriesSplit (no data-leakage).
 
 LIVELLO 2 — Ensemble calibrato RF + Poisson-G-R
   Peso RF e peso Poisson ottimizzati via log-loss minimization sullo storico.
   Se dati insufficienti per calibrazione, pesi default: RF 0.6 / Poisson 0.4.
 
-LIVELLO 3 — Narrazione AI (g4f / OpenAI)
+LIVELLO 3 — Legge Omori-Utsu per aftershock decay
+  Attivato se presente evento M≥3.0 negli ultimi 14 giorni.
+
+LIVELLO 4 — Narrazione AI (g4f / OpenAI)
   Il forecast numerico viene tradotto in linguaggio naturale contestualizzato
   usando i provider AI già presenti nell'app. Descrive drivers, suggerimenti
   e livello di confidenza. Fallback graceful se il provider non risponde.
+
+Ispirato alla ricerca INGV OV + Stanford (Science 2025):
+  AI per identificazione terremoti nascosti nel rumore sismico ai Campi Flegrei.
 """
 
 import numpy as np
 import pandas as pd
+import requests
+import time
 from datetime import datetime, timedelta
 
 
@@ -46,7 +55,67 @@ _FEATURE_COLS = [
     "avg_depth",
     "dow_sin", "dow_cos", "doy_sin", "doy_cos",
     "days_since_sig",
+    "pressure_base", "pressure_delta", "temp_base",
 ]
+
+# Cache pressione atmosferica (30 min)
+_PRESSURE_CACHE: dict = {}
+
+def fetch_atmospheric_features(area: str = "Campi Flegrei") -> dict:
+    """
+    Fetch pressione atmosferica e temperatura da Open-Meteo.
+    Area base: Pozzuoli (CF) o Torre del Greco (Vesuvio).
+    Ritorna dict con: pressure_base, pressure_vetta (se Vesuvio), temp_base, pressure_delta.
+    Cache 30 min.
+    """
+    coords = {
+        "Campi Flegrei": {"base": (40.8228, 14.1247), "vetta": None},
+        "Vesuvio":        {"base": (40.8063, 14.3540), "vetta": (40.8221, 14.4260)},
+        "Ischia":         {"base": (40.7310, 13.9497), "vetta": None},
+        "Italy":          {"base": (41.9028, 12.4964), "vetta": None},
+    }
+    cache_key = area
+    now = time.time()
+    cached = _PRESSURE_CACHE.get(cache_key)
+    if cached and (now - cached.get("_ts", 0)) < 1800:
+        return cached
+
+    area_coords = coords.get(area, coords["Campi Flegrei"])
+    blat, blon = area_coords["base"]
+
+    result = {"pressure_base": 1013.25, "pressure_delta": 0.0, "temp_base": 15.0, "_ts": now}
+    try:
+        url = (
+            f"https://api.open-meteo.com/v1/forecast"
+            f"?latitude={blat}&longitude={blon}"
+            f"&current=pressure_msl,surface_pressure,temperature_2m"
+            f"&timezone=Europe%2FRome"
+        )
+        r = requests.get(url, timeout=8)
+        if r.status_code == 200:
+            d = r.json().get("current", {})
+            result["pressure_base"] = d.get("pressure_msl", 1013.25)
+            result["temp_base"]     = d.get("temperature_2m", 15.0)
+
+        if area_coords["vetta"]:
+            vlat, vlon = area_coords["vetta"]
+            url2 = (
+                f"https://api.open-meteo.com/v1/forecast"
+                f"?latitude={vlat}&longitude={vlon}"
+                f"&current=pressure_msl"
+                f"&timezone=Europe%2FRome"
+            )
+            r2 = requests.get(url2, timeout=8)
+            if r2.status_code == 200:
+                d2 = r2.json().get("current", {})
+                p_vetta = d2.get("pressure_msl", result["pressure_base"] - 120)
+                result["pressure_vetta"] = p_vetta
+                result["pressure_delta"] = result["pressure_base"] - p_vetta
+    except Exception:
+        pass
+
+    _PRESSURE_CACHE[cache_key] = result
+    return result
 
 
 def _energy_j(mag: float) -> float:
@@ -61,7 +130,7 @@ def _prep(df: pd.DataFrame) -> pd.DataFrame:
     return df.dropna(subset=["datetime"]).sort_values("datetime")
 
 
-def _build_daily(df: pd.DataFrame, area: str) -> pd.DataFrame:
+def _build_daily(df: pd.DataFrame, area: str, atm: dict | None = None) -> pd.DataFrame:
     thresh = _THRESHOLDS.get(area, _DEFAULT_THRESH)
     df = _prep(df)
     df["date"]   = df["datetime"].dt.date
@@ -105,6 +174,13 @@ def _build_daily(df: pd.DataFrame, area: str) -> pd.DataFrame:
         last_sig = 0 if v > 0 else last_sig + 1
         dsig.append(last_sig)
     daily["days_since_sig"] = dsig
+
+    # Pressione atmosferica e temperatura (feature live — costante per tutto lo storico)
+    if atm is None:
+        atm = {}
+    daily["pressure_base"]  = float(atm.get("pressure_base", 1013.25))
+    daily["pressure_delta"] = float(atm.get("pressure_delta", 0.0))
+    daily["temp_base"]      = float(atm.get("temp_base", 15.0))
 
     daily["risk_label"] = daily["n_events"].apply(
         lambda n: 0 if n < thresh["low"] else (1 if n < thresh["high"] else 2)
@@ -211,9 +287,11 @@ def _calibrate_weights(daily: pd.DataFrame, classes, rf, poisson_vec: list[float
         return 0.65, 0.35
 
 
-def _future_features(daily: pd.DataFrame, horizon: int = 7) -> list[pd.DataFrame]:
+def _future_features(daily: pd.DataFrame, horizon: int = 7, atm: dict | None = None) -> list[pd.DataFrame]:
     if daily.empty:
         return []
+    if atm is None:
+        atm = {}
     lam = daily["n_events"].tail(14).mean()
     last_dsig = float(daily["days_since_sig"].iloc[-1])
     last_date = pd.Timestamp(daily["date"].iloc[-1])
@@ -244,6 +322,9 @@ def _future_features(daily: pd.DataFrame, horizon: int = 7) -> list[pd.DataFrame
             "doy_sin":      np.sin(2 * np.pi * dt.dayofyear / 365),
             "doy_cos":      np.cos(2 * np.pi * dt.dayofyear / 365),
             "days_since_sig": last_dsig + i,
+            "pressure_base":  float(atm.get("pressure_base", 1013.25)),
+            "pressure_delta": float(atm.get("pressure_delta", 0.0)),
+            "temp_base":      float(atm.get("temp_base", 15.0)),
             "date":          fdate,
         }
         rows.append(pd.DataFrame([row]))
@@ -328,9 +409,10 @@ Regole:
 
 
 def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
-                    with_ai_narrative: bool = True) -> dict:
+                    with_ai_narrative: bool = True,
+                    atm: dict | None = None) -> dict:
     """
-    Pipeline completa: feature eng → RF → ensemble calibrato → narrazione AI.
+    Pipeline completa SISMAI: feature eng (+ pressione atm) → RF → ensemble calibrato → narrazione AI.
 
     Ritorna dict con:
       - 'days':          lista 7 dict {date, risk_level, label, color, proba, confidence}
@@ -340,10 +422,15 @@ def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
       - 'n_train':       giorni usati per training
       - 'top_features':  top-5 feature importances [(nome, valore)]
       - 'ai_narrative':  testo AI opzionale
+      - 'atm':           dati pressione/temperatura usati come feature
       - 'error':         stringa se fallisce, None altrimenti
     """
     try:
-        daily = _build_daily(df, area)
+        # Fetch pressione atmosferica live se non fornita
+        if atm is None:
+            atm = fetch_atmospheric_features(area)
+
+        daily = _build_daily(df, area, atm=atm)
         if daily.empty or len(daily) < 20:
             return {"error": "Dati insufficienti (min 20 giorni)."}
 
@@ -354,7 +441,7 @@ def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
         poisson_vec = _poisson_proba_vector(df, area)
         w_rf, w_poi = _calibrate_weights(daily, classes, rf, poisson_vec)
 
-        future_dfs = _future_features(daily, horizon)
+        future_dfs = _future_features(daily, horizon, atm=atm)
         if not future_dfs:
             return {"error": "Errore nella proiezione delle feature future."}
 
@@ -396,6 +483,7 @@ def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
             "top_features":   top_feats,
             "classes_seen":   [int(c) for c in classes],
             "ai_narrative":   None,
+            "atm":            atm,
             "error":          None,
         }
 
