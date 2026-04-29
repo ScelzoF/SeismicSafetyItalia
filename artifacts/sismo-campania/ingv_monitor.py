@@ -593,21 +593,37 @@ def _fetch_bulletin_pdf_cf() -> dict:
             except Exception:
                 pass
 
-        # Temperatura fumarola Bocca Grande
-        tbg = re.search(r"fumarola BG[^.]{0,120}?(\d{2,3})\s*°\s*C", text, re.I)
+        # Temperatura fumarola Bocca Grande — usa re.DOTALL per passare i "." interni
+        tbg = re.search(
+            r"fumarola\s+BG.{0,300}?circa\s+(\d{2,3})\s*°\s*C",
+            text, re.I | re.DOTALL,
+        )
+        if not tbg:
+            # Fallback: cerca "valore medio ... circa NNN °C" vicino a "Solfatara" o "V11"
+            tbg = re.search(
+                r"(?:Solfatara|V11|stazione\s+V11).{0,400}?circa\s+(\d{2,3})\s*°\s*C",
+                text, re.I | re.DOTALL,
+            )
         if tbg:
             result["fumarole_temp_bocca_grande"] = int(tbg.group(1))
 
-        # Velocità sollevamento GPS (prende il valore più recente — l'ultimo trovato nel testo)
+        # Velocità sollevamento GPS — usa re.DOTALL per permettere punti nel match
         uplift_matches = re.findall(
-            r"velocit[àa][^.]{0,80}?(\d+)[^.]{0,20}mm/mese", text, re.I
+            r"velocit[àa].{0,120}?(\d+)(?:\s*±\s*\d+)?\s*mm/mese", text, re.I | re.DOTALL
         )
         if uplift_matches:
-            # L'ultimo valore citato è il più recente
             result["gps_uplift_mm_month"] = float(uplift_matches[-1])
 
-        # Sismicità settimanale
-        seis = re.search(r"localizzati\s+(\d+)\s+terremoti[^.]{0,80}?Mdmax\s*=\s*([\d.]+)", text, re.I)
+        # Sismicità settimanale — usa .{} per passare "Md≥0.0" con punti interni
+        seis = re.search(
+            r"localizzati\s+(\d+)\s+terremoti.{0,120}?Md\s*max\s*=\s*([\d.]+)",
+            text, re.I | re.DOTALL,
+        )
+        if not seis:
+            seis = re.search(
+                r"sono stati localizzati\s+(\d+).{0,120}?Mdmax\s*=\s*([\d.]+)",
+                text, re.I | re.DOTALL,
+            )
         if seis:
             result["seismic_events_week"] = int(seis.group(1))
             result["seismic_md_max_week"]  = float(seis.group(2))
@@ -683,14 +699,14 @@ def _fetch_bulletin_pdf_vesuvio() -> dict:
             result["bulletin_month_num"] = _MESI_IT_MAP.get(mese_m.group(1), 0)
             result["bulletin_year"] = anno
 
-        # Numero eventi e Mdmax
+        # Numero eventi e Mdmax — usa .{} per permettere "." interni (es. Md≥0.0)
         ev_m = re.search(
-            r"sono stati registrati\s+(\d+)\s+terremoti[^(]{0,30}"
-            r"\(Md\s*max\s*=\s*([\d.]+)", text, re.I
+            r"sono stati registrati\s+(\d+)\s+terremoti.{0,80}?"
+            r"Md\s*max\s*=\s*([\d.]+)", text, re.I | re.DOTALL
         )
         if not ev_m:
             ev_m = re.search(
-                r"(\d+)\s+terremoti[^)]{0,60}Mdmax\s*=\s*([\d.]+)", text, re.I
+                r"(\d+)\s+terremoti.{0,80}?Mdmax\s*=\s*([\d.]+)", text, re.I | re.DOTALL
             )
         if ev_m:
             result["seismic_events_month"] = int(ev_m.group(1))

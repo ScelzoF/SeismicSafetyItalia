@@ -1007,22 +1007,23 @@ per fare <b>previsioni probabilistiche del rischio</b> nei 7 giorni successivi, 
         # Link
         st.markdown("#### 🔗 Risorse ufficiali")
         lc1, lc2, lc3 = st.columns(3)
+        _yr = datetime.now().year
         with lc1:
             st.link_button(
-                "📰 Articolo INGV OV",
-                "https://www.ov.ingv.it/index.php/it/news-ov/28-news-ct/338-grazie-allintelligenza-artificiale-un-aiuto-per-il-monitoraggio-della-sismicita-dei-campi-flegrei",
+                "📰 Comunicati CF — INGV OV",
+                "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/campi-flegrei",
                 use_container_width=True,
             )
         with lc2:
             st.link_button(
-                "🌐 INGV Osservatorio Vesuviano",
-                "https://www.ov.ingv.it",
+                "📡 Bollettini Settimanali CF",
+                f"https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/bollettini-tutti/boll-sett-flegre/anno-{_yr}",
                 use_container_width=True,
             )
         with lc3:
             st.link_button(
-                "📡 Bollettino Sorveglianza INGV",
-                "https://www.ov.ingv.it/index.php/it/monitoraggio-e-infrastrutture/bollettini-comunicati-e-reportage/bollettino-di-sorveglianza-campi-flegrei",
+                "🌐 INGV Osservatorio Vesuviano",
+                "https://www.ov.ingv.it/",
                 use_container_width=True,
             )
 
