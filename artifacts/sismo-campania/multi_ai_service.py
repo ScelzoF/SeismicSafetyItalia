@@ -18,31 +18,56 @@ from datetime import datetime
 import requests
 
 # ─────────────────────────────────────────────────────────────
-# PROVIDER CONFIGS
-# Priorità: Replit AI Integrations proxy → API key diretta
+# PROVIDER CREDENTIAL RESOLVER — riletto ad ogni chiamata
+# Priorità: Replit AI Integrations proxy → OPENAI_API_KEY diretto
 # ─────────────────────────────────────────────────────────────
 
-_OPENAI_BASE     = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
-_OPENAI_KEY      = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
-_ANTHROPIC_BASE  = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "")
-_ANTHROPIC_KEY   = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "")
-_GEMINI_BASE     = os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL", "")
-_GEMINI_KEY      = os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY", "")
+def _get_openai_creds():
+    """Restituisce (base_url, api_key, model) leggendo le env vars live."""
+    base = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
+    key  = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
+    if base and key:
+        return base, key, "gpt-5.1"
+    direct = os.environ.get("OPENAI_API_KEY", "")
+    if direct:
+        return "https://api.openai.com/v1", direct, "gpt-4o"
+    # Streamlit Cloud: prova st.secrets come ultima risorsa
+    try:
+        import streamlit as st
+        direct = st.secrets.get("OPENAI_API_KEY", "")
+        if direct:
+            return "https://api.openai.com/v1", direct, "gpt-4o"
+    except Exception:
+        pass
+    return "", "", ""
 
-# Fallback: OpenAI API key diretta (Streamlit Cloud / altro host)
-_OPENAI_DIRECT_KEY = os.environ.get("OPENAI_API_KEY", "")
-if not (_OPENAI_BASE and _OPENAI_KEY) and _OPENAI_DIRECT_KEY:
-    _OPENAI_BASE = "https://api.openai.com/v1"
-    _OPENAI_KEY  = _OPENAI_DIRECT_KEY
-    _OPENAI_MODEL_OVERRIDE = "gpt-4o"
-else:
-    _OPENAI_MODEL_OVERRIDE = ""
 
-_PROVIDERS_OK = {
-    "gpt":    bool(_OPENAI_BASE and _OPENAI_KEY),
-    "claude": bool(_ANTHROPIC_BASE and _ANTHROPIC_KEY),
-    "gemini": bool(_GEMINI_BASE and _GEMINI_KEY),
-}
+def _get_claude_creds():
+    base = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "")
+    key  = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "")
+    return base, key
+
+
+def _get_gemini_creds():
+    base = os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL", "")
+    key  = os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY", "")
+    return base, key
+
+
+def _providers_status() -> dict:
+    """Stato disponibilità provider — calcolato live."""
+    ob, ok, _ = _get_openai_creds()
+    cb, ck     = _get_claude_creds()
+    gb, gk     = _get_gemini_creds()
+    return {
+        "gpt":    bool(ob and ok),
+        "claude": bool(cb and ck),
+        "gemini": bool(gb and gk),
+    }
+
+
+# Compatibilità con codice esterno che legge _PROVIDERS_OK
+_PROVIDERS_OK = _providers_status()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -51,12 +76,12 @@ _PROVIDERS_OK = {
 
 def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-5.1") -> str:
     """Chiama OpenAI GPT via Replit proxy o API diretta."""
-    if not _PROVIDERS_OK["gpt"]:
+    base, key, effective_model = _get_openai_creds()
+    if not (base and key):
         return "GPT non disponibile (env vars mancanti)."
-    effective_model = _OPENAI_MODEL_OVERRIDE or model
     try:
         import openai
-        client = openai.OpenAI(base_url=_OPENAI_BASE, api_key=_OPENAI_KEY)
+        client = openai.OpenAI(base_url=base, api_key=key)
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
