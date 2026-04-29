@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="220" viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skyG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a1e"/>
+      <stop offset="100%" stop-color="#1a1a3e"/>
+    </linearGradient>
+    <linearGradient id="mtnG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4a2010"/>
+      <stop offset="100%" stop-color="#1a0804"/>
+    </linearGradient>
+    <linearGradient id="seaG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a3a6a"/>
+      <stop offset="100%" stop-color="#0d2040"/>
+    </linearGradient>
+    <radialGradient id="lava" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ff6600" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ff0000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="400" height="220" fill="url(#skyG)"/>
+
+  <circle cx="340" cy="35" r="16" fill="#fffde7" opacity="0.9" filter="url(#glow)"/>
+  <circle cx="60" cy="28" r="1.5" fill="white" opacity="0.7"/>
+  <circle cx="110" cy="18" r="1" fill="white" opacity="0.6"/>
+  <circle cx="175" cy="32" r="1.5" fill="white" opacity="0.8"/>
+  <circle cx="240" cy="14" r="2" fill="white" opacity="0.7"/>
+  <circle cx="300" cy="22" r="1" fill="white" opacity="0.6"/>
+  <circle cx="30" cy="48" r="1" fill="white" opacity="0.5"/>
+  <circle cx="380" cy="55" r="1" fill="white" opacity="0.5"/>
+  <circle cx="145" cy="8" r="1" fill="white" opacity="0.7"/>
+
+  <path d="M0,165 L60,155 L110,130 L155,105 L185,82 L205,58 L215,52 L225,60 L255,88 L300,118 L350,140 L400,152 L400,220 L0,220 Z" fill="url(#mtnG)"/>
+
+  <ellipse cx="215" cy="50" rx="20" ry="9" fill="url(#lava)" opacity="0.65"/>
+  <circle cx="215" cy="48" r="5" fill="#ff6600" filter="url(#glow)"/>
+  <path d="M210,53 Q213,40 215,36 Q217,40 220,53" fill="#ff4400" opacity="0.55"/>
+
+  <rect x="0" y="178" width="400" height="42" fill="url(#seaG)"/>
+  <path d="M0,181 Q50,175 100,181 Q150,187 200,181 Q250,175 300,181 Q350,187 400,181" fill="none" stroke="#2a5a9a" stroke-width="1.2" opacity="0.5"/>
+
+  <rect x="4" y="200" width="148" height="16" rx="3" fill="#111827" opacity="0.88"/>
+  <circle cx="14" cy="208" r="3.5" fill="#2dc653"/>
+  <text x="22" y="211" font-family="Arial,sans-serif" font-size="8.5" fill="#eee">VESUVIO  Alert: VERDE</text>
+
+  <rect x="248" y="200" width="148" height="16" rx="3" fill="#111827" opacity="0.88"/>
+  <text x="322" y="211" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" fill="#aaa">INGV OV &#8226; 1281m slm</text>
+
+  <text x="200" y="145" text-anchor="middle" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="#f4a261" filter="url(#glow)">VESUVIO</text>
+  <text x="200" y="158" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" fill="#aaa">Monitoraggio INGV OV — Real Time</text>
+</svg>
