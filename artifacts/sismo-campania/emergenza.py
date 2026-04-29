@@ -857,7 +857,7 @@ def show():
             "e disponibili sul sito del tuo Comune."
         )
         st.markdown(
-            "🔗 [Cerca piano emergenza del tuo Comune — DPC](https://www.protezionecivile.gov.it/it/attivita/pianificazione)"
+            "🔗 [Cerca piano emergenza del tuo Comune — DPC Rischi](https://rischi.protezionecivile.gov.it/)"
         )
 
     # ════════════════════════════════════════════════════════════════════════════
@@ -960,11 +960,11 @@ def show():
         - 🏛️ [Protezione Civile Nazionale](https://www.protezionecivile.gov.it)
         - 🌋 [INGV — monitoraggio](https://www.ingv.it)
         - 🌡️ INGV Osservatorio Vesuviano
-        - 📋 [Piani PC Comunali](https://www.protezionecivile.gov.it/it/attivita/pianificazione)
+        - 📋 [DPC Rischi — Pianificazione](https://rischi.protezionecivile.gov.it/)
         """)
     with link_cols[1]:
         st.markdown("""
-        - 🌊 [Allerta meteo Campania](https://allertameteo.regione.campania.it/)
+        - 🌊 [Allerta meteo Campania](https://centrofunzionale.regione.campania.it/)
         - 🚒 [Vigili del Fuoco](https://www.vigilfuoco.it)
         - 🏥 [Ministero della Salute](https://www.salute.gov.it)
         - ⚡ [e-distribuzione — guasti](https://www.e-distribuzione.it)

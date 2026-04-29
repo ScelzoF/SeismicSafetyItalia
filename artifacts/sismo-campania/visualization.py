@@ -2164,16 +2164,35 @@ def _show_risk_timeline_bar(df, area_name="Italia", plot_key="timeline"):
             dp = round((last3 - prev3) / prev3 * 100)
             delta_str = f"{'↑' if dp >= 0 else '↓'}{abs(dp)}%"
 
-        # ── Indice di Clustering (CV inter-evento) ────────────────────────
-        clustering = 0.0
+        # ── Indice di Clustering (CV inter-evento = CoV-IET) ─────────────
+        # Coefficiente di variazione dei tempi inter-evento:
+        #   CoV < 0.5  → sismicità quasi-periodica (regolare)
+        #   CoV ≈ 1.0  → processo Poissoniano casuale (benchmark)
+        #   CoV > 1.0  → sciame / clustering anomalo
+        # Richiede ≥2 eventi; con meno si mostra "N/D" (non calcolabile).
+        clustering_val = None
+        clustering_str = "N/D"
+        clustering_delta = None
         try:
             times = pd.to_datetime(df2["datetime"]).sort_values()
             inter = times.diff().dt.total_seconds().dropna()
-            if len(inter) > 1 and inter.mean() > 0:
-                clustering = round(float(inter.std()) / float(inter.mean()), 2)
-                clustering = min(clustering, 9.99)
+            n_inter = len(inter)
+            if n_inter >= 2 and inter.mean() > 0:
+                cov = round(float(inter.std()) / float(inter.mean()), 2)
+                clustering_val = min(cov, 9.99)
+                clustering_str = f"{clustering_val:.2f}"
+                if clustering_val < 0.5:
+                    clustering_delta = "regolare"
+                elif clustering_val < 1.0:
+                    clustering_delta = "sub-Poisson"
+                elif clustering_val < 2.0:
+                    clustering_delta = "Poisson/lieve cluster"
+                else:
+                    clustering_delta = "⚠️ clustering"
+            elif n_inter == 1:
+                clustering_str = "N/D (1 inter-evento)"
         except Exception:
-            clustering = 0.0
+            clustering_str = "N/D"
 
         tc1, tc2 = st.columns(2)
         with tc1:
@@ -2186,8 +2205,14 @@ def _show_risk_timeline_bar(df, area_name="Italia", plot_key="timeline"):
         with tc2:
             st.metric(
                 "Indice di Clustering",
-                f"{clustering:.2f}",
-                help="Coefficiente di variazione inter-evento: 0 = cadenza regolare, >1 = raggruppamento anomalo",
+                clustering_str,
+                delta=clustering_delta,
+                help=(
+                    "Coefficiente di variazione dei tempi inter-evento (CoV-IET). "
+                    "< 0.5 = sismicità regolare; ≈ 1.0 = casuale (Poisson); "
+                    "> 1.0 = raggruppamento anomalo (sciame). "
+                    "Richiede ≥ 2 eventi nello stesso periodo."
+                ),
             )
 
     except Exception as exc:
