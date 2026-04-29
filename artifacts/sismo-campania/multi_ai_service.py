@@ -27,7 +27,7 @@ def _get_openai_creds():
     base = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
     if base and key:
-        return base, key, "gpt-5.1"
+        return base, key, "gpt-4o"
     direct = os.environ.get("OPENAI_API_KEY", "")
     if direct:
         return "https://api.openai.com/v1", direct, "gpt-4o"
@@ -74,7 +74,7 @@ _PROVIDERS_OK = _providers_status()
 # SINGLE-PROVIDER CALLS
 # ─────────────────────────────────────────────────────────────
 
-def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-5.1") -> str:
+def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-4o") -> str:
     """Chiama OpenAI GPT via Replit proxy o API diretta."""
     base, key, effective_model = _get_openai_creds()
     if not (base and key):
