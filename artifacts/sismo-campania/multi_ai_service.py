@@ -23,7 +23,8 @@ import requests
 # ─────────────────────────────────────────────────────────────
 
 def _get_openai_creds():
-    """Restituisce (base_url, api_key, model) leggendo le env vars live."""
+    """Restituisce (base_url, api_key, model) leggendo le env vars live.
+    Priorità: Replit proxy → OPENAI_API_KEY → OpenRouter."""
     base = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
     if base and key:
@@ -31,7 +32,6 @@ def _get_openai_creds():
     direct = os.environ.get("OPENAI_API_KEY", "")
     if direct:
         return "https://api.openai.com/v1", direct, "gpt-4o"
-    # Streamlit Cloud: prova st.secrets come ultima risorsa
     try:
         import streamlit as st
         direct = st.secrets.get("OPENAI_API_KEY", "")
@@ -39,6 +39,10 @@ def _get_openai_creds():
             return "https://api.openai.com/v1", direct, "gpt-4o"
     except Exception:
         pass
+    # Fallback OpenRouter (usa GPT-4o tramite OpenRouter)
+    or_key = _get_openrouter_key()
+    if or_key:
+        return "https://openrouter.ai/api/v1", or_key, "openai/gpt-4o"
     return "", "", ""
 
 
@@ -96,7 +100,7 @@ def _get_gemini_creds():
         pass
     or_key = _get_openrouter_key()
     if or_key:
-        return "https://openrouter.ai/api/v1", or_key, "google/gemini-flash-1.5", "openrouter"
+        return "https://openrouter.ai/api/v1", or_key, "google/gemini-2.0-flash-001", "openrouter"
     return "", "", "", ""
 
 
@@ -121,23 +125,12 @@ _PROVIDERS_OK = _providers_status()
 # ─────────────────────────────────────────────────────────────
 
 def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-4o") -> str:
-    """Chiama OpenAI GPT via Replit proxy o API diretta."""
+    """Chiama OpenAI GPT via Replit proxy, API diretta o OpenRouter."""
     base, key, effective_model = _get_openai_creds()
     if not (base and key):
         return "GPT non disponibile (env vars mancanti)."
     try:
-        import openai
-        client = openai.OpenAI(base_url=base, api_key=key)
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-        r = client.chat.completions.create(
-            model=effective_model,
-            messages=messages,
-            max_tokens=600,
-        )
-        return r.choices[0].message.content.strip()
+        return _openai_compat_call(base, key, effective_model, prompt, system)
     except Exception as e:
         return f"[GPT errore: {str(e)[:120]}]"
 
