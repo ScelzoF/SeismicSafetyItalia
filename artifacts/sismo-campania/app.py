@@ -933,32 +933,41 @@ border-radius:10px;padding:10px 4px;background:#fff;">
             st.markdown("#### 🤖 Risposte individuali")
             col_g, col_c, col_gem = st.columns(3)
 
+            _card_style = (
+                "border-radius:10px;padding:16px 18px;border-left:4px solid {color};"
+                "background:{bg};min-height:160px;"
+                "font-size:14px;line-height:1.65;color:#222;"
+            )
+
             with col_g:
+                _txt = mai_result.get("gpt") or "Non disponibile"
                 st.markdown(
-                    "<div style='background:#e8f4fd;border-radius:10px;padding:14px;"
-                    "border-left:4px solid #0d6efd;'>"
-                    "<b style='color:#0d6efd;'>🔵 GPT-5 (OpenAI)</b></div>",
+                    f"<div style='{_card_style.format(color=\"#0d6efd\", bg=\"#e8f4fd\")}'>"
+                    f"<b style='color:#0d6efd;font-size:15px;'>🔵 GPT-4o (OpenAI)</b>"
+                    f"<hr style='margin:10px 0 12px;border:none;border-top:1px solid #c8dff8;'>"
+                    f"{_txt}</div>",
                     unsafe_allow_html=True,
                 )
-                st.markdown(mai_result.get("gpt") or "_Non disponibile_")
 
             with col_c:
+                _txt = mai_result.get("claude") or "Non disponibile"
                 st.markdown(
-                    "<div style='background:#fdf0e8;border-radius:10px;padding:14px;"
-                    "border-left:4px solid #fd7e14;'>"
-                    "<b style='color:#fd7e14;'>🟠 Claude (Anthropic)</b></div>",
+                    f"<div style='{_card_style.format(color=\"#fd7e14\", bg=\"#fdf0e8\")}'>"
+                    f"<b style='color:#fd7e14;font-size:15px;'>🟠 Claude (Anthropic)</b>"
+                    f"<hr style='margin:10px 0 12px;border:none;border-top:1px solid #fdddb8;'>"
+                    f"{_txt}</div>",
                     unsafe_allow_html=True,
                 )
-                st.markdown(mai_result.get("claude") or "_Non disponibile_")
 
             with col_gem:
+                _txt = mai_result.get("gemini") or "Non disponibile"
                 st.markdown(
-                    "<div style='background:#e8fdf0;border-radius:10px;padding:14px;"
-                    "border-left:4px solid #198754;'>"
-                    "<b style='color:#198754;'>🟢 Gemini (Google)</b></div>",
+                    f"<div style='{_card_style.format(color=\"#198754\", bg=\"#e8fdf0\")}'>"
+                    f"<b style='color:#198754;font-size:15px;'>🟢 Gemini (Google)</b>"
+                    f"<hr style='margin:10px 0 12px;border:none;border-top:1px solid #b8f0d0;'>"
+                    f"{_txt}</div>",
                     unsafe_allow_html=True,
                 )
-                st.markdown(mai_result.get("gemini") or "_Non disponibile_")
 
             st.markdown("---")
             st.markdown("#### 🎯 Consenso Scientifico Multi-AI")
