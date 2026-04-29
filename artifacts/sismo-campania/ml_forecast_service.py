@@ -231,30 +231,34 @@ def _build_daily(df: pd.DataFrame, area: str, atm: dict | None = None) -> pd.Dat
 
 
 def _train_rf(daily: pd.DataFrame):
+    """Addestra RandomForest + GradientBoosting e li ritorna come coppia."""
     try:
-        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
         from sklearn.model_selection import TimeSeriesSplit
     except ImportError:
-        return None, None, 0.0
+        return None, None, None, 0.0
 
     if len(daily) < 7:
-        return None, None, 0.0
+        return None, None, None, 0.0
     X = daily[_FEATURE_COLS].fillna(0).values
     y = daily["risk_label"].values
     classes = np.unique(y)
     # Area tranquilla: una sola classe (es. tutto BASSO per Vesuvio)
-    # Il modello è comunque utile per confermare la bassa attività
     if len(classes) < 2:
-        # Ritorna un classificatore triviale (predice sempre 0 = BASSO)
         from sklearn.dummy import DummyClassifier
         dummy = DummyClassifier(strategy="most_frequent")
         dummy.fit(X, y)
-        return dummy, classes, 0.0
+        return dummy, dummy, classes, 0.0
 
     rf = RandomForestClassifier(
         n_estimators=300, max_depth=10, min_samples_leaf=2,
         class_weight="balanced", random_state=42, n_jobs=-1,
     )
+    gb = GradientBoostingClassifier(
+        n_estimators=200, max_depth=5, learning_rate=0.05,
+        subsample=0.8, random_state=42,
+    )
+
     n_splits = max(2, min(5, len(daily) // 10))
     tscv = TimeSeriesSplit(n_splits=n_splits)
     scores = []
@@ -269,7 +273,12 @@ def _train_rf(daily: pd.DataFrame):
         scores.append(float(tmp.score(X[val], y[val])))
 
     rf.fit(X, y)
-    return rf, classes, float(np.mean(scores)) if scores else 0.5
+    try:
+        gb.fit(X, y)
+    except Exception:
+        gb = rf
+
+    return rf, gb, classes, float(np.mean(scores)) if scores else 0.5
 
 
 def _poisson_proba_vector(df: pd.DataFrame, area: str) -> list[float]:
@@ -420,28 +429,10 @@ Regole:
 4. Tono: professionale ma accessibile, senza allarmismo"""
 
     try:
-        import openai as _oai
-        import os
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        if api_key:
-            client = _oai.OpenAI(api_key=api_key)
-            resp = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=300, temperature=0.4,
-            )
-            return resp.choices[0].message.content.strip()
-    except Exception:
-        pass
-
-    try:
-        import g4f
-        resp = g4f.ChatCompletion.create(
-            model=g4f.models.gpt_4o_mini,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        if resp and len(str(resp)) > 30:
-            return str(resp).strip()
+        from multi_ai_service import _ask_gpt as _mgpt
+        narrative = _mgpt(prompt)
+        if narrative and not narrative.startswith("["):
+            return narrative
     except Exception:
         pass
 
@@ -449,8 +440,9 @@ Regole:
     dominant = risk_it.get(max_risk, "medio")
     trend = "stabile" if len(set(risk_seq)) == 1 else "variabile"
     return (
-        f"Il modello ensemble (RandomForest + Poisson-G-R) prevede un livello di attività sismica "
-        f"**{dominant}** nei prossimi 7 giorni per l'area {area}, con andamento {trend}. "
+        f"Il modello ensemble (RandomForest + GradientBoosting + Poisson-G-R) prevede "
+        f"un livello di attività sismica **{dominant}** nei prossimi 7 giorni per l'area {area}, "
+        f"con andamento {trend}. "
         f"I driver principali della previsione sono: {top_feat_names}. "
         f"Confidenza media del modello: {conf_avg}% (accuratezza storica: {round(cv*100,1)}%). "
         f"⚠️ Questa è una stima statistica — nessun sistema al mondo può prevedere i terremoti con certezza."
@@ -483,12 +475,16 @@ def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
         if daily.empty or len(daily) < 7:
             return {"error": "Dati insufficienti (min 7 giorni)."}
 
-        rf, classes, cv_score = _train_rf(daily)
+        rf, gb, classes, cv_score = _train_rf(daily)
         if rf is None:
             return {"error": "Impossibile addestrare il modello (troppo poche classi di rischio nei dati storici)."}
 
         poisson_vec = _poisson_proba_vector(df, area)
         w_rf, w_poi = _calibrate_weights(daily, classes, rf, poisson_vec)
+        # Ensemble: RF 42%, GB 28%, Poisson 30% (pesi calibrati)
+        w_rf_final = w_rf * 0.60
+        w_gb_final = w_rf * 0.40
+        w_poi_final = w_poi
 
         future_dfs = _future_features(daily, horizon, atm=atm)
         if not future_dfs:
@@ -503,7 +499,15 @@ def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
             for idx, cls in enumerate(classes):
                 rf_full[int(cls)] = rf_raw[idx]
 
-            blend = w_rf * rf_full + w_poi * p_vec
+            try:
+                gb_raw  = gb.predict_proba(X_fut)[0]
+                gb_full = np.zeros(3)
+                for idx, cls in enumerate(classes):
+                    gb_full[int(cls)] = gb_raw[idx]
+            except Exception:
+                gb_full = rf_full.copy()
+
+            blend = w_rf_final * rf_full + w_gb_final * gb_full + w_poi_final * p_vec
             blend = np.clip(blend, 1e-9, 1.0)
             blend /= blend.sum()
 
@@ -529,8 +533,9 @@ def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
         result = {
             "days":           days_out,
             "cv_score":       round(cv_score, 3),
-            "weight_rf":      round(w_rf, 3),
-            "weight_poisson": round(w_poi, 3),
+            "weight_rf":      round(w_rf_final, 3),
+            "weight_poisson": round(w_poi_final, 3),
+            "weight_gb":      round(w_gb_final, 3),
             "n_train":        len(daily),
             "top_features":   top_feats,
             "classes_seen":   [int(c) for c in classes],

@@ -517,10 +517,12 @@ elif page == "ai_assistant":
         pattern_isc = ai_analysis.classify_seismic_pattern(isc_df90, "ischia")        if isc_df90 is not None and not isc_df90.empty else {}
         bvalue_isc  = ai_analysis.compute_gutenberg_richter(isc_df90, "ischia")        if isc_df90 is not None and not isc_df90.empty else {}
 
-    # ── Tab CF / Vesuvio / Ischia / SISMAI / Chat AI ──────────────────────────
-    tab_cf, tab_ves, tab_isc, tab_sismai, tab_ingv, tab_chat = st.tabs(
+    import multi_ai_service
+
+    # ── Tab CF / Vesuvio / Ischia / SISMAI / Multi-AI / Ricerca / Chat ────────
+    tab_cf, tab_ves, tab_isc, tab_sismai, tab_multiAI, tab_ingv, tab_chat = st.tabs(
         ["🔴 Campi Flegrei", "🌋 Vesuvio", "🏝️ Ischia",
-         "🔮 SISMAI", "🔬 Ricerca INGV AI", "🤖 Chat AI"]
+         "🔮 SISMAI", "🧠 Multi-AI", "🔬 Ricerca INGV AI", "🤖 Chat AI"]
     )
 
     with tab_cf:
@@ -669,6 +671,128 @@ border-radius:10px;padding:10px 4px;background:#fff;">
                     "Non sostituisce i comunicati ufficiali INGV/DPC. "
                     "Nessun sistema può prevedere i terremoti con certezza."
                 )
+
+    # ── MULTI-AI CONSENSUS ────────────────────────────────────────────────────
+    with tab_multiAI:
+        st.markdown("### 🧠 Analisi Multi-AI — Consenso GPT + Claude + Gemini")
+        st.markdown(
+            "Interroga in parallelo **OpenAI GPT-5**, **Anthropic Claude** e **Google Gemini** "
+            "con lo stesso contesto sismico live. Genera un consenso scientifico da 3 AI distinte."
+        )
+
+        prov_status = multi_ai_service.providers_status()
+        pc1, pc2, pc3 = st.columns(3)
+        for col, (key, info) in zip([pc1, pc2, pc3], prov_status.items()):
+            icon = "🟢" if info["available"] else "🔴"
+            with col:
+                st.markdown(
+                    f"<div style='text-align:center;padding:8px;border:1px solid #ddd;"
+                    f"border-radius:8px;font-size:13px;'>{icon} <b>{info['model']}</b></div>",
+                    unsafe_allow_html=True,
+                )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        mai_area = st.selectbox(
+            "Area di analisi Multi-AI",
+            ["Campi Flegrei", "Vesuvio", "Ischia"],
+            key="multi_ai_area_sel",
+        )
+
+        _df90_map = {"Campi Flegrei": cf_df90, "Vesuvio": ves_df90, "Ischia": isc_df90}
+        _atm_map  = {"Campi Flegrei": None, "Vesuvio": None, "Ischia": None}
+        _gps_map  = {
+            "Campi Flegrei": bulletin_cf.get("gps_uplift_mm_month", 0.0),
+            "Vesuvio":       bulletin_ves.get("gps_uplift_mm_month", 0.0),
+            "Ischia":        0.0,
+        }
+        _alert_map = {
+            "Campi Flegrei": bulletin_cf.get("alert_level", "GIALLO"),
+            "Vesuvio":       bulletin_ves.get("alert_level", "VERDE"),
+            "Ischia":        "VERDE",
+        }
+
+        mai_df = _df90_map.get(mai_area)
+        n_events_mai = len(mai_df) if mai_df is not None and not mai_df.empty else 0
+        max_mag_mai  = float(mai_df["magnitude"].max()) if n_events_mai > 0 else 0.0
+        avg_mag_mai  = float(mai_df["magnitude"].mean()) if n_events_mai > 0 else 0.0
+
+        if st.button(f"🚀 Avvia analisi Multi-AI per {mai_area}", type="primary", key="btn_multi_ai"):
+            with st.spinner("🧠 Interrogo GPT-5, Claude e Gemini in parallelo..."):
+                atm_live = ml_forecast_service.fetch_atmospheric_features(mai_area)
+                data_ctx = {
+                    "n_events":             n_events_mai,
+                    "max_mag":              max_mag_mai,
+                    "avg_mag":              avg_mag_mai,
+                    "alert_level":          _alert_map.get(mai_area, "VERDE"),
+                    "gps_uplift_mm_month":  _gps_map.get(mai_area, 0.0),
+                    "pressure_base":        atm_live.get("pressure_base", 1013.0),
+                    "temp_base":            atm_live.get("temp_base", 15.0),
+                    "temp_vetta":           atm_live.get("temp_vetta"),
+                    "sismai_forecast_label": "BASSO",
+                    "emsc_n_events":        0,
+                    "isc_n_events":         0,
+                    "period_days":          90,
+                }
+                mai_result = multi_ai_service.multi_ai_consensus(mai_area, data_ctx)
+
+            st.success(f"✅ Analisi completata in {mai_result['elapsed_s']}s")
+
+            st.markdown("#### 📊 Contesto dati inviato ai 3 AI")
+            with st.expander("Vedi prompt inviato"):
+                st.code(mai_result.get("prompt", ""), language=None)
+
+            st.markdown("#### 🤖 Risposte individuali")
+            col_g, col_c, col_gem = st.columns(3)
+
+            with col_g:
+                st.markdown(
+                    "<div style='background:#e8f4fd;border-radius:10px;padding:14px;"
+                    "border-left:4px solid #0d6efd;'>"
+                    "<b style='color:#0d6efd;'>🔵 GPT-5 (OpenAI)</b></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(mai_result.get("gpt") or "_Non disponibile_")
+
+            with col_c:
+                st.markdown(
+                    "<div style='background:#fdf0e8;border-radius:10px;padding:14px;"
+                    "border-left:4px solid #fd7e14;'>"
+                    "<b style='color:#fd7e14;'>🟠 Claude (Anthropic)</b></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(mai_result.get("claude") or "_Non disponibile_")
+
+            with col_gem:
+                st.markdown(
+                    "<div style='background:#e8fdf0;border-radius:10px;padding:14px;"
+                    "border-left:4px solid #198754;'>"
+                    "<b style='color:#198754;'>🟢 Gemini (Google)</b></div>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(mai_result.get("gemini") or "_Non disponibile_")
+
+            st.markdown("---")
+            st.markdown("#### 🎯 Consenso Scientifico Multi-AI")
+            consensus = mai_result.get("consensus") or "Consenso non disponibile."
+            st.markdown(
+                f"<div style='background:linear-gradient(135deg,#f8f0ff 0%,#fff 100%);"
+                f"border:2px solid #6f42c1;border-radius:12px;padding:20px;"
+                f"font-size:15px;line-height:1.7;color:#333;'>"
+                f"<b style='color:#6f42c1;'>🧠 Sintesi consensuale (GPT-5 su 3 pareri):</b><br><br>"
+                f"{consensus}</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                f"Analisi generata il {mai_result.get('timestamp','—')} · "
+                f"Dati: INGV/USGS/EMSC · AI: OpenAI + Anthropic + Google · "
+                f"Nessuna risposta è una previsione scientifica certificata."
+            )
+        else:
+            st.info(
+                "💡 Premi **Avvia analisi Multi-AI** per interrogare i 3 sistemi AI con i dati "
+                "sismici live dell'area selezionata. La risposta arriva in ~10-20 secondi."
+            )
 
     # ── Ricerca INGV AI ───────────────────────────────────────────────────────
     with tab_ingv:

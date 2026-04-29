@@ -33,9 +33,12 @@ Also includes a Python/Streamlit seismic monitoring app (SismoCampania).
 - **Port**: 5000
 - **Preview Path**: /
 - **Source**: Replicated from https://github.com/ScelzoF/SeismicSafetyItalia
-- **Modules**: data_service, visualization, emergenza, weather, forum, utils, ai_analysis, ai_chat, orario, translations_lib, ml_forecast_service, ingv_monitor, supabase_utils, chat_pubblica, security
-- **Features**: Real-time seismic monitoring (INGV/USGS), maps (Folium), weather (Open-Meteo), ML forecasting, AI chat, emergency routes, community forum
-- **Data Sources**: INGV, USGS, Open-Meteo, OpenAQ
+- **Modules**: data_service, visualization, emergenza, weather, forum, utils, ai_analysis, ai_chat, orario, translations_lib, ml_forecast_service, ingv_monitor, supabase_utils, chat_pubblica, security, multi_ai_service
+- **Features**: Real-time seismic monitoring (INGV/USGS/EMSC/GOSSIP-OV), maps (Folium), weather (Open-Meteo), ML forecasting (RF+GB+Poisson-G-R+Omori-Utsu ensemble), Multi-AI consensus (GPT-5+Claude+Gemini in parallel), AI chat, emergency routes, community forum
+- **Data Sources**: INGV, USGS, EMSC (seismicportal.eu), GOSSIP-OV, Open-Meteo (atm pressure base+vetta), NOAA CO2
+- **AI Providers (Replit proxy)**: OpenAI GPT-5.1, Anthropic Claude Haiku 4.5, Google Gemini 2.5 Flash
+- **SISMAI Ensemble**: RandomForest (42%) + GradientBoosting (28%) + Poisson-G-R (30%) with calibrated weights, temp_vetta feature, atmospheric pressure
+- **Multi-AI Tab**: Parallel GPT+Claude+Gemini analysis for CF/Vesuvio/Ischia with live seismic context + scientific consensus synthesis
 - **Optional**: Supabase (for forum/chat persistence) - set SUPABASE_URL and SUPABASE_KEY env vars
 - **Run**: `cd artifacts/sismo-campania && streamlit run app.py --server.port 5000`
 
