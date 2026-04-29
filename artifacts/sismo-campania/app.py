@@ -7,8 +7,13 @@ import pandas as pd
 import requests
 import locale
 
-# Sopprimi log DEBUG da watchdog, urllib3, PIL, matplotlib
-for _noisy in ("watchdog", "urllib3", "PIL", "matplotlib", "asyncio"):
+# Sopprimi log DEBUG da watchdog, urllib3, PIL, matplotlib, pdfminer, charset_normalizer
+for _noisy in (
+    "watchdog", "urllib3", "PIL", "matplotlib", "asyncio",
+    "pdfminer", "pdfminer.pdfpage", "pdfminer.pdfinterp",
+    "pdfminer.pdfdocument", "pdfminer.psparser", "pdfminer.cmapdb",
+    "pdfminer.converter", "charset_normalizer",
+):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 import data_service
@@ -253,7 +258,7 @@ with st.sidebar:
     st.markdown("---")
 
     # Refresh data button
-    if st.button(get_text('refresh'), use_container_width=True, type="primary"):
+    if st.button(get_text('refresh'), width='stretch', type="primary"):
         with st.spinner(get_text('updating')):
             st.session_state.earthquake_data = data_service.fetch_earthquake_data()
             st.session_state.last_data_fetch = datetime.now()
@@ -1058,19 +1063,19 @@ per fare <b>previsioni probabilistiche del rischio</b> nei 7 giorni successivi, 
             st.link_button(
                 "🌋 Stato Attuale CF — INGV OV",
                 "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
-                use_container_width=True,
+                width='stretch',
             )
         with lc2:
             st.link_button(
                 "📡 Bollettini Settimanali CF",
                 f"https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/bollettini-tutti/boll-sett-flegre/anno-{_yr}",
-                use_container_width=True,
+                width='stretch',
             )
         with lc3:
             st.link_button(
                 "🌐 INGV Osservatorio Vesuviano",
                 "https://www.ov.ingv.it/",
-                use_container_width=True,
+                width='stretch',
             )
 
         st.caption(

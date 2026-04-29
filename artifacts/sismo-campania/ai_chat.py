@@ -579,7 +579,7 @@ def show_ai_chat(earthquake_data=None, bulletin_cf=None, bulletin_ves=None,
         scols = st.columns(len(sug_list))
         for sc, s in zip(scols, sug_list):
             with sc:
-                if st.button(s, key=f"sug_{s[:15]}", use_container_width=True):
+                if st.button(s, key=f"sug_{s[:15]}", width='stretch'):
                     st.session_state["_ai_pending"] = s
                     st.rerun()
 
@@ -663,6 +663,6 @@ def show_ai_chat(earthquake_data=None, bulletin_cf=None, bulletin_ves=None,
         col_btn, _ = st.columns([1, 4])
         with col_btn:
             if st.button("🗑️ Cancella conversazione", key="clear_ai_chat",
-                         type="secondary", use_container_width=True):
+                         type="secondary", width='stretch'):
                 st.session_state.ai_messages = []
                 st.rerun()

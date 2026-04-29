@@ -523,7 +523,7 @@ def _render_rsam_widget(area: str) -> None:
         resp = _ingv_get(img_url, timeout=5,
                          headers={"User-Agent": "SeismicSafetyItalia/2.0"})
         if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image"):
-            st.image(resp.content, use_container_width=True,
+            st.image(resp.content, width='stretch',
                      caption=f"RSAM {sel_lbl} — {sel_per_lbl} | INGV OV portale2")
         else:
             raise ValueError("no image")
@@ -787,7 +787,7 @@ def _render_pdf_download_button(area: str) -> None:
             data=pdf_bytes,
             file_name=filename,
             mime="application/pdf",
-            use_container_width=True,
+            width='stretch',
             key=f"pdf_dl_{area}",
             help=f"Bollettino mensile INGV OV — {nome}",
         )
@@ -939,7 +939,7 @@ def _render_gps_chart(gps_result: dict, area_name: str) -> None:
         )
         with st.expander("📈 Curva deformazione del suolo GPS", expanded=False):
             st.caption(badge)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
     except Exception as _e:
         st.warning(f"Grafico GPS non disponibile: {_e}")
 
@@ -1435,19 +1435,19 @@ Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi er
             st.link_button(
                 "🔥 NASA FIRMS — Mappa Solfatara",
                 "https://firms.modaps.eosdis.nasa.gov/map/#d:24hrs;@14.14,40.83,12z",
-                use_container_width=True,
+                width='stretch',
             )
         with sat_cols[1]:
             st.link_button(
                 "🌍 MIROVA — Monitoraggio Termico",
                 "https://www.mirovaweb.it/",
-                use_container_width=True,
+                width='stretch',
             )
         with sat_cols[2]:
             st.link_button(
                 "🛰️ Copernicus Emergency Mgmt",
                 "https://emergency.copernicus.eu/mapping/list-of-activations-rapid",
-                use_container_width=True,
+                width='stretch',
             )
 
     # ── STATO SENSORI ─────────────────────────────────────────────────────
@@ -2154,7 +2154,7 @@ def _show_risk_timeline_bar(df, area_name="Italia", plot_key="timeline"):
             hoverlabel=dict(bgcolor="#222" if _dark else "#fff", font_size=12),
         )
 
-        st.plotly_chart(bar_fig, use_container_width=True, key=f"riskbar_{plot_key}")
+        st.plotly_chart(bar_fig, width='stretch', key=f"riskbar_{plot_key}")
 
         # ── Trend Eventi (ultimi 3gg vs 3gg precedenti) ───────────────────
         last3 = sum(hist_counts.get(today - timedelta(days=i), 0) for i in range(3))
@@ -2821,7 +2821,7 @@ def _show_risk_banner(risk_level, risk_metrics, stats, ctx_key="default"):
             plot_bgcolor="rgba(0,0,0,0)",
             font={"color": "#222"},
         )
-        st.plotly_chart(_gauge_fig, use_container_width=True, key=f"gauge_{ctx_key}")
+        st.plotly_chart(_gauge_fig, width='stretch', key=f"gauge_{ctx_key}")
     with banner_col:
         st.markdown(f"""
 <div style="background:{v['bg']};border:1px solid {v['border']};border-left:5px solid {v['border']};
