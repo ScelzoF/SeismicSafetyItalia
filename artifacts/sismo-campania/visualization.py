@@ -2499,8 +2499,8 @@ def _show_ingv_official_links(area):
             _link_row("🌍 Terremoti INGV live", "https://terremoti.ingv.it/", "terremoti.ingv.it") +
             _link_row("📡 Rete sismica ISNet", "http://isnet.na.infn.it/", "isnet.na.infn.it") +
             _link_row("🚨 Protezione Civile — Vesuvio",
-                      "https://www.protezionecivile.gov.it/it/rischio/rischio-vulcanico/vesuvio",
-                      "protezionecivile.gov.it") +
+                      "https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/vesuvio/",
+                      "rischi.protezionecivile.gov.it") +
             _link_row("🛰️ GPS Nevada Geodetic Lab",
                       "http://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/",
                       "geodesy.unr.edu")
@@ -2514,8 +2514,8 @@ def _show_ingv_official_links(area):
             _link_row("🌍 Terremoti INGV live", "https://terremoti.ingv.it/", "terremoti.ingv.it") +
             _link_row("💨 Qualità aria (OpenAQ)", "https://openaq.org/#/countries/IT", "openaq.org") +
             _link_row("🚨 Protezione Civile — CF",
-                      "https://www.protezionecivile.gov.it/it/rischio/rischio-vulcanico/campi-flegrei",
-                      "protezionecivile.gov.it")
+                      "https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/campi-flegrei/",
+                      "rischi.protezionecivile.gov.it")
         )
         st.markdown(_table_start + rows + _table_end, unsafe_allow_html=True)
     elif area == "ischia":

@@ -239,7 +239,7 @@ DATI_REGIONI = {
         "numeri": "800 232 525 (PC Campania) · 112 · 118",
         "link_pc": "https://www.regione.campania.it/regione/it/tematiche/portale-protezione-civile",
         "link_arpa": "http://www.arpacampania.it",
-        "link_speciale": "https://www.protezionecivile.gov.it/it/rischio/rischio-vulcanico/vesuvio",
+        "link_speciale": "https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/vesuvio/",
         "label_speciale": "Piano evacuazione Vesuvio — Protezione Civile",
     },
     "Sicilia": {
@@ -607,7 +607,7 @@ def show():
             4. Segui le vie di fuga indicate dalla segnaletica gialla DPC
             5. NON portare oggetti pesanti — carica solo documenti, medicinali, acqua
             """)
-            st.markdown("🔗 [Piano evacuazione ufficiale DPC](https://www.protezionecivile.gov.it/it/rischio/rischio-vulcanico/vesuvio)")
+            st.markdown("🔗 [Piano evacuazione ufficiale DPC](https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/vesuvio/)")
 
         with col_kit_v:
             st.markdown("""
@@ -692,7 +692,7 @@ def show():
             4. Usa le uscite verso nord (A1, A56 Tangenziale)
             5. Evita i tunnel e le gallerie della costa flegrea
             """)
-            st.markdown("🔗 [Piano evacuazione CF — DPC](https://www.protezionecivile.gov.it/it/rischio/rischio-vulcanico/campi-flegrei)")
+            st.markdown("🔗 [Piano evacuazione CF — DPC](https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/campi-flegrei/)")
 
         with col_vie_f:
             st.markdown("""
@@ -857,7 +857,7 @@ def show():
             "e disponibili sul sito del tuo Comune."
         )
         st.markdown(
-            "🔗 [Cerca piano emergenza del tuo Comune — DPC](https://pianidiprotezionecivile.gov.it)"
+            "🔗 [Cerca piano emergenza del tuo Comune — DPC](https://www.protezionecivile.gov.it/it/attivita/pianificazione)"
         )
 
     # ════════════════════════════════════════════════════════════════════════════
@@ -960,19 +960,19 @@ def show():
         - 🏛️ [Protezione Civile Nazionale](https://www.protezionecivile.gov.it)
         - 🌋 [INGV — monitoraggio](https://www.ingv.it)
         - 🌡️ INGV Osservatorio Vesuviano
-        - 📋 [Piani PC Comunali](https://pianidiprotezionecivile.gov.it)
+        - 📋 [Piani PC Comunali](https://www.protezionecivile.gov.it/it/attivita/pianificazione)
         """)
     with link_cols[1]:
         st.markdown("""
-        - 🌊 [Allerta meteo Campania](https://allertameteo.protezionecivilecampania.it)
+        - 🌊 [Allerta meteo Campania](https://allertameteo.regione.campania.it/)
         - 🚒 [Vigili del Fuoco](https://www.vigilfuoco.it)
         - 🏥 [Ministero della Salute](https://www.salute.gov.it)
         - ⚡ [e-distribuzione — guasti](https://www.e-distribuzione.it)
         """)
     with link_cols[2]:
         st.markdown("""
-        - 🌋 [Piano evacuazione Vesuvio](https://www.protezionecivile.gov.it/it/rischio/rischio-vulcanico/vesuvio)
-        - 🔥 [Piano evacuazione CF](https://www.protezionecivile.gov.it/it/rischio/rischio-vulcanico/campi-flegrei)
+        - 🌋 [Piano evacuazione Vesuvio](https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/vesuvio/)
+        - 🔥 [Piano evacuazione CF](https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/campi-flegrei/)
         - 📡 [IT-Alert — sistema allerta](https://www.it-alert.it)
         - 🌐 [DPC Open Data](https://github.com/pcm-dpc)
         """)
