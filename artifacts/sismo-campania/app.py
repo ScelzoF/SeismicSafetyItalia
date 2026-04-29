@@ -189,6 +189,18 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
+    # ── CSS: forza testo leggibile nei selectbox della sidebar ─────────────
+    st.markdown("""<style>
+div[data-testid="stSidebarContent"] [data-baseweb="select"] span,
+div[data-testid="stSidebarContent"] [data-baseweb="select"] div,
+div[data-testid="stSidebarContent"] [data-baseweb="select"] input {
+    color: #1a1a1a !important;
+}
+div[data-testid="stSidebarContent"] [data-baseweb="select"] {
+    background-color: #fff !important;
+}
+</style>""", unsafe_allow_html=True)
+
     # ── Lingua ─────────────────────────────────────────────────────────────
     lang_options = {
         'it': '🇮🇹 Italiano',

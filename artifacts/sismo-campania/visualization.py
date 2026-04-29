@@ -2190,7 +2190,7 @@ def _show_risk_timeline_bar(df, area_name="Italia", plot_key="timeline"):
                 else:
                     clustering_delta = "⚠️ clustering"
             elif n_inter == 1:
-                clustering_str = "N/D (1 inter-evento)"
+                clustering_str = "N/D (< 3 eventi)"
         except Exception:
             clustering_str = "N/D"
 
