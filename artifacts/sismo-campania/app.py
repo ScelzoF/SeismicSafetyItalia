@@ -387,45 +387,51 @@ with st.sidebar:
     st.markdown("---")
     _support = get_text('support_project')
     _coffee = get_text('buy_coffee')
-    # Bordo oro sul container che racchiude tutto il blocco "Sostieni"
+    # ── CSS: aggancia il pulsante PostePay (unico "secondary" nella sidebar)
+    #    alla parte bassa del riquadro oro, eliminando il gap ──────────────
     st.markdown(
         """<style>
-[data-testid="stSidebarContent"] [data-testid="stVerticalBlockBorderWrapper"] {
-    border-color: #e8a800 !important;
-    background: rgba(255,255,255,0.06);
-    border-radius: 10px !important;
+div[data-testid="stSidebarContent"]
+    button[data-testid="baseButton-secondary"] {
+    margin-top: -2px !important;
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid #e8a800 !important;
+    border-top: none !important;
+    border-radius: 0 0 10px 10px !important;
+    color: #f1faee !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
 }
-[data-testid="stSidebarContent"] [data-testid="stVerticalBlockBorderWrapper"]
-    button[kind="secondary"] {
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.3);
-    color: #f1faee;
-    font-weight: 700;
-    font-size: 13px;
-    border-radius: 8px;
+div[data-testid="stSidebarContent"]
+    button[data-testid="baseButton-secondary"]:hover {
+    background: rgba(232,168,0,0.18) !important;
+    color: #ffd200 !important;
 }
-[data-testid="stSidebarContent"] [data-testid="stVerticalBlockBorderWrapper"]
-    button[kind="secondary"]:hover {
-    border-color: #e8a800;
-    background: rgba(232,168,0,0.15);
+div[data-testid="stSidebarContent"]
+    div[data-testid="stButton"] {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
 }
 </style>""",
         unsafe_allow_html=True,
     )
-    with st.container(border=True):
-        st.markdown(
-            f"""<p style="color:#f1faee;font-size:11px;margin:0 0 8px 0;
-text-align:center;letter-spacing:.05em;">☕ {_support}</p>
+    # ── Riquadro oro: top + left + right, aperto in basso dove si aggancia
+    #    il pulsante PostePay ───────────────────────────────────────────────
+    st.markdown(
+        f"""<div style="background:rgba(255,255,255,0.08);padding:12px 14px 10px 14px;
+border-radius:10px 10px 0 0;border:1px solid #e8a800;border-bottom:none;margin-top:4px;">
+<p style="color:#f1faee;font-size:11px;margin:0 0 8px 0;text-align:center;letter-spacing:.05em;">
+☕ {_support}</p>
 <a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" target="_blank"
 style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e,#ffd200);
-padding:9px 14px;text-decoration:none;border-radius:8px;margin-bottom:2px;
+padding:9px 14px;text-decoration:none;border-radius:8px;
 box-shadow:0 3px 10px rgba(255,210,0,.4);">
 <span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
-</a>""",
-            unsafe_allow_html=True,
-        )
-        if st.button("💳 Dona con PostePay", key="btn_postepay", use_container_width=True):
-            _show_postepay_dialog()
+</a></div>""",
+        unsafe_allow_html=True,
+    )
+    if st.button("💳 Dona con PostePay", key="btn_postepay", use_container_width=True):
+        _show_postepay_dialog()
 
 # Main content area
 st.title("🌋 " + get_text('title'))
