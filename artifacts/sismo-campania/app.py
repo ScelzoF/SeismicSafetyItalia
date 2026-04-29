@@ -353,30 +353,42 @@ with st.sidebar:
 
     # ── Sostieni il progetto ───────────────────────────────────────────────
     st.markdown("---")
-    st.caption("☕ " + get_text('support_project'))
-    # PayPal — pulsante giallo testo scuro
+    _support = get_text('support_project')
+    _coffee = get_text('buy_coffee')
     st.markdown(
-        f"""<a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com"
-target="_blank"
-style="display:block;text-align:center;
-background:linear-gradient(135deg,#f7971e,#ffd200);
-padding:10px 14px;text-decoration:none;border-radius:8px;
-margin-bottom:6px;box-shadow:0 2px 8px rgba(247,151,30,.5);">
-<span style="color:#1a1a1a;font-size:13px;font-weight:800;">
-☕ {get_text('buy_coffee')}</span></a>""",
+        f"""<div style="background:rgba(255,255,255,0.08);padding:12px 14px;
+border-radius:10px;border:1px solid #e8a800;margin-top:4px;">
+<p style="color:#f1faee;font-size:11px;margin:0 0 8px 0;text-align:center;letter-spacing:.05em;">
+☕ {_support}</p>
+<a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" target="_blank"
+style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e,#ffd200);
+padding:9px 14px;text-decoration:none;border-radius:8px;
+box-shadow:0 3px 10px rgba(255,210,0,.4);">
+<span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
+</a></div>""",
         unsafe_allow_html=True,
     )
-    # PostePay — dati nascosti su richiesta
+    # ── PostePay (dati nascosti, mostrati su richiesta) ────────────────────
     with st.expander("💳 Dona con PostePay", expanded=False):
-        st.markdown("**👤 Intestatario:** Andrea Scelzo")
-        st.markdown("**💳 N° Carta**")
-        st.code("5333 1759 3373 3088", language=None)
-        st.markdown("**🏦 IBAN (Evolution)**")
-        st.code("IT30 B360 8105 1382 9282 0692 842", language=None)
-        st.caption(
-            "Nessun CF richiesto online. "
-            "Ricarica mensile: attivabile dall'app Postepay. "
-            "Bonifico gratuito da altra PostePay Evolution."
+        st.markdown(
+            """<div style="font-size:12px;line-height:1.8;">
+<div style="margin-bottom:6px;">
+  <span style="color:#adb5bd;font-weight:600;">👤 Intestatario</span><br>
+  <strong>Andrea Scelzo</strong>
+</div>
+<div style="margin-bottom:6px;">
+  <span style="color:#adb5bd;font-weight:600;">💳 N° Carta</span><br>
+  <code style="font-size:13px;letter-spacing:.08em;">5333 1759 3373 3088</code>
+</div>
+<div style="margin-bottom:8px;">
+  <span style="color:#adb5bd;font-weight:600;">🏦 IBAN (Evolution)</span><br>
+  <code style="font-size:11px;letter-spacing:.04em;">IT30 B360 8105 1382 9282 0692 842</code>
+</div>
+<p style="color:#adb5bd;font-size:10px;margin:0;">
+Nessun CF richiesto online · Ricarica mensile dall'app Postepay · Bonifico gratuito da altra Evolution
+</p>
+</div>""",
+            unsafe_allow_html=True,
         )
 
 # Main content area
