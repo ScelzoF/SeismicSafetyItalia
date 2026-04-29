@@ -592,31 +592,72 @@ elif page == "ai_assistant":
             if fc.get("error"):
                 st.warning(f"⚠️ {fc['error']}")
             else:
-                # Pressione atmosferica live
-                atm_data = fc.get("atm", {})
-                p_base   = atm_data.get("pressure_base", 0)
-                p_vetta  = atm_data.get("pressure_vetta", None)
-                p_delta  = atm_data.get("pressure_delta", 0)
-                temp_b   = atm_data.get("temp_base", 0)
+                # ── BADGE SORGENTI DATI ────────────────────────────────────
+                atm_data   = fc.get("atm", {})
+                p_base     = atm_data.get("pressure_base", 0.0)
+                p_vetta    = atm_data.get("pressure_vetta", None)
+                p_delta    = atm_data.get("pressure_delta", 0.0)
+                temp_b     = atm_data.get("temp_base", 0.0)
+                temp_v     = atm_data.get("temp_vetta", None)
 
+                # Determina sorgenti live dal dataframe SISMAI
+                _src_active = set(sismai_df["source"].unique()) if "source" in sismai_df.columns else set()
+                _meteo_live = abs(p_base - 1013.25) > 0.5  # Open-Meteo ha risposto se diverso dal default
+
+                def _src_badge(name: str, is_live: bool, n: int = 0) -> str:
+                    color  = "#198754" if is_live else "#adb5bd"
+                    status = "LIVE" if is_live else "fallback"
+                    count  = f" ({n})" if n > 0 else ""
+                    return (
+                        f"<span style='display:inline-block;background:{color};color:#fff;"
+                        f"border-radius:5px;padding:2px 8px;font-size:11px;font-weight:700;"
+                        f"margin:2px 3px;'>{name} {status}{count}</span>"
+                    )
+
+                badges_html = (
+                    "<div style='margin-bottom:8px;'>"
+                    + _src_badge("INGV", "INGV" in _src_active, int((_src_active and sismai_df[sismai_df["source"]=="INGV"].shape[0]) if "INGV" in _src_active else 0))
+                    + _src_badge("EMSC", "EMSC" in _src_active, int(sismai_df[sismai_df["source"]=="EMSC"].shape[0]) if "EMSC" in _src_active else 0)
+                    + _src_badge("GOSSIP-OV", "GOSSIP-OV" in _src_active, int(sismai_df[sismai_df["source"]=="GOSSIP-OV"].shape[0]) if "GOSSIP-OV" in _src_active else 0)
+                    + _src_badge("USGS", "USGS" in _src_active, int(sismai_df[sismai_df["source"]=="USGS"].shape[0]) if "USGS" in _src_active else 0)
+                    + _src_badge("Open-Meteo", _meteo_live)
+                    + "</div>"
+                )
+                st.markdown(
+                    f"<div style='background:#f8f9fa;border-radius:8px;padding:10px 14px;"
+                    f"margin-bottom:12px;border:1px solid #dee2e6;'>"
+                    f"<span style='font-size:12px;font-weight:600;color:#555;'>📡 Sorgenti dati attive:</span><br>"
+                    f"{badges_html}</div>",
+                    unsafe_allow_html=True,
+                )
+
+                # ── DATI METEOROLOGICI ─────────────────────────────────────
                 st.markdown("#### 🌡️ Dati meteorologici live (feature SISMAI)")
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Pressione base", f"{p_base:.1f} hPa")
-                if p_vetta:
-                    m2.metric("Pressione vetta", f"{p_vetta:.1f} hPa")
-                    m3.metric("Δ Pressione", f"{p_delta:.1f} hPa")
+                m1, m2, m3, m4, m5 = st.columns(5)
+                m1.metric(
+                    "Pressione base",
+                    f"{p_base:.1f} hPa",
+                    delta=None if not _meteo_live else "🟢 live",
+                )
+                m2.metric("Δ Pressione base-vetta", f"{p_delta:+.1f} hPa")
+                m3.metric(
+                    "Temp. base",
+                    f"{temp_b:.1f} °C",
+                    delta=None if not _meteo_live else "🟢 live",
+                )
+                if temp_v is not None:
+                    m4.metric("Temp. vetta", f"{temp_v:.1f} °C", delta="🟢 live")
                 else:
-                    m2.metric("Pressione delta", f"{p_delta:.1f} hPa")
-                    m3.metric("Fonte meteo", "Open-Meteo")
-                m4.metric("Temperatura base", f"{temp_b:.1f} °C")
+                    m4.metric("Temp. vetta", "formula", delta="📐 adiabatica")
+                m5.metric("Fonte meteo", "Open-Meteo" if _meteo_live else "⚠️ fallback")
 
+                # ── PREVISIONE 7 GIORNI ────────────────────────────────────
                 st.markdown("#### 🔮 Previsione rischio sismico — prossimi 7 giorni")
                 cols_fc = st.columns(7)
                 days = fc.get("days", [])
                 for i, day in enumerate(days[:7]):
                     with cols_fc[i]:
-                        date_str = str(day["date"])[-5:]  # MM-DD
-                        rl = day["risk_level"]
+                        date_str = str(day["date"])[-5:]
                         color = day["color"]
                         label = day["label"]
                         conf  = day["confidence"]
@@ -630,37 +671,33 @@ border-radius:10px;padding:10px 4px;background:#fff;">
                             unsafe_allow_html=True,
                         )
 
-                # Metriche modello
-                st.markdown("#### 📊 Parametri modello ensemble")
-                mc1, mc2, mc3, mc4 = st.columns(4)
+                # ── PARAMETRI MODELLO ──────────────────────────────────────
+                st.markdown("#### 📊 Parametri modello ensemble RF+GB+Poisson")
+                mc1, mc2, mc3, mc4, mc5 = st.columns(5)
                 mc1.metric("Accuratezza CV", f"{fc.get('cv_score',0)*100:.1f}%")
                 mc2.metric("Peso RandomForest", f"{fc.get('weight_rf',0)*100:.0f}%")
-                mc3.metric("Peso Poisson-GR", f"{fc.get('weight_poisson',0)*100:.0f}%")
-                mc4.metric("Giorni training", f"{fc.get('n_train',0)}")
+                mc3.metric("Peso GradBoost", f"{fc.get('weight_gb',0)*100:.0f}%")
+                mc4.metric("Peso Poisson-GR", f"{fc.get('weight_poisson',0)*100:.0f}%")
+                mc5.metric("Giorni training", f"{fc.get('n_train',0)}")
 
-                # Top features
+                # ── TOP FEATURE ────────────────────────────────────────────
                 top_feats = fc.get("top_features", [])
                 if top_feats:
                     st.markdown("#### 🏆 Feature più importanti nel modello")
                     feat_labels = {
-                        "n_7d": "Sismicità 7 giorni",
-                        "n_3d": "Sismicità 3 giorni",
-                        "n_14d": "Sismicità 14 giorni",
-                        "energy_7d": "Energia sismica 7gg",
-                        "maxmag_7d": "Magnitudo max 7gg",
-                        "days_since_sig": "Giorni dall'ultimo M≥3",
-                        "pressure_base": "Pressione atmosferica base",
-                        "pressure_delta": "Δ Pressione base-vetta",
-                        "temp_base": "Temperatura base",
-                        "log_energy": "Log energia totale",
+                        "n_7d": "Sismicità 7gg", "n_3d": "Sismicità 3gg",
+                        "n_14d": "Sismicità 14gg", "energy_7d": "Energia 7gg",
+                        "maxmag_7d": "Mag max 7gg", "days_since_sig": "Giorni da M≥3",
+                        "pressure_base": "Pressione base", "pressure_delta": "Δ Pressione",
+                        "temp_base": "Temp. base", "temp_vetta": "Temp. vetta",
+                        "log_energy": "Log energia",
                     }
                     feat_cols = st.columns(min(len(top_feats), 5))
                     for i, (fname, fval) in enumerate(top_feats[:5]):
                         with feat_cols[i]:
-                            label = feat_labels.get(fname, fname.replace("_", " "))
-                            st.metric(label, f"{fval*100:.1f}%")
+                            st.metric(feat_labels.get(fname, fname.replace("_", " ")), f"{fval*100:.1f}%")
 
-                # Narrativa AI
+                # ── NARRATIVA AI ───────────────────────────────────────────
                 narrative = fc.get("ai_narrative", "")
                 if narrative:
                     st.markdown("#### 💬 Analisi AI del forecast")
