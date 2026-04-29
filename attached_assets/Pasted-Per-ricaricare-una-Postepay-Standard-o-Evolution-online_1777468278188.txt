@@ -1,0 +1,99 @@
+Per ricaricare una Postepay (Standard o Evolution) online, i dati necessari variano in base al metodo scelto, ma in generale sono necessari il numero della carta, le credenziali di accesso al sito/app e il metodo di pagamento. 
+Ecco i dettagli specifici per le diverse modalità online:
+1. Ricarica da App Poste Italiane o App Postepay (Metodo più comune) 
+Credenziali: Nome utente e password del sito poste.it o app (PosteID o impronta digitale).
+Numero Carta: Le 16 cifre della carta da ricaricare (se non salvata).
+Intestatario: Nome e cognome del titolare della carta da ricaricare.
+Importo da ricaricare.
+Metodo di pagamento: Il conto BancoPosta, la carta Postepay o un'altra carta di pagamento (Visa/Mastercard) da cui scalare i fondi. 
+Facebook
+Facebook
+ +4
+2. Ricarica da Sito Poste Italiane (PC)
+Accesso: QR Code con app Poste o credenziali standard.
+Dati Carta: Numero carta da ricaricare (16 cifre).
+Metodo di pagamento: Carta di credito/debito/prepagata (circuito Visa, VPay, Mastercard). 
+PostePay
+PostePay
+ +4
+3. Ricarica con Bonifico (Solo Evolution)
+IBAN: Il codice IBAN della Postepay Evolution.
+Intestatario: Nome e cognome del beneficiario.
+Causale: Es: "Ricarica Postepay". 
+Salvatore Aranzulla
+Salvatore Aranzulla
+4. Ricarica Automatica (Impostabile online)
+Scegliere se ricaricare a tempo (es: primo del mese) o al raggiungimento di una soglia di saldo.
+Necessario abilitare la funzionalità tramite App Postepay/Poste Italiane. 
+PostePay
+PostePay
+ +2
+Cosa NON serve: Non è mai necessario fornire il codice CVV (le 3 cifre sul retro) per ricevere ricariche, né i codici di sicurezza per l'accesso ai servizi. 
+Poste Italiane
+Poste Italiane
+Nota: La ricarica di un'altra carta Postepay online costa solitamente 1€. 
+Le risposte dell'AI potrebbero contenere errori. Per una consulenza finanziaria, rivolgiti a un professionista. Scopri di più
+
+
+
+
+
+
+
+
+
+15 siti
+Postepay Standard - Carte Prepagate Postepay - Poste Italiane
+Se sei registrato puoi ricaricare la tua Carta Postepay subito online dalla tua Area Personale. Se effettui l'operazione di ricari...
+
+
+PostePay
+Postepay Digital: richiedi online la carta prepagata gratuita
+Ti basta avere una Carta Postepay Digital e uno smartphone Android abilitato alla tecnologia NFC con una versione del sistema oper...
+
+
+PostePay
+Come ricaricare la Postepay dall’app. #PosteItaliane ...
+Per ricaricare una carta Postepay Standard o Postepay Evolution tramite l'app Postepay, si inizia aprendo l'app precedentemente sc...
+
+1m
+
+Facebook
+·
+Poste Italiane
+Mostra tutto
+io vorrei caricare e donare soldi ad altra persona
+Per ricaricare o inviare denaro sulla carta Postepay di un'altra persona online, puoi procedere in tre modi principali a seconda delle informazioni in tuo possesso.
+1. Tramite App o Sito (Ricarica Standard)
+Questo è il metodo classico per "ricaricare" la carta di qualcun altro. Ti serviranno i seguenti dati del destinatario:
+Numero della carta: Le 16 cifre stampate sul fronte della carta del destinatario.
+Nome e Cognome: L'intestatario completo della carta.
+Costo: La commissione è di 1,00 €.
+Limiti: Online puoi effettuare massimo 2 ricariche al giorno verso lo stesso beneficiario, con un limite di 500 € per singola operazione. 
+Facile.it
+Facile.it
+ +4
+2. Tramite servizio P2P (Postepay to Postepay) 
+Se hai il destinatario salvato nella tua rubrica telefonica e anche lui usa l'App Postepay, puoi "donare" soldi istantaneamente senza conoscere il numero della sua carta. 
+Poste Italiane
+Poste Italiane
+ +1
+Dati necessari: Solo il numero di cellulare del destinatario.
+Costo: Gratis per invii fino a 25 € al giorno.
+Come fare: Apri l'app, vai su "Paga", seleziona "P2P" e scegli il contatto dalla rubrica. 
+YouTube
+YouTube
+ +2
+3. Tramite Bonifico (Solo per Postepay Evolution)
+Se il destinatario ha una Postepay Evolution, puoi inviare i soldi come se fosse un normale bonifico bancario. 
+Facile.it
+Facile.it
+Dati necessari: Codice IBAN della carta e Nome/Cognome del beneficiario.
+Costo: Dipende dalle condizioni della tua banca o carta (solitamente 1 € se fatto da un'altra Postepay Evolution). 
+Wise
+Wise
+ +1
+Un consiglio importante: Se decidi di fare l'operazione fisicamente in un punto vendita (Tabaccaio/Sisal), ti verrà richiesto obbligatoriamente anche il Codice Fiscale del destinatario, oltre al tuo documento. Online, invece, il codice fiscale solitamente non è richiesto se hai già il numero della carta. 
+Poste Italiane
+Poste Italiane
+ +1
