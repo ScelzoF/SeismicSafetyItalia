@@ -118,6 +118,11 @@ if 'alert_level_cache' not in st.session_state:
 if 'bulletin_live_cache' not in st.session_state:
     st.session_state.bulletin_live_cache = None
 
+# === Apertura dialog PostePay via query param ===
+if st.query_params.get("postepay") == "1":
+    st.query_params.clear()
+    _show_postepay_dialog()
+
 # === CONTATORE VISITE (una sola volta per sessione) ===
 from security import read_visit_counter, increment_visit_counter
 if 'visit_counted' not in st.session_state:
@@ -395,13 +400,18 @@ border-radius:10px;border:1px solid #e8a800;margin-top:4px;">
 <a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" target="_blank"
 style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e,#ffd200);
 padding:9px 14px;text-decoration:none;border-radius:8px;
-box-shadow:0 3px 10px rgba(255,210,0,.4);">
+box-shadow:0 3px 10px rgba(255,210,0,.4);margin-bottom:8px;">
 <span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
-</a></div>""",
+</a>
+<a href="?postepay=1" target="_self"
+style="display:block;text-align:center;background:rgba(255,255,255,0.10);
+border:1px solid rgba(255,255,255,0.30);padding:8px 14px;text-decoration:none;
+border-radius:8px;cursor:pointer;">
+<span style="color:#f1faee;font-size:13px;font-weight:700;">💳 Dona con PostePay</span>
+</a>
+</div>""",
         unsafe_allow_html=True,
     )
-    if st.button("💳 Dona con PostePay", key="btn_postepay", use_container_width=True):
-        _show_postepay_dialog()
 
 # Main content area
 st.title("🌋 " + get_text('title'))
