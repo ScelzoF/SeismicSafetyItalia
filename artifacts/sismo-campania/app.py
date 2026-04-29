@@ -369,27 +369,27 @@ box-shadow:0 3px 10px rgba(255,210,0,.4);">
         unsafe_allow_html=True,
     )
     # ── PostePay (dati nascosti, mostrati su richiesta) ────────────────────
-    with st.expander("💳 Dona con PostePay", expanded=False):
-        st.markdown(
-            """<div style="font-size:12px;line-height:1.8;">
-<div style="margin-bottom:6px;">
-  <span style="color:#adb5bd;font-weight:600;">👤 Intestatario</span><br>
-  <strong>Andrea Scelzo</strong>
+    st.markdown(
+        """<details style="margin-top:8px;">
+<summary style="cursor:pointer;color:#f1faee;font-size:12px;font-weight:700;
+list-style:none;padding:8px 12px;border-radius:8px;
+background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);">
+&#9654; 💳 Dona con PostePay
+</summary>
+<div style="padding:10px 12px 4px 12px;font-size:12px;line-height:1.9;
+background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+border-top:none;border-radius:0 0 8px 8px;">
+<span style="color:#adb5bd;font-weight:600;">👤 Intestatario</span><br>
+<strong style="color:#f1faee;">Andrea Scelzo</strong><br><br>
+<span style="color:#adb5bd;font-weight:600;">💳 N° Carta</span><br>
+<code style="color:#ffd200;font-size:13px;letter-spacing:.08em;">5333 1759 3373 3088</code><br><br>
+<span style="color:#adb5bd;font-weight:600;">🏦 IBAN (Evolution)</span><br>
+<code style="color:#ffd200;font-size:11px;letter-spacing:.04em;">IT30 B360 8105 1382 9282 0692 842</code><br><br>
+<span style="color:#adb5bd;font-size:10px;">Nessun CF richiesto online · Ricarica mensile dall'app Postepay · Bonifico gratuito da altra Evolution</span>
 </div>
-<div style="margin-bottom:6px;">
-  <span style="color:#adb5bd;font-weight:600;">💳 N° Carta</span><br>
-  <code style="font-size:13px;letter-spacing:.08em;">5333 1759 3373 3088</code>
-</div>
-<div style="margin-bottom:8px;">
-  <span style="color:#adb5bd;font-weight:600;">🏦 IBAN (Evolution)</span><br>
-  <code style="font-size:11px;letter-spacing:.04em;">IT30 B360 8105 1382 9282 0692 842</code>
-</div>
-<p style="color:#adb5bd;font-size:10px;margin:0;">
-Nessun CF richiesto online · Ricarica mensile dall'app Postepay · Bonifico gratuito da altra Evolution
-</p>
-</div>""",
-            unsafe_allow_html=True,
-        )
+</details>""",
+        unsafe_allow_html=True,
+    )
 
 # Main content area
 st.title("🌋 " + get_text('title'))
