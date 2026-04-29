@@ -1,0 +1,16 @@
+# Runtime data
+data/earthquake_cache.json
+data/visit_counter.txt
+data/*.json
+logs/
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Replit
+.replit
+replit.nix
