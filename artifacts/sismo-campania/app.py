@@ -365,29 +365,24 @@ style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e
 padding:9px 14px;text-decoration:none;border-radius:8px;
 box-shadow:0 3px 10px rgba(255,210,0,.4);">
 <span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
-</a></div>""",
-        unsafe_allow_html=True,
-    )
-    # ── PostePay (dati nascosti, mostrati su richiesta) ────────────────────
-    st.markdown(
-        """<details style="margin-top:8px;">
-<summary style="cursor:pointer;color:#f1faee;font-size:12px;font-weight:700;
-list-style:none;padding:8px 12px;border-radius:8px;
-background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);">
-&#9654; 💳 Dona con PostePay
+</a>
+<details style="margin-top:8px;">
+<summary style="cursor:pointer;list-style:none;display:block;text-align:center;
+background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.25);
+padding:8px 14px;border-radius:8px;color:#f1faee;font-size:13px;font-weight:700;">
+💳 Dona con PostePay
 </summary>
-<div style="padding:10px 12px 4px 12px;font-size:12px;line-height:1.9;
-background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
-border-top:none;border-radius:0 0 8px 8px;">
+<div style="margin-top:8px;font-size:12px;line-height:1.9;">
 <span style="color:#adb5bd;font-weight:600;">👤 Intestatario</span><br>
 <strong style="color:#f1faee;">Andrea Scelzo</strong><br><br>
 <span style="color:#adb5bd;font-weight:600;">💳 N° Carta</span><br>
 <code style="color:#ffd200;font-size:13px;letter-spacing:.08em;">5333 1759 3373 3088</code><br><br>
 <span style="color:#adb5bd;font-weight:600;">🏦 IBAN (Evolution)</span><br>
 <code style="color:#ffd200;font-size:11px;letter-spacing:.04em;">IT30 B360 8105 1382 9282 0692 842</code><br><br>
-<span style="color:#adb5bd;font-size:10px;">Nessun CF richiesto online · Ricarica mensile dall'app Postepay · Bonifico gratuito da altra Evolution</span>
+<span style="color:#adb5bd;font-size:10px;">Nessun CF richiesto · Ricarica mensile dall'app Postepay · Bonifico gratuito da altra Evolution</span>
 </div>
-</details>""",
+</details>
+</div>""",
         unsafe_allow_html=True,
     )
 
