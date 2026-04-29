@@ -369,19 +369,30 @@ box-shadow:0 3px 10px rgba(255,210,0,.4);">
         unsafe_allow_html=True,
     )
     # ── PostePay (dati nascosti, mostrati su richiesta) ────────────────────
-    with st.expander("💳 Dona con PostePay", expanded=False):
+    with st.expander("💳 Dona con PostePay Evolution", expanded=False):
         st.markdown(
-            "<p style='color:#f1faee;font-size:11px;margin:0 0 6px 0;'>"
-            "Puoi inviare una donazione diretta tramite <b>PostePay Evolution</b> "
-            "con bonifico (gratis da altra Evolution) o ricarica carta.</p>",
+            """
+<div style="font-size:11px;line-height:1.7;">
+<p style="margin:0 0 8px 0;">Invia direttamente tramite bonifico o ricarica carta.</p>
+<table style="width:100%;border-collapse:collapse;">
+  <tr>
+    <td style="color:#adb5bd;padding:3px 6px 3px 0;white-space:nowrap;font-weight:600;">👤 Intestatario</td>
+    <td style="padding:3px 0;font-weight:700;">Saverio Morano</td>
+  </tr>
+  <tr>
+    <td style="color:#adb5bd;padding:3px 6px 3px 0;white-space:nowrap;font-weight:600;">💳 N° Carta</td>
+    <td style="padding:3px 0;font-family:monospace;letter-spacing:.05em;">5333 1759 3373 3088</td>
+  </tr>
+  <tr>
+    <td style="color:#adb5bd;padding:3px 6px 3px 0;white-space:nowrap;font-weight:600;">🏦 IBAN</td>
+    <td style="padding:3px 0;font-family:monospace;font-size:10px;letter-spacing:.04em;">IT30 B360 8105 1382 9282 0692 842</td>
+  </tr>
+</table>
+<p style="color:#adb5bd;font-size:10px;margin:8px 0 0 0;">
+Online non serve il codice fiscale. La ricarica mensile automatica si imposta dall'app Postepay/Poste Italiane. Bonifico gratuito da altra PostePay Evolution.
+</p>
+</div>""",
             unsafe_allow_html=True,
-        )
-        st.markdown("**Intestatario:** Saverio Morano")
-        st.code("Carta: 5333 1759 3373 3088", language=None)
-        st.code("IBAN:  IT30 B360 8105 1382 9282 0692 842", language=None)
-        st.caption(
-            "Online basta numero carta + intestatario (nessun CF richiesto). "
-            "Ricarica mensile: abilitabile dall'app Postepay/Poste Italiane."
         )
 
 # Main content area
