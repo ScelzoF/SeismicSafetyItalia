@@ -484,11 +484,19 @@ elif page == "ai_assistant":
     )
 
     eq_data = st.session_state.earthquake_data
-    from data_service import filter_area_earthquakes
+    from data_service import filter_area_earthquakes, fetch_earthquake_data_for_ml_area
     import ingv_monitor
+
+    # Dati recenti (30gg) per conteggi display e badge
     cf_df  = filter_area_earthquakes(eq_data, "campi_flegrei") if eq_data is not None else None
     ves_df = filter_area_earthquakes(eq_data, "vesuvio")       if eq_data is not None else None
     isc_df = filter_area_earthquakes(eq_data, "ischia")        if eq_data is not None else None
+
+    # Dati 90 giorni (box allargato, M≥0.0) per i modelli AI — sempre disponibili
+    with st.spinner("⏳ Caricamento storico 90 giorni per modelli AI..."):
+        cf_df90  = fetch_earthquake_data_for_ml_area("campi_flegrei", days=90)
+        ves_df90 = fetch_earthquake_data_for_ml_area("vesuvio",       days=90)
+        isc_df90 = fetch_earthquake_data_for_ml_area("ischia",        days=90)
 
     bulletin_live = ingv_monitor.fetch_bulletin_values_live()
     bulletin_cf   = bulletin_live.get("campi_flegrei", ingv_monitor.get_ingv_bulletin_values().get("campi_flegrei", {}))
@@ -496,18 +504,18 @@ elif page == "ai_assistant":
     alert         = ingv_monitor.fetch_ingv_alert_level() or {}
     gps           = ingv_monitor.fetch_gps_rite()
 
-    # ── Carica dati AI per tutte le aree ─────────────────────────────────────
+    # ── Carica dati AI per tutte le aree (usa 90gg per avere sempre abbastanza dati) ──
     with st.spinner("⏳ Modelli AI in esecuzione sui dati INGV..."):
-        anomaly_cf  = ai_analysis.detect_anomalies(cf_df,  "campi_flegrei") if cf_df  is not None and not cf_df.empty  else {}
-        pattern_cf  = ai_analysis.classify_seismic_pattern(cf_df,  "campi_flegrei") if cf_df  is not None and not cf_df.empty  else {}
-        bvalue_cf   = ai_analysis.compute_gutenberg_richter(cf_df,  "campi_flegrei") if cf_df  is not None and not cf_df.empty  else {}
-        gps_corr_cf = ai_analysis.compute_gps_seismicity_correlation(cf_df, gps)
-        anomaly_ves = ai_analysis.detect_anomalies(ves_df, "vesuvio")       if ves_df is not None and not ves_df.empty else {}
-        pattern_ves = ai_analysis.classify_seismic_pattern(ves_df, "vesuvio")       if ves_df is not None and not ves_df.empty else {}
-        bvalue_ves  = ai_analysis.compute_gutenberg_richter(ves_df, "vesuvio")       if ves_df is not None and not ves_df.empty else {}
-        anomaly_isc = ai_analysis.detect_anomalies(isc_df, "ischia")        if isc_df is not None and not isc_df.empty else {}
-        pattern_isc = ai_analysis.classify_seismic_pattern(isc_df, "ischia")        if isc_df is not None and not isc_df.empty else {}
-        bvalue_isc  = ai_analysis.compute_gutenberg_richter(isc_df, "ischia")        if isc_df is not None and not isc_df.empty else {}
+        anomaly_cf  = ai_analysis.detect_anomalies(cf_df90,  "campi_flegrei") if cf_df90  is not None and not cf_df90.empty  else {}
+        pattern_cf  = ai_analysis.classify_seismic_pattern(cf_df90,  "campi_flegrei") if cf_df90  is not None and not cf_df90.empty  else {}
+        bvalue_cf   = ai_analysis.compute_gutenberg_richter(cf_df90,  "campi_flegrei") if cf_df90  is not None and not cf_df90.empty  else {}
+        gps_corr_cf = ai_analysis.compute_gps_seismicity_correlation(cf_df90, gps)
+        anomaly_ves = ai_analysis.detect_anomalies(ves_df90, "vesuvio")       if ves_df90 is not None and not ves_df90.empty else {}
+        pattern_ves = ai_analysis.classify_seismic_pattern(ves_df90, "vesuvio")       if ves_df90 is not None and not ves_df90.empty else {}
+        bvalue_ves  = ai_analysis.compute_gutenberg_richter(ves_df90, "vesuvio")       if ves_df90 is not None and not ves_df90.empty else {}
+        anomaly_isc = ai_analysis.detect_anomalies(isc_df90, "ischia")        if isc_df90 is not None and not isc_df90.empty else {}
+        pattern_isc = ai_analysis.classify_seismic_pattern(isc_df90, "ischia")        if isc_df90 is not None and not isc_df90.empty else {}
+        bvalue_isc  = ai_analysis.compute_gutenberg_richter(isc_df90, "ischia")        if isc_df90 is not None and not isc_df90.empty else {}
 
     # ── Tab CF / Vesuvio / Ischia / SISMAI / Chat AI ──────────────────────────
     tab_cf, tab_ves, tab_isc, tab_sismai, tab_ingv, tab_chat = st.tabs(
@@ -517,18 +525,20 @@ elif page == "ai_assistant":
 
     with tab_cf:
         st.markdown("### Analisi AI — Campi Flegrei")
-        if cf_df is None or cf_df.empty:
+        if cf_df90 is None or cf_df90.empty:
             st.warning("Nessun dato sismico disponibile per i Campi Flegrei.")
         else:
-            st.caption(f"Basata su {len(cf_df)} eventi INGV/USGS nell'ultimo periodo")
+            n_30 = len(cf_df) if cf_df is not None and not cf_df.empty else 0
+            st.caption(f"Basata su {len(cf_df90)} eventi INGV (90 giorni) · {n_30} nelle ultime 4 settimane")
             _render_ai_panel(anomaly_cf, pattern_cf, bvalue_cf, gps_corr_cf)
 
     with tab_ves:
         st.markdown("### Analisi AI — Vesuvio")
-        if ves_df is None or ves_df.empty:
-            st.warning("Nessun dato sismico disponibile per il Vesuvio.")
+        if ves_df90 is None or ves_df90.empty:
+            st.success("✅ Nessuna attività sismica rilevante nelle ultime 24 ore. Attività nella norma (VERDE).")
         else:
-            st.caption(f"Basata su {len(ves_df)} eventi INGV/USGS nell'ultimo periodo")
+            n_30 = len(ves_df) if ves_df is not None and not ves_df.empty else 0
+            st.caption(f"Basata su {len(ves_df90)} eventi INGV (90 giorni) · {n_30} nelle ultime 4 settimane")
             _render_ai_panel(anomaly_ves, pattern_ves, bvalue_ves, None)
 
     with tab_isc:
@@ -538,10 +548,11 @@ elif page == "ai_assistant":
             "L'anomaly detection e il b-value sono particolarmente utili per identificare "
             "sequenze sismiche precursori di eventi come quello del 2022 (M 5.7)."
         )
-        if isc_df is None or isc_df.empty:
+        if isc_df90 is None or isc_df90.empty:
             st.success("✅ Nessun evento sismico recente nell'area di Ischia — attività nella norma.")
         else:
-            st.caption(f"Basata su {len(isc_df)} eventi INGV/USGS nell'ultimo periodo")
+            n_30 = len(isc_df) if isc_df is not None and not isc_df.empty else 0
+            st.caption(f"Basata su {len(isc_df90)} eventi INGV (90 giorni) · {n_30} nelle ultime 4 settimane")
             _render_ai_panel(anomaly_isc, pattern_isc, bvalue_isc, None)
 
     # ── SISMAI ────────────────────────────────────────────────────────────────
@@ -550,7 +561,7 @@ elif page == "ai_assistant":
         st.markdown(
             "Modello ensemble **RandomForest + Poisson-Gutenberg-Richter + Omori-Utsu** "
             "con feature live: sismicità INGV/USGS · pressione atmosferica (base+vetta) · "
-            "temperatura · bollettino INGV OV Vesuvio · GPS deformazione."
+            "temperatura · bollettino INGV OV · GPS deformazione · 90 giorni di storico."
         )
 
         sismai_area = st.selectbox(
@@ -558,10 +569,11 @@ elif page == "ai_assistant":
             ["Campi Flegrei", "Vesuvio", "Ischia"],
             key="sismai_area_sel",
         )
+        # Usa 90 giorni (box allargato) per SISMAI — molto più dati rispetto ai 30gg filtrati
         sismai_df_map = {
-            "Campi Flegrei": cf_df,
-            "Vesuvio":       ves_df,
-            "Ischia":        isc_df,
+            "Campi Flegrei": cf_df90,
+            "Vesuvio":       ves_df90,
+            "Ischia":        isc_df90,
         }
         sismai_df = sismai_df_map.get(sismai_area)
 

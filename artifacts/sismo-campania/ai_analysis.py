@@ -24,7 +24,7 @@ def detect_anomalies(df: pd.DataFrame, area: str = "") -> dict:
     Confronta la finestra recente (3 giorni) con la baseline (30 giorni).
     Restituisce: livello anomalia, score, spiegazione.
     """
-    if df is None or df.empty or len(df) < 10:
+    if df is None or df.empty or len(df) < 5:
         return {"status": "insufficient_data", "anomaly": False, "score": 0.0, "explanation": "Dati insufficienti"}
 
     try:
@@ -43,7 +43,7 @@ def detect_anomalies(df: pd.DataFrame, area: str = "") -> dict:
         baseline = df[df["datetime"] >= cutoff_30d].copy()
         recent   = df[df["datetime"] >= cutoff_3d].copy()
 
-        if len(baseline) < 8:
+        if len(baseline) < 5:
             return {"status": "insufficient_data", "anomaly": False, "score": 0.0,
                     "explanation": "Storico insufficiente per rilevare anomalie"}
 
@@ -228,16 +228,16 @@ def compute_gutenberg_richter(df: pd.DataFrame, area: str = "") -> dict:
     b basso (<0.7) può indicare accumulo di stress.
     b alto (>1.5) può indicare frammentazione/fluidi.
     """
-    if df is None or df.empty or len(df) < 20:
+    if df is None or df.empty or len(df) < 8:
         return {"b_value": None, "a_value": None, "r_squared": None,
-                "interpretation": "Dati insufficienti (minimo 20 eventi)", "status": "insufficient"}
+                "interpretation": "Dati insufficienti (minimo 8 eventi)", "status": "insufficient"}
 
     try:
         mags = df["magnitude"].dropna().values
-        mags = mags[mags >= 1.0]  # soglia minima completezza
+        mags = mags[mags >= 0.5]  # soglia minima completezza (abbassata per aree tranquille)
 
-        if len(mags) < 15:
-            return {"b_value": None, "interpretation": "Troppi pochi eventi ≥ M1.0", "status": "insufficient"}
+        if len(mags) < 6:
+            return {"b_value": None, "interpretation": "Troppi pochi eventi ≥ M0.5", "status": "insufficient"}
 
         # Magnitudo di completezza (metodo massima curvatura)
         mag_bins = np.arange(0.5, mags.max() + 0.5, 0.5)
@@ -246,11 +246,11 @@ def compute_gutenberg_richter(df: pd.DataFrame, area: str = "") -> dict:
         mc = float(edges[mc_idx])
 
         mags_above = mags[mags >= mc]
-        if len(mags_above) < 10:
+        if len(mags_above) < 5:
             mc = float(np.percentile(mags, 20))
             mags_above = mags[mags >= mc]
 
-        if len(mags_above) < 8:
+        if len(mags_above) < 4:
             return {"b_value": None, "interpretation": "Campione insufficiente sopra Mc", "status": "insufficient"}
 
         # Stima b con massima verosimiglianza (Aki 1965)

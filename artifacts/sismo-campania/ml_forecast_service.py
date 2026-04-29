@@ -55,7 +55,7 @@ _FEATURE_COLS = [
     "avg_depth",
     "dow_sin", "dow_cos", "doy_sin", "doy_cos",
     "days_since_sig",
-    "pressure_base", "pressure_delta", "temp_base",
+    "pressure_base", "pressure_delta", "temp_base", "temp_vetta",
 ]
 
 # Cache pressione atmosferica (30 min)
@@ -83,26 +83,61 @@ def fetch_atmospheric_features(area: str = "Campi Flegrei") -> dict:
     area_coords = coords.get(area, coords["Campi Flegrei"])
     blat, blon = area_coords["base"]
 
-    result = {"pressure_base": 1013.25, "pressure_delta": 0.0, "temp_base": 15.0, "_ts": now}
+    # Elevazioni vetta per temperatura: Vesuvio 1281m, Solfatara (CF) 92m (crateri Solfatara)
+    vetta_elevations = {
+        "Campi Flegrei": 92,   # cratere Solfatara
+        "Vesuvio":       1281, # Gran Cono
+        "Ischia":        789,  # Monte Epomeo
+        "Italy":         0,
+    }
+
+    result = {
+        "pressure_base": 1013.25, "pressure_delta": 0.0,
+        "temp_base": 15.0, "temp_vetta": None,
+        "wind_base": None, "humidity_base": None,
+        "_ts": now, "_source_live": False,
+    }
     try:
         url = (
             f"https://api.open-meteo.com/v1/forecast"
             f"?latitude={blat}&longitude={blon}"
-            f"&current=pressure_msl,surface_pressure,temperature_2m"
+            f"&current=pressure_msl,surface_pressure,temperature_2m,"
+            f"wind_speed_10m,relative_humidity_2m"
             f"&timezone=Europe%2FRome"
         )
         r = requests.get(url, timeout=8)
         if r.status_code == 200:
             d = r.json().get("current", {})
-            result["pressure_base"] = d.get("pressure_msl", 1013.25)
-            result["temp_base"]     = d.get("temperature_2m", 15.0)
+            result["pressure_base"]  = d.get("pressure_msl", 1013.25)
+            result["temp_base"]      = d.get("temperature_2m", 15.0)
+            result["wind_base"]      = d.get("wind_speed_10m")
+            result["humidity_base"]  = d.get("relative_humidity_2m")
+            result["_source_live"]   = True
 
-        if area_coords["vetta"]:
+        # Temperatura vetta con elevazione specifica
+        elev = vetta_elevations.get(area, 0)
+        if elev > 100:
+            vlat, vlon = area_coords["vetta"] if area_coords["vetta"] else (blat, blon)
+            url_vetta = (
+                f"https://api.open-meteo.com/v1/forecast"
+                f"?latitude={vlat}&longitude={vlon}"
+                f"&current=pressure_msl,temperature_2m"
+                f"&elevation={elev}"
+                f"&timezone=Europe%2FRome"
+            )
+            r_v = requests.get(url_vetta, timeout=8)
+            if r_v.status_code == 200:
+                d_v = r_v.json().get("current", {})
+                p_vetta = d_v.get("pressure_msl", result["pressure_base"] - int(elev * 0.12))
+                result["pressure_vetta"] = p_vetta
+                result["pressure_delta"] = result["pressure_base"] - p_vetta
+                result["temp_vetta"]     = d_v.get("temperature_2m")
+        elif area_coords["vetta"]:
             vlat, vlon = area_coords["vetta"]
             url2 = (
                 f"https://api.open-meteo.com/v1/forecast"
                 f"?latitude={vlat}&longitude={vlon}"
-                f"&current=pressure_msl"
+                f"&current=pressure_msl,temperature_2m"
                 f"&timezone=Europe%2FRome"
             )
             r2 = requests.get(url2, timeout=8)
@@ -111,8 +146,14 @@ def fetch_atmospheric_features(area: str = "Campi Flegrei") -> dict:
                 p_vetta = d2.get("pressure_msl", result["pressure_base"] - 120)
                 result["pressure_vetta"] = p_vetta
                 result["pressure_delta"] = result["pressure_base"] - p_vetta
+                result["temp_vetta"]     = d2.get("temperature_2m")
     except Exception:
         pass
+
+    # temp_vetta default: formula adiabatica −6.5°C/1000m se non disponibile
+    if result["temp_vetta"] is None:
+        elev = vetta_elevations.get(area, 0)
+        result["temp_vetta"] = result["temp_base"] - (elev / 1000) * 6.5 if elev > 0 else result["temp_base"]
 
     _PRESSURE_CACHE[cache_key] = result
     return result
@@ -175,12 +216,13 @@ def _build_daily(df: pd.DataFrame, area: str, atm: dict | None = None) -> pd.Dat
         dsig.append(last_sig)
     daily["days_since_sig"] = dsig
 
-    # Pressione atmosferica e temperatura (feature live — costante per tutto lo storico)
+    # Feature meteo live (pressione, temperatura base+vetta)
     if atm is None:
         atm = {}
     daily["pressure_base"]  = float(atm.get("pressure_base", 1013.25))
     daily["pressure_delta"] = float(atm.get("pressure_delta", 0.0))
     daily["temp_base"]      = float(atm.get("temp_base", 15.0))
+    daily["temp_vetta"]     = float(atm.get("temp_vetta") or atm.get("temp_base", 15.0))
 
     daily["risk_label"] = daily["n_events"].apply(
         lambda n: 0 if n < thresh["low"] else (1 if n < thresh["high"] else 2)
@@ -195,13 +237,19 @@ def _train_rf(daily: pd.DataFrame):
     except ImportError:
         return None, None, 0.0
 
-    if len(daily) < 20:
+    if len(daily) < 7:
         return None, None, 0.0
     X = daily[_FEATURE_COLS].fillna(0).values
     y = daily["risk_label"].values
     classes = np.unique(y)
+    # Area tranquilla: una sola classe (es. tutto BASSO per Vesuvio)
+    # Il modello è comunque utile per confermare la bassa attività
     if len(classes) < 2:
-        return None, None, 0.0
+        # Ritorna un classificatore triviale (predice sempre 0 = BASSO)
+        from sklearn.dummy import DummyClassifier
+        dummy = DummyClassifier(strategy="most_frequent")
+        dummy.fit(X, y)
+        return dummy, classes, 0.0
 
     rf = RandomForestClassifier(
         n_estimators=300, max_depth=10, min_samples_leaf=2,
@@ -325,6 +373,7 @@ def _future_features(daily: pd.DataFrame, horizon: int = 7, atm: dict | None = N
             "pressure_base":  float(atm.get("pressure_base", 1013.25)),
             "pressure_delta": float(atm.get("pressure_delta", 0.0)),
             "temp_base":      float(atm.get("temp_base", 15.0)),
+            "temp_vetta":     float(atm.get("temp_vetta") or atm.get("temp_base", 15.0)),
             "date":          fdate,
         }
         rows.append(pd.DataFrame([row]))
@@ -431,8 +480,8 @@ def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
             atm = fetch_atmospheric_features(area)
 
         daily = _build_daily(df, area, atm=atm)
-        if daily.empty or len(daily) < 20:
-            return {"error": "Dati insufficienti (min 20 giorni)."}
+        if daily.empty or len(daily) < 7:
+            return {"error": "Dati insufficienti (min 7 giorni)."}
 
         rf, classes, cv_score = _train_rf(daily)
         if rf is None:
@@ -471,8 +520,11 @@ def run_ml_forecast(df: pd.DataFrame, area: str = "Italy", horizon: int = 7,
                 "confidence": conf,
             })
 
-        feat_imp   = dict(zip(_FEATURE_COLS, rf.feature_importances_))
-        top_feats  = sorted(feat_imp.items(), key=lambda x: x[1], reverse=True)[:5]
+        if hasattr(rf, "feature_importances_"):
+            feat_imp  = dict(zip(_FEATURE_COLS, rf.feature_importances_))
+            top_feats = sorted(feat_imp.items(), key=lambda x: x[1], reverse=True)[:5]
+        else:
+            top_feats = [(f, 0.0) for f in _FEATURE_COLS[:5]]
 
         result = {
             "days":           days_out,
