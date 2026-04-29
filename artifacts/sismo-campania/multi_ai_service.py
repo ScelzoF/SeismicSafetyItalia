@@ -42,49 +42,69 @@ def _get_openai_creds():
     return "", "", ""
 
 
+def _get_openrouter_key() -> str:
+    """Restituisce la chiave OpenRouter se disponibile."""
+    key = os.environ.get("OPENROUTER_API_KEY", "")
+    if key:
+        return key
+    try:
+        import streamlit as st
+        return st.secrets.get("OPENROUTER_API_KEY", "")
+    except Exception:
+        return ""
+
+
 def _get_claude_creds():
+    """Replit proxy → ANTHROPIC_API_KEY → OpenRouter."""
     base = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "")
     if base and key:
-        return base, key
+        return base, key, "claude-haiku-4-5", "native"
     direct = os.environ.get("ANTHROPIC_API_KEY", "")
     if direct:
-        return "https://api.anthropic.com", direct
+        return "https://api.anthropic.com", direct, "claude-3-5-haiku-20241022", "native"
     try:
         import streamlit as st
         direct = st.secrets.get("ANTHROPIC_API_KEY", "")
         if direct:
-            return "https://api.anthropic.com", direct
+            return "https://api.anthropic.com", direct, "claude-3-5-haiku-20241022", "native"
     except Exception:
         pass
-    return "", ""
+    or_key = _get_openrouter_key()
+    if or_key:
+        return "https://openrouter.ai/api/v1", or_key, "anthropic/claude-3-haiku", "openrouter"
+    return "", "", "", ""
 
 
 def _get_gemini_creds():
+    """Replit proxy → GOOGLE_API_KEY → OpenRouter."""
     base = os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY", "")
     if base and key:
-        return base, key
+        return base, key, "gemini-2.5-flash", "native"
     for var in ("GOOGLE_API_KEY", "GEMINI_API_KEY"):
         direct = os.environ.get(var, "")
         if direct:
-            return "https://generativelanguage.googleapis.com/v1beta", direct
+            return "https://generativelanguage.googleapis.com/v1beta", direct, "gemini-2.0-flash", "native"
     try:
         import streamlit as st
         for var in ("GOOGLE_API_KEY", "GEMINI_API_KEY"):
             direct = st.secrets.get(var, "")
             if direct:
-                return "https://generativelanguage.googleapis.com/v1beta", direct
+                return "https://generativelanguage.googleapis.com/v1beta", direct, "gemini-2.0-flash", "native"
     except Exception:
         pass
-    return "", ""
+    or_key = _get_openrouter_key()
+    if or_key:
+        return "https://openrouter.ai/api/v1", or_key, "google/gemini-flash-1.5", "openrouter"
+    return "", "", "", ""
 
 
 def _providers_status() -> dict:
     """Stato disponibilità provider — calcolato live."""
     ob, ok, _ = _get_openai_creds()
-    cb, ck     = _get_claude_creds()
-    gb, gk     = _get_gemini_creds()
+    cb, ck, _, _ = _get_claude_creds()
+    gb, gk, _, _ = _get_gemini_creds()
     return {
         "gpt":    bool(ob and ok),
         "claude": bool(cb and ck),
@@ -131,45 +151,60 @@ Analizza i dati forniti dal punto di vista della sicurezza pubblica: cosa signif
 quali precauzioni sono consigliate, come interpretare i livelli di allerta. Rispondi in italiano, 3-5 frasi."""
 
 
+def _openai_compat_call(base: str, key: str, model: str, prompt: str, system: str) -> str:
+    """Chiamata OpenAI-compatibile (funziona con Replit proxy, OpenAI, OpenRouter)."""
+    import openai
+    extra = {}
+    if "openrouter.ai" in base:
+        extra["default_headers"] = {
+            "HTTP-Referer": "https://sismocampania.streamlit.app",
+            "X-Title": "SismoCampania",
+        }
+    client = openai.OpenAI(base_url=base, api_key=key, **extra)
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    r = client.chat.completions.create(model=model, messages=messages, max_tokens=600)
+    return r.choices[0].message.content.strip()
+
+
 def _ask_claude(prompt: str, system: str = "", model: str = "claude-haiku-4-5") -> str:
-    """Chiama Anthropic Claude. Fallback: GPT-4o con prospettiva statistica."""
-    cb, ck = _get_claude_creds()
+    """Chiama Claude: nativo Anthropic → OpenRouter → GPT-4o fallback."""
+    cb, ck, cm, provider = _get_claude_creds()
     if cb and ck:
         try:
-            import anthropic
-            client = anthropic.Anthropic(base_url=cb, api_key=ck)
-            kwargs = {
-                "model": model,
-                "max_tokens": 600,
-                "messages": [{"role": "user", "content": prompt}],
-            }
-            if system:
-                kwargs["system"] = system
-            r = client.messages.create(**kwargs)
-            return r.content[0].text.strip()
-        except Exception as e:
-            pass  # fall through to GPT-4o fallback
-    # Fallback: GPT-4o con prospettiva analitica statistica
-    fallback_sys = system or _CLAUDE_FALLBACK_SYSTEM
+            if provider == "native":
+                import anthropic
+                client = anthropic.Anthropic(base_url=cb, api_key=ck)
+                kwargs = {"model": cm, "max_tokens": 600,
+                          "messages": [{"role": "user", "content": prompt}]}
+                if system:
+                    kwargs["system"] = system
+                r = client.messages.create(**kwargs)
+                return r.content[0].text.strip()
+            else:
+                return _openai_compat_call(cb, ck, cm, prompt, system)
+        except Exception:
+            pass
+    # Fallback GPT-4o con prospettiva statistica
     base, key, mdl = _get_openai_creds()
     if not (base and key):
-        return "Claude non disponibile (API key mancante)."
+        return "Claude non disponibile (nessuna API key configurata)."
     try:
-        import openai
-        client = openai.OpenAI(base_url=base, api_key=key)
-        messages = [{"role": "system", "content": fallback_sys},
-                    {"role": "user", "content": prompt}]
-        r = client.chat.completions.create(model=mdl, messages=messages, max_tokens=600)
-        return r.choices[0].message.content.strip()
+        return _openai_compat_call(base, key, mdl, prompt, system or _CLAUDE_FALLBACK_SYSTEM)
     except Exception as e:
-        return f"[Claude/fallback errore: {str(e)[:120]}]"
+        return f"[Claude errore: {str(e)[:120]}]"
 
 
 def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") -> str:
-    """Chiama Google Gemini. Fallback: GPT-4o con prospettiva protezione civile."""
-    gb, gk = _get_gemini_creds()
+    """Chiama Gemini: nativo Google → OpenRouter → GPT-4o fallback."""
+    gb, gk, gm, provider = _get_gemini_creds()
     if gb and gk:
         try:
+            if provider == "openrouter":
+                return _openai_compat_call(gb, gk, gm, prompt, system)
+            # Gemini nativo via REST
             contents = []
             if system:
                 contents.append({"role": "user", "parts": [{"text": f"[Sistema]\n{system}"}]})
@@ -177,28 +212,22 @@ def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") 
             contents.append({"role": "user", "parts": [{"text": prompt}]})
             payload = {"contents": contents, "generationConfig": {"maxOutputTokens": 600}}
             headers = {"Content-Type": "application/json", "Authorization": f"Bearer {gk}"}
-            url = f"{gb}/models/{model}:generateContent"
+            url = f"{gb}/models/{gm}:generateContent"
             r = requests.post(url, headers=headers, json=payload, timeout=20)
             if r.status_code == 200:
                 d = r.json()
                 parts = d.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
                 return (parts[0].get("text") or "").strip()
         except Exception:
-            pass  # fall through to GPT-4o fallback
-    # Fallback: GPT-4o con prospettiva protezione civile
-    fallback_sys = system or _GEMINI_FALLBACK_SYSTEM
+            pass
+    # Fallback GPT-4o con prospettiva protezione civile
     base, key, mdl = _get_openai_creds()
     if not (base and key):
-        return "Gemini non disponibile (API key mancante)."
+        return "Gemini non disponibile (nessuna API key configurata)."
     try:
-        import openai
-        client = openai.OpenAI(base_url=base, api_key=key)
-        messages = [{"role": "system", "content": fallback_sys},
-                    {"role": "user", "content": prompt}]
-        r = client.chat.completions.create(model=mdl, messages=messages, max_tokens=600)
-        return r.choices[0].message.content.strip()
+        return _openai_compat_call(base, key, mdl, prompt, system or _GEMINI_FALLBACK_SYSTEM)
     except Exception as e:
-        return f"[Gemini/fallback errore: {str(e)[:120]}]"
+        return f"[Gemini errore: {str(e)[:120]}]"
 
 
 # ─────────────────────────────────────────────────────────────
