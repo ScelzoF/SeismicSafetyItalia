@@ -368,6 +368,21 @@ box-shadow:0 3px 10px rgba(255,210,0,.4);">
 </a></div>""",
         unsafe_allow_html=True,
     )
+    # ── PostePay (dati nascosti, mostrati su richiesta) ────────────────────
+    with st.expander("💳 Dona con PostePay", expanded=False):
+        st.markdown(
+            "<p style='color:#f1faee;font-size:11px;margin:0 0 6px 0;'>"
+            "Puoi inviare una donazione diretta tramite <b>PostePay Evolution</b> "
+            "con bonifico (gratis da altra Evolution) o ricarica carta.</p>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("**Intestatario:** Saverio Morano")
+        st.code("Carta: 5333 1759 3373 3088", language=None)
+        st.code("IBAN:  IT30 B360 8105 1382 9282 0692 842", language=None)
+        st.caption(
+            "Online basta numero carta + intestatario (nessun CF richiesto). "
+            "Ricarica mensile: abilitabile dall'app Postepay/Poste Italiane."
+        )
 
 # Main content area
 st.title("🌋 " + get_text('title'))
