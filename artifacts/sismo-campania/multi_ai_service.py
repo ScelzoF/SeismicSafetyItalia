@@ -45,13 +45,39 @@ def _get_openai_creds():
 def _get_claude_creds():
     base = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "")
-    return base, key
+    if base and key:
+        return base, key
+    direct = os.environ.get("ANTHROPIC_API_KEY", "")
+    if direct:
+        return "https://api.anthropic.com", direct
+    try:
+        import streamlit as st
+        direct = st.secrets.get("ANTHROPIC_API_KEY", "")
+        if direct:
+            return "https://api.anthropic.com", direct
+    except Exception:
+        pass
+    return "", ""
 
 
 def _get_gemini_creds():
     base = os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY", "")
-    return base, key
+    if base and key:
+        return base, key
+    for var in ("GOOGLE_API_KEY", "GEMINI_API_KEY"):
+        direct = os.environ.get(var, "")
+        if direct:
+            return "https://generativelanguage.googleapis.com/v1beta", direct
+    try:
+        import streamlit as st
+        for var in ("GOOGLE_API_KEY", "GEMINI_API_KEY"):
+            direct = st.secrets.get(var, "")
+            if direct:
+                return "https://generativelanguage.googleapis.com/v1beta", direct
+    except Exception:
+        pass
+    return "", ""
 
 
 def _providers_status() -> dict:
@@ -96,53 +122,83 @@ def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-4o") -> str:
         return f"[GPT errore: {str(e)[:120]}]"
 
 
+_CLAUDE_FALLBACK_SYSTEM = """Sei un sismologo statistico specializzato nell'analisi probabilistica del rischio.
+Analizza i dati forniti con un approccio quantitativo: concentrati su frequenza, distribuzione
+delle magnitudo, trend temporali e implicazioni statistiche. Rispondi in italiano, 3-5 frasi concise."""
+
+_GEMINI_FALLBACK_SYSTEM = """Sei un esperto di protezione civile e comunicazione del rischio sismico.
+Analizza i dati forniti dal punto di vista della sicurezza pubblica: cosa significa per i residenti,
+quali precauzioni sono consigliate, come interpretare i livelli di allerta. Rispondi in italiano, 3-5 frasi."""
+
+
 def _ask_claude(prompt: str, system: str = "", model: str = "claude-haiku-4-5") -> str:
-    """Chiama Anthropic Claude via Replit proxy."""
-    if not _PROVIDERS_OK["claude"]:
-        return "Claude non disponibile (env vars mancanti)."
+    """Chiama Anthropic Claude. Fallback: GPT-4o con prospettiva statistica."""
+    cb, ck = _get_claude_creds()
+    if cb and ck:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(base_url=cb, api_key=ck)
+            kwargs = {
+                "model": model,
+                "max_tokens": 600,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if system:
+                kwargs["system"] = system
+            r = client.messages.create(**kwargs)
+            return r.content[0].text.strip()
+        except Exception as e:
+            pass  # fall through to GPT-4o fallback
+    # Fallback: GPT-4o con prospettiva analitica statistica
+    fallback_sys = system or _CLAUDE_FALLBACK_SYSTEM
+    base, key, mdl = _get_openai_creds()
+    if not (base and key):
+        return "Claude non disponibile (API key mancante)."
     try:
-        import anthropic
-        client = anthropic.Anthropic(base_url=_ANTHROPIC_BASE, api_key=_ANTHROPIC_KEY)
-        kwargs = {
-            "model": model,
-            "max_tokens": 600,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-        if system:
-            kwargs["system"] = system
-        r = client.messages.create(**kwargs)
-        return r.content[0].text.strip()
+        import openai
+        client = openai.OpenAI(base_url=base, api_key=key)
+        messages = [{"role": "system", "content": fallback_sys},
+                    {"role": "user", "content": prompt}]
+        r = client.chat.completions.create(model=mdl, messages=messages, max_tokens=600)
+        return r.choices[0].message.content.strip()
     except Exception as e:
-        return f"[Claude errore: {str(e)[:120]}]"
+        return f"[Claude/fallback errore: {str(e)[:120]}]"
 
 
 def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") -> str:
-    """Chiama Google Gemini via Replit proxy (HTTP diretto)."""
-    if not _PROVIDERS_OK["gemini"]:
-        return "Gemini non disponibile (env vars mancanti)."
+    """Chiama Google Gemini. Fallback: GPT-4o con prospettiva protezione civile."""
+    gb, gk = _get_gemini_creds()
+    if gb and gk:
+        try:
+            contents = []
+            if system:
+                contents.append({"role": "user", "parts": [{"text": f"[Sistema]\n{system}"}]})
+                contents.append({"role": "model", "parts": [{"text": "Capito."}]})
+            contents.append({"role": "user", "parts": [{"text": prompt}]})
+            payload = {"contents": contents, "generationConfig": {"maxOutputTokens": 600}}
+            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {gk}"}
+            url = f"{gb}/models/{model}:generateContent"
+            r = requests.post(url, headers=headers, json=payload, timeout=20)
+            if r.status_code == 200:
+                d = r.json()
+                parts = d.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
+                return (parts[0].get("text") or "").strip()
+        except Exception:
+            pass  # fall through to GPT-4o fallback
+    # Fallback: GPT-4o con prospettiva protezione civile
+    fallback_sys = system or _GEMINI_FALLBACK_SYSTEM
+    base, key, mdl = _get_openai_creds()
+    if not (base and key):
+        return "Gemini non disponibile (API key mancante)."
     try:
-        contents = []
-        if system:
-            contents.append({"role": "user", "parts": [{"text": f"[Contesto sistema]\n{system}"}]})
-            contents.append({"role": "model", "parts": [{"text": "Capito, procedo."}]})
-        contents.append({"role": "user", "parts": [{"text": prompt}]})
-        payload = {
-            "contents": contents,
-            "generationConfig": {"maxOutputTokens": 600},
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {_GEMINI_KEY}",
-        }
-        url = f"{_GEMINI_BASE}/models/{model}:generateContent"
-        r = requests.post(url, headers=headers, json=payload, timeout=20)
-        if r.status_code == 200:
-            d = r.json()
-            parts = d.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
-            return (parts[0].get("text") or "").strip()
-        return f"[Gemini errore {r.status_code}: {r.text[:120]}]"
+        import openai
+        client = openai.OpenAI(base_url=base, api_key=key)
+        messages = [{"role": "system", "content": fallback_sys},
+                    {"role": "user", "content": prompt}]
+        r = client.chat.completions.create(model=mdl, messages=messages, max_tokens=600)
+        return r.choices[0].message.content.strip()
     except Exception as e:
-        return f"[Gemini errore: {str(e)[:120]}]"
+        return f"[Gemini/fallback errore: {str(e)[:120]}]"
 
 
 # ─────────────────────────────────────────────────────────────
