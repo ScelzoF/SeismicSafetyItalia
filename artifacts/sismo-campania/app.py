@@ -289,9 +289,9 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
     # Last update timestamp + data quality badge
     if st.session_state.last_data_fetch:
         age_s = (datetime.now() - st.session_state.last_data_fetch).total_seconds()
-        if age_s < 300:
+        if age_s < 660:
             _dq_icon, _dq_color, _dq_label = "✅", "#27ae60", "live"
-        elif age_s < 1200:
+        elif age_s < 1800:
             _dq_icon, _dq_color, _dq_label = "⚠️", "#e67e22", "cache"
         else:
             _dq_icon, _dq_color, _dq_label = "❌", "#c0392b", "non aggiornato"

@@ -2,12 +2,11 @@
 multi_ai_service.py — Sistema Multi-AI per SeismicSafetyItalia
 ==============================================================
 Interroga in parallelo:
-  • OpenAI GPT-5.1   (via Replit AI Integrations)
+  • OpenAI GPT   (Replit AI Integrations o OPENAI_API_KEY diretto)
   • Anthropic Claude (via Replit AI Integrations)
   • Google Gemini    (via Replit AI Integrations)
 
 Produce un'analisi simica consensuale da 3 prospettive AI distinte.
-Nessuna API key richiesta — crediti addebitati sull'account Replit.
 """
 
 import os
@@ -20,6 +19,7 @@ import requests
 
 # ─────────────────────────────────────────────────────────────
 # PROVIDER CONFIGS
+# Priorità: Replit AI Integrations proxy → API key diretta
 # ─────────────────────────────────────────────────────────────
 
 _OPENAI_BASE     = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
@@ -28,6 +28,15 @@ _ANTHROPIC_BASE  = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "")
 _ANTHROPIC_KEY   = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "")
 _GEMINI_BASE     = os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL", "")
 _GEMINI_KEY      = os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY", "")
+
+# Fallback: OpenAI API key diretta (Streamlit Cloud / altro host)
+_OPENAI_DIRECT_KEY = os.environ.get("OPENAI_API_KEY", "")
+if not (_OPENAI_BASE and _OPENAI_KEY) and _OPENAI_DIRECT_KEY:
+    _OPENAI_BASE = "https://api.openai.com/v1"
+    _OPENAI_KEY  = _OPENAI_DIRECT_KEY
+    _OPENAI_MODEL_OVERRIDE = "gpt-4o"
+else:
+    _OPENAI_MODEL_OVERRIDE = ""
 
 _PROVIDERS_OK = {
     "gpt":    bool(_OPENAI_BASE and _OPENAI_KEY),
@@ -41,9 +50,10 @@ _PROVIDERS_OK = {
 # ─────────────────────────────────────────────────────────────
 
 def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-5.1") -> str:
-    """Chiama OpenAI GPT via Replit proxy."""
+    """Chiama OpenAI GPT via Replit proxy o API diretta."""
     if not _PROVIDERS_OK["gpt"]:
         return "GPT non disponibile (env vars mancanti)."
+    effective_model = _OPENAI_MODEL_OVERRIDE or model
     try:
         import openai
         client = openai.OpenAI(base_url=_OPENAI_BASE, api_key=_OPENAI_KEY)
@@ -52,9 +62,9 @@ def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-5.1") -> str:
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         r = client.chat.completions.create(
-            model=model,
+            model=effective_model,
             messages=messages,
-            max_completion_tokens=600,
+            max_tokens=600,
         )
         return r.choices[0].message.content.strip()
     except Exception as e:
