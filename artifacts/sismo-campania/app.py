@@ -356,16 +356,15 @@ with st.sidebar:
     _support = get_text('support_project')
     _coffee = get_text('buy_coffee')
     st.markdown(
-        f"""<div style="background:rgba(255,255,255,0.1);padding:12px 14px;
-border-radius:10px;border:1px solid #e63946;margin-top:4px;">
+        f"""<div style="background:rgba(255,255,255,0.08);padding:12px 14px;
+border-radius:10px;border:1px solid #e8a800;margin-top:4px;">
 <p style="color:#f1faee;font-size:11px;margin:0 0 8px 0;text-align:center;letter-spacing:.05em;">
 ☕ {_support}</p>
 <a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" target="_blank"
-class="donate-btn"
 style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e,#ffd200);
-color:#1a1a1a !important;padding:9px 14px;text-decoration:none;border-radius:8px;font-size:14px;
-font-weight:800;letter-spacing:.03em;box-shadow:0 3px 10px rgba(255,210,0,.4);">
-☕ {_coffee}
+padding:9px 14px;text-decoration:none;border-radius:8px;
+box-shadow:0 3px 10px rgba(255,210,0,.4);">
+<span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
 </a></div>""",
         unsafe_allow_html=True,
     )
