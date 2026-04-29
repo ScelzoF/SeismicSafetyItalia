@@ -387,39 +387,9 @@ with st.sidebar:
     st.markdown("---")
     _support = get_text('support_project')
     _coffee = get_text('buy_coffee')
-    # ── CSS: aggancia il pulsante PostePay (unico "secondary" nella sidebar)
-    #    alla parte bassa del riquadro oro, eliminando il gap ──────────────
     st.markdown(
-        """<style>
-div[data-testid="stSidebarContent"]
-    button[data-testid="baseButton-secondary"] {
-    margin-top: -2px !important;
-    background: rgba(255,255,255,0.08) !important;
-    border: 1px solid #e8a800 !important;
-    border-top: none !important;
-    border-radius: 0 0 10px 10px !important;
-    color: #f1faee !important;
-    font-weight: 700 !important;
-    font-size: 13px !important;
-}
-div[data-testid="stSidebarContent"]
-    button[data-testid="baseButton-secondary"]:hover {
-    background: rgba(232,168,0,0.18) !important;
-    color: #ffd200 !important;
-}
-div[data-testid="stSidebarContent"]
-    div[data-testid="stButton"] {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-}
-</style>""",
-        unsafe_allow_html=True,
-    )
-    # ── Riquadro oro: top + left + right, aperto in basso dove si aggancia
-    #    il pulsante PostePay ───────────────────────────────────────────────
-    st.markdown(
-        f"""<div style="background:rgba(255,255,255,0.08);padding:12px 14px 10px 14px;
-border-radius:10px 10px 0 0;border:1px solid #e8a800;border-bottom:none;margin-top:4px;">
+        f"""<div style="background:rgba(255,255,255,0.08);padding:12px 14px;
+border-radius:10px;border:1px solid #e8a800;margin-top:4px;">
 <p style="color:#f1faee;font-size:11px;margin:0 0 8px 0;text-align:center;letter-spacing:.05em;">
 ☕ {_support}</p>
 <a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" target="_blank"
