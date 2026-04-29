@@ -42,20 +42,33 @@ giorni_settimana = {
 
 @st.dialog("💳 Dati per donazione PostePay")
 def _show_postepay_dialog():
-    st.markdown("Invia direttamente tramite **bonifico** o **ricarica carta**.")
-    st.divider()
-    col1, col2 = st.columns([1, 2])
-    col1.markdown("**👤 Intestatario**")
-    col2.markdown("Andrea Scelzo")
-    col1.markdown("**💳 N° Carta**")
-    col2.code("5333 1759 3373 3088")
-    col1.markdown("**🏦 IBAN**")
-    col2.code("IT30 B360 8105 1382 9282 0692 842")
-    st.divider()
-    st.caption(
-        "📌 Nessun codice fiscale richiesto online. "
-        "Ricarica mensile automatica: attivabile dall'app Postepay / Poste Italiane. "
-        "Bonifico gratuito da altra PostePay Evolution."
+    st.markdown(
+        """
+<div style="font-size:14px;line-height:2.2;">
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px;">
+  <span style="color:#888;font-size:12px;min-width:110px;">👤 Intestatario</span>
+  <span style="font-size:16px;font-weight:700;">Andrea Scelzo</span>
+</div>
+<hr style="border:none;border-top:1px solid rgba(128,128,128,0.2);margin:6px 0;">
+<div style="margin-bottom:4px;">
+  <span style="color:#888;font-size:12px;">💳 Numero Carta</span><br>
+  <span style="font-family:monospace;font-size:22px;font-weight:700;
+  letter-spacing:.18em;color:#f7971e;">5333 1759 3373 3088</span>
+</div>
+<hr style="border:none;border-top:1px solid rgba(128,128,128,0.2);margin:6px 0;">
+<div style="margin-bottom:4px;">
+  <span style="color:#888;font-size:12px;">🏦 IBAN (PostePay Evolution)</span><br>
+  <span style="font-family:monospace;font-size:16px;font-weight:700;
+  letter-spacing:.1em;color:#f7971e;">IT30 B360 8105 1382 9282 0692 842</span>
+</div>
+</div>
+<div style="margin-top:14px;padding:10px 12px;background:rgba(247,151,30,0.1);
+border-radius:8px;border-left:3px solid #f7971e;font-size:12px;color:#aaa;">
+📌 <b>Nessun codice fiscale</b> richiesto online.<br>
+Ricarica <b>mensile automatica</b>: attivabile dall'app Postepay/Poste Italiane.<br>
+Bonifico <b>gratuito</b> da altra PostePay Evolution.
+</div>""",
+        unsafe_allow_html=True,
     )
 
 
@@ -374,41 +387,45 @@ with st.sidebar:
     st.markdown("---")
     _support = get_text('support_project')
     _coffee = get_text('buy_coffee')
-    st.markdown(
-        f"""<div style="background:rgba(255,255,255,0.08);padding:12px 14px;
-border-radius:10px;border:1px solid #e8a800;margin-top:4px;">
-<p style="color:#f1faee;font-size:11px;margin:0 0 8px 0;text-align:center;letter-spacing:.05em;">
-☕ {_support}</p>
-<a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" target="_blank"
-style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e,#ffd200);
-padding:9px 14px;text-decoration:none;border-radius:8px;
-box-shadow:0 3px 10px rgba(255,210,0,.4);">
-<span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
-</a></div>""",
-        unsafe_allow_html=True,
-    )
-    # CSS per uniformare il pulsante PostePay al riquadro giallo
+    # Bordo oro sul container che racchiude tutto il blocco "Sostieni"
     st.markdown(
         """<style>
-div[data-testid="stSidebarContent"] div.stButton:last-of-type > button {
+[data-testid="stSidebarContent"] [data-testid="stVerticalBlockBorderWrapper"] {
+    border-color: #e8a800 !important;
+    background: rgba(255,255,255,0.06);
+    border-radius: 10px !important;
+}
+[data-testid="stSidebarContent"] [data-testid="stVerticalBlockBorderWrapper"]
+    button[kind="secondary"] {
     background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.35);
+    border: 1px solid rgba(255,255,255,0.3);
     color: #f1faee;
     font-weight: 700;
     font-size: 13px;
-    width: 100%;
     border-radius: 8px;
-    margin-top: 6px;
 }
-div[data-testid="stSidebarContent"] div.stButton:last-of-type > button:hover {
-    background: rgba(255,255,255,0.16);
+[data-testid="stSidebarContent"] [data-testid="stVerticalBlockBorderWrapper"]
+    button[kind="secondary"]:hover {
     border-color: #e8a800;
+    background: rgba(232,168,0,0.15);
 }
 </style>""",
         unsafe_allow_html=True,
     )
-    if st.button("💳 Dona con PostePay", key="btn_postepay", use_container_width=True):
-        _show_postepay_dialog()
+    with st.container(border=True):
+        st.markdown(
+            f"""<p style="color:#f1faee;font-size:11px;margin:0 0 8px 0;
+text-align:center;letter-spacing:.05em;">☕ {_support}</p>
+<a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" target="_blank"
+style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e,#ffd200);
+padding:9px 14px;text-decoration:none;border-radius:8px;margin-bottom:2px;
+box-shadow:0 3px 10px rgba(255,210,0,.4);">
+<span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
+</a>""",
+            unsafe_allow_html=True,
+        )
+        if st.button("💳 Dona con PostePay", key="btn_postepay", use_container_width=True):
+            _show_postepay_dialog()
 
 # Main content area
 st.title("🌋 " + get_text('title'))
