@@ -1013,8 +1013,8 @@ per fare <b>previsioni probabilistiche del rischio</b> nei 7 giorni successivi, 
         _yr = datetime.now().year
         with lc1:
             st.link_button(
-                "📰 Comunicati CF — INGV OV",
-                "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/campi-flegrei",
+                "🌋 Stato Attuale CF — INGV OV",
+                "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
                 use_container_width=True,
             )
         with lc2:

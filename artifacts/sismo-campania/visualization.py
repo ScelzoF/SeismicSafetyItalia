@@ -1280,6 +1280,14 @@ def _show_flegrei_tab(df, get_text):
             "📡 INGV OV — sensori Bocca Grande",
             help=_gt("fumarole_temp_help")
         )
+        pisc_t = bulletin.get("fumarole_temp_pisciarelli")
+        if pisc_t:
+            st.metric(
+                "🌡️ Fumarola Pisciarelli",
+                f"{pisc_t}°C",
+                "📡 INGV OV — stazione Pisciarelli",
+                help="Temperatura media settimanale fumarola area Pisciarelli (versante NE Solfatara) — dal bollettino INGV OV PDF",
+            )
 
     with sensor_cols[1]:
         st.markdown(f"### {_gt('geochemical_params')}")
@@ -1395,11 +1403,51 @@ def _show_flegrei_tab(df, get_text):
                     col.metric(label, f"{v['value']:.1f} {v['unit']}",
                                f"🟢 CAMS · {v['datetime'][:16]}")
     # Link ufficiali bollettino
+    _yr_cf = datetime.now().year
     st.markdown(
         "📋 **Grafici CO₂, sollevamento e tremore ufficiali INGV OV** — aggiornati settimanalmente: "
-        "[Bollettino CF](https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/campi-flegrei) · "
-        "[Dati RT INGV OV](https://www.ov.ingv.it/ov/it/sorveglianza/dati-in-tempo-reale.html)"
+        f"[Stato Attuale CF](https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente) · "
+        f"[Bollettini Settimanali CF](https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/bollettini-tutti/boll-sett-flegre/anno-{_yr_cf})"
     )
+
+    # ── MONITORAGGIO TERMICO SATELLITARE ───────────────────────────────────
+    with st.expander("🛰️ Monitoraggio Termico Satellitare — Solfatara / CF", expanded=False):
+        st.markdown("""
+**Perché il satellite non misura le singole fumarole:**  
+I sensori termici satellitari (MODIS, VIIRS) hanno una risoluzione spaziale di 375 m–1 km,
+insufficiente per distinguere le singole bocche fumaroliche di Solfatara.
+Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi eruzioni laviche
+(Etna, Stromboli, Vesuvio nel 1944) ma non il bradisismo o le fumarole idrotermali dei CF.
+
+**Cosa è disponibile per i Campi Flegrei:**
+
+| Strumento | Cosa misura | Risoluzione | Aggiornamento |
+|-----------|-------------|-------------|---------------|
+| 🌡️ **Bollettino INGV OV PDF** | Temp. Bocca Grande, Pisciarelli (°C) | Stazione in situ | **Settimanale** (integrato in questa app) |
+| 📡 **INGV OV V11 / FLXOV** | Sensori continui fumarola BG | In situ 1 min | Non pubblico |
+| 🛰️ **Sentinel-3 SLSTR** | Radianza termica superficiale area | 1 km | Giornaliero |
+| 🔥 **NASA FIRMS VIIRS** | Hotspot termici area (no fumarole) | 375 m | Orario |
+| 🌍 **MIROVA** | Anomalia termica vulcanica | 1 km | Giornaliero (no CF) |
+""")
+        sat_cols = st.columns(3)
+        with sat_cols[0]:
+            st.link_button(
+                "🔥 NASA FIRMS — Mappa Solfatara",
+                "https://firms.modaps.eosdis.nasa.gov/map/#d:24hrs;@14.14,40.83,12z",
+                use_container_width=True,
+            )
+        with sat_cols[1]:
+            st.link_button(
+                "🌍 MIROVA — Monitoraggio Termico",
+                "https://www.mirovaweb.it/",
+                use_container_width=True,
+            )
+        with sat_cols[2]:
+            st.link_button(
+                "🛰️ Copernicus Emergency Mgmt",
+                "https://emergency.copernicus.eu/mapping/list-of-activations-rapid",
+                use_container_width=True,
+            )
 
     # ── STATO SENSORI ─────────────────────────────────────────────────────
     with st.expander(_gt("sensor_status_section"), expanded=False):

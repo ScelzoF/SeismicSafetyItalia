@@ -37,7 +37,7 @@ def _ingv_get(url: str, timeout: int = 8, **kwargs) -> requests.Response:
         return requests.get(url, timeout=timeout, verify=False, **kwargs)  # nosec B501
 
 _BULLETIN_LISTING = {
-    "campi_flegrei": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/campi-flegrei",
+    "campi_flegrei": "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
     "vesuvio": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/vesuvio",
 }
 
@@ -48,7 +48,7 @@ def fetch_latest_bulletin_url(area: str) -> str:
     continuamente rendendo lo scraping inaffidabile.
     """
     DIRECT_URLS = {
-        "campi_flegrei": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/campi-flegrei",
+        "campi_flegrei": "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
         "vesuvio": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/vesuvio",
     }
     return DIRECT_URLS.get(area, _BULLETIN_LISTING.get(area, "https://www.ov.ingv.it"))
@@ -444,9 +444,10 @@ def _static_bulletin_values():
             "alert_level": "GIALLO",
             "alert_since": "11 maggio 2023",
             "bulletin_date": _last_bulletin_date,
-            "bulletin_url": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/campi-flegrei",
+            "bulletin_url": "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
             "fumarole_temp_bocca_grande": 173,
             "fumarole_temp_bocca_nuova": 156,
+            "fumarole_temp_pisciarelli": 95,
             "ground_temp_30cm": 97,
             "co2_flux_td": 2800,
             "h2s_flux_td": 55,
@@ -627,6 +628,19 @@ def _fetch_bulletin_pdf_cf() -> dict:
         if seis:
             result["seismic_events_week"] = int(seis.group(1))
             result["seismic_md_max_week"]  = float(seis.group(2))
+
+        # Temperatura fumarola Pisciarelli
+        pisc = re.search(
+            r"[Pp]isciarelli.{0,300}?valore medio.{0,80}?~?\s*(\d{2,3})\s*°\s*[Cc]",
+            text, re.DOTALL,
+        )
+        if not pisc:
+            pisc = re.search(
+                r"[Pp]isciarelli.{0,300}?temperatura.{0,80}?~?\s*(\d{2,3})\s*°\s*[Cc]",
+                text, re.DOTALL,
+            )
+        if pisc:
+            result["fumarole_temp_pisciarelli"] = int(pisc.group(1))
 
         # Flusso H2S
         h2s = re.search(r"H\s*2\s*S[^.]{0,80}?(\d{1,4})\s*(?:t/g|t/d|ton)", text, re.I)
@@ -1162,6 +1176,8 @@ def fetch_bulletin_values_live():
                 result["campi_flegrei"]["bulletin_date"] = pdf_data["bulletin_date"]
             if "fumarole_temp_bocca_grande" in pdf_data:
                 result["campi_flegrei"]["fumarole_temp_bocca_grande"] = pdf_data["fumarole_temp_bocca_grande"]
+            if "fumarole_temp_pisciarelli" in pdf_data:
+                result["campi_flegrei"]["fumarole_temp_pisciarelli"] = pdf_data["fumarole_temp_pisciarelli"]
             if "gps_uplift_mm_month" in pdf_data:
                 result["campi_flegrei"]["gps_uplift_mm_month"] = pdf_data["gps_uplift_mm_month"]
             if "h2s_flux_td" in pdf_data:
