@@ -77,6 +77,14 @@ if 'weather_data' not in st.session_state:
     st.session_state.weather_data = None
 if 'last_weather_fetch' not in st.session_state:
     st.session_state.last_weather_fetch = None
+if 'gps_rite' not in st.session_state:
+    st.session_state.gps_rite = None
+if 'gps_vesuvio' not in st.session_state:
+    st.session_state.gps_vesuvio = None
+if 'alert_level_cache' not in st.session_state:
+    st.session_state.alert_level_cache = None
+if 'bulletin_live_cache' not in st.session_state:
+    st.session_state.bulletin_live_cache = None
 
 # === CONTATORE VISITE (una sola volta per sessione) ===
 from security import read_visit_counter, increment_visit_counter
@@ -385,7 +393,15 @@ if st.session_state.earthquake_data is None or (
             _faqv  = _ex.submit(_im.fetch_air_quality_vesuvio)
             _fst   = _ex.submit(_im.fetch_summit_temperature, 40.821, 14.126, 1281, "Vesuvio")
             st.session_state.earthquake_data = _feq.result()
-            for _fut in (_fbv, _fal, _fgps, _fgpsv, _faq, _faqv, _fst):
+            try: st.session_state.bulletin_live_cache = _fbv.result()
+            except Exception: pass
+            try: st.session_state.alert_level_cache   = _fal.result()
+            except Exception: pass
+            try: st.session_state.gps_rite    = _fgps.result()
+            except Exception: pass
+            try: st.session_state.gps_vesuvio = _fgpsv.result()
+            except Exception: pass
+            for _fut in (_faq, _faqv, _fst):
                 try: _fut.result()
                 except Exception: pass
         st.session_state.last_data_fetch = datetime.now()
@@ -498,11 +514,64 @@ elif page == "ai_assistant":
         ves_df90 = fetch_earthquake_data_for_ml_area("vesuvio",       days=90)
         isc_df90 = fetch_earthquake_data_for_ml_area("ischia",        days=90)
 
-    bulletin_live = ingv_monitor.fetch_bulletin_values_live()
-    bulletin_cf   = bulletin_live.get("campi_flegrei", ingv_monitor.get_ingv_bulletin_values().get("campi_flegrei", {}))
-    bulletin_ves  = bulletin_live.get("vesuvio",       ingv_monitor.get_ingv_bulletin_values().get("vesuvio", {}))
-    alert         = ingv_monitor.fetch_ingv_alert_level() or {}
-    gps           = ingv_monitor.fetch_gps_rite()
+    # Riusa i dati già caricati dal prefetch (session_state) — evita doppio fetch
+    _static_bv    = ingv_monitor.get_ingv_bulletin_values()
+    bulletin_live = st.session_state.bulletin_live_cache or ingv_monitor.fetch_bulletin_values_live()
+    bulletin_cf   = bulletin_live.get("campi_flegrei", _static_bv.get("campi_flegrei", {}))
+    bulletin_ves  = bulletin_live.get("vesuvio",       _static_bv.get("vesuvio", {}))
+    alert         = st.session_state.alert_level_cache or ingv_monitor.fetch_ingv_alert_level() or {}
+    gps           = st.session_state.gps_rite or ingv_monitor.fetch_gps_rite()
+    gps_ves       = st.session_state.gps_vesuvio or {}
+
+    # ── Funzione banner fonte dati per ogni tab ──────────────────────────────
+    def _fonte_banner(df90, df30, area_label: str, fetch_ts=None):
+        """Banner compatto che mostra: n eventi live, finestra, fonte, freshness."""
+        n90  = len(df90)  if df90  is not None and not df90.empty  else 0
+        n30  = len(df30)  if df30  is not None and not df30.empty  else 0
+        ts   = fetch_ts or st.session_state.last_data_fetch
+        ts_s = ts.strftime("%H:%M") if ts else "—"
+
+        # GPS live o fallback
+        if area_label == "Campi Flegrei":
+            gps_val  = gps.get("uplift_mm_month") or gps.get("gps_uplift_mm_month")
+            gps_src  = gps.get("source", "NGL/RITE")
+            gps_live = bool(gps.get("_live") or gps.get("data_source") == "NGL")
+        elif area_label == "Vesuvio":
+            gps_val  = gps_ves.get("uplift_mm_month") or gps_ves.get("gps_uplift_mm_month")
+            gps_src  = gps_ves.get("source", "NGL/Vesuvio")
+            gps_live = bool(gps_ves.get("_live") or gps_ves.get("data_source") == "NGL")
+        else:
+            gps_val, gps_src, gps_live = None, None, False
+
+        bl_scraped = bulletin_live.get("_scraped", False)
+        _bl_map    = {"Campi Flegrei": bulletin_cf, "Vesuvio": bulletin_ves}
+        _bl_cur    = _bl_map.get(area_label, bulletin_cf)
+        bl_date    = _bl_cur.get("bulletin_date") or "—"
+        alert_src  = alert.get("_source", "INGV OV") if alert else "INGV OV"
+
+        # Componi badge
+        def _b(txt, color):
+            return (
+                f"<span style='background:{color};color:#fff;border-radius:4px;"
+                f"padding:1px 7px;font-size:11px;font-weight:700;margin:1px 2px;"
+                f"display:inline-block;'>{txt}</span>"
+            )
+        seismic_b = _b(f"INGV LIVE  {n90}ev/90gg · {n30}ev/30gg · {ts_s}", "#198754")
+        gps_b = (_b(f"GPS {gps_src}  {gps_val:+.1f} mm/mese", "#0d6efd" if gps_live else "#6c757d")
+                 if gps_val is not None else "")
+        alert_b = _b(f"Allerta INGV OV  {alert_src}", "#198754" if alert_src != "INGV OV" else "#fd7e14")
+        bulletin_b = (
+            _b(f"Bollettino INGV OV  {bl_date} (live)", "#198754")
+            if bl_scraped else
+            _b(f"Bollettino INGV OV  {bl_date} (fallback)", "#6c757d")
+        )
+        st.markdown(
+            f"<div style='background:#f0f2f6;border-radius:8px;padding:8px 12px;"
+            f"margin-bottom:10px;font-size:12px;'>"
+            f"📡 <b>Sorgenti dati:</b> {seismic_b} {gps_b} {alert_b} {bulletin_b}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
     # ── Carica dati AI per tutte le aree (usa 90gg per avere sempre abbastanza dati) ──
     with st.spinner("⏳ Modelli AI in esecuzione sui dati INGV..."):
@@ -527,34 +596,31 @@ elif page == "ai_assistant":
 
     with tab_cf:
         st.markdown("### Analisi AI — Campi Flegrei")
+        _fonte_banner(cf_df90, cf_df, "Campi Flegrei")
         if cf_df90 is None or cf_df90.empty:
             st.warning("Nessun dato sismico disponibile per i Campi Flegrei.")
         else:
-            n_30 = len(cf_df) if cf_df is not None and not cf_df.empty else 0
-            st.caption(f"Basata su {len(cf_df90)} eventi INGV (90 giorni) · {n_30} nelle ultime 4 settimane")
             _render_ai_panel(anomaly_cf, pattern_cf, bvalue_cf, gps_corr_cf)
 
     with tab_ves:
         st.markdown("### Analisi AI — Vesuvio")
+        _fonte_banner(ves_df90, ves_df, "Vesuvio")
         if ves_df90 is None or ves_df90.empty:
-            st.success("✅ Nessuna attività sismica rilevante nelle ultime 24 ore. Attività nella norma (VERDE).")
+            st.success("✅ Nessuna attività sismica rilevante. Attività nella norma (VERDE).")
         else:
-            n_30 = len(ves_df) if ves_df is not None and not ves_df.empty else 0
-            st.caption(f"Basata su {len(ves_df90)} eventi INGV (90 giorni) · {n_30} nelle ultime 4 settimane")
             _render_ai_panel(anomaly_ves, pattern_ves, bvalue_ves, None)
 
     with tab_isc:
         st.markdown("### Analisi AI — Ischia")
+        _fonte_banner(isc_df90, isc_df, "Ischia")
         st.info(
             "🏝️ **Nota Ischia**: La sismicità è prevalentemente tettonica superficiale (<5 km). "
-            "L'anomaly detection e il b-value sono particolarmente utili per identificare "
-            "sequenze sismiche precursori di eventi come quello del 2022 (M 5.7)."
+            "L'anomaly detection e il b-value sono utili per identificare "
+            "sequenze precursori di eventi come quello del 2022 (M 5.7)."
         )
         if isc_df90 is None or isc_df90.empty:
             st.success("✅ Nessun evento sismico recente nell'area di Ischia — attività nella norma.")
         else:
-            n_30 = len(isc_df) if isc_df is not None and not isc_df.empty else 0
-            st.caption(f"Basata su {len(isc_df90)} eventi INGV (90 giorni) · {n_30} nelle ultime 4 settimane")
             _render_ai_panel(anomaly_isc, pattern_isc, bvalue_isc, None)
 
     # ── SISMAI ────────────────────────────────────────────────────────────────
@@ -571,7 +637,7 @@ elif page == "ai_assistant":
             ["Campi Flegrei", "Vesuvio", "Ischia"],
             key="sismai_area_sel",
         )
-        # Usa 90 giorni (box allargato) per SISMAI — molto più dati rispetto ai 30gg filtrati
+        # Usa 90 giorni (box allargato) per SISMAI
         sismai_df_map = {
             "Campi Flegrei": cf_df90,
             "Vesuvio":       ves_df90,
@@ -737,37 +803,59 @@ border-radius:10px;padding:10px 4px;background:#fff;">
         )
 
         _df90_map = {"Campi Flegrei": cf_df90, "Vesuvio": ves_df90, "Ischia": isc_df90}
-        _atm_map  = {"Campi Flegrei": None, "Vesuvio": None, "Ischia": None}
-        _gps_map  = {
-            "Campi Flegrei": bulletin_cf.get("gps_uplift_mm_month", 0.0),
-            "Vesuvio":       bulletin_ves.get("gps_uplift_mm_month", 0.0),
-            "Ischia":        0.0,
-        }
+
+        # GPS live: usa NGL/RITE per CF, NGL/Vesuvio per Vesuvio (session_state-backed)
+        def _live_gps_uplift(area_key: str) -> float:
+            if area_key == "Campi Flegrei":
+                v = (gps.get("uplift_mm_month") or gps.get("gps_uplift_mm_month")
+                     or bulletin_cf.get("gps_uplift_mm_month", 0.0))
+            elif area_key == "Vesuvio":
+                v = (gps_ves.get("uplift_mm_month") or gps_ves.get("gps_uplift_mm_month")
+                     or bulletin_ves.get("gps_uplift_mm_month", 0.0))
+            else:
+                v = 0.0
+            return float(v or 0.0)
+
         _alert_map = {
-            "Campi Flegrei": bulletin_cf.get("alert_level", "GIALLO"),
-            "Vesuvio":       bulletin_ves.get("alert_level", "VERDE"),
+            "Campi Flegrei": (alert or {}).get("campi_flegrei") or bulletin_cf.get("alert_level", "GIALLO"),
+            "Vesuvio":       (alert or {}).get("vesuvio")       or bulletin_ves.get("alert_level", "VERDE"),
             "Ischia":        "VERDE",
         }
 
         mai_df = _df90_map.get(mai_area)
-        n_events_mai = len(mai_df) if mai_df is not None and not mai_df.empty else 0
-        max_mag_mai  = float(mai_df["magnitude"].max()) if n_events_mai > 0 else 0.0
-        avg_mag_mai  = float(mai_df["magnitude"].mean()) if n_events_mai > 0 else 0.0
+        n_events_mai  = len(mai_df) if mai_df is not None and not mai_df.empty else 0
+        max_mag_mai   = float(mai_df["magnitude"].max())  if n_events_mai > 0 else 0.0
+        avg_mag_mai   = float(mai_df["magnitude"].mean()) if n_events_mai > 0 else 0.0
+        emsc_n_mai    = int(mai_df[mai_df["source"] == "EMSC"].shape[0]) if (
+            mai_df is not None and not mai_df.empty and "source" in mai_df.columns) else 0
 
         if st.button(f"🚀 Avvia analisi Multi-AI per {mai_area}", type="primary", key="btn_multi_ai"):
-            with st.spinner("🧠 Interrogo GPT-5, Claude e Gemini in parallelo..."):
+            with st.spinner("🧠 Calcolo SISMAI + interrogazione GPT-5 · Claude · Gemini in parallelo..."):
                 atm_live = ml_forecast_service.fetch_atmospheric_features(mai_area)
+
+                # Pre-calcola SISMAI per avere il forecast label reale
+                sismai_label = "BASSO"
+                if mai_df is not None and not mai_df.empty:
+                    try:
+                        _fc_pre = ml_forecast_service.run_ml_forecast(
+                            mai_df, area=mai_area, horizon=1, with_ai_narrative=False, atm=atm_live
+                        )
+                        if _fc_pre and not _fc_pre.get("error") and _fc_pre.get("days"):
+                            sismai_label = _fc_pre["days"][0]["label"]
+                    except Exception:
+                        pass
+
                 data_ctx = {
                     "n_events":             n_events_mai,
                     "max_mag":              max_mag_mai,
                     "avg_mag":              avg_mag_mai,
                     "alert_level":          _alert_map.get(mai_area, "VERDE"),
-                    "gps_uplift_mm_month":  _gps_map.get(mai_area, 0.0),
+                    "gps_uplift_mm_month":  _live_gps_uplift(mai_area),
                     "pressure_base":        atm_live.get("pressure_base", 1013.0),
                     "temp_base":            atm_live.get("temp_base", 15.0),
                     "temp_vetta":           atm_live.get("temp_vetta"),
-                    "sismai_forecast_label": "BASSO",
-                    "emsc_n_events":        0,
+                    "sismai_forecast_label": sismai_label,
+                    "emsc_n_events":        emsc_n_mai,
                     "isc_n_events":         0,
                     "period_days":          90,
                 }
