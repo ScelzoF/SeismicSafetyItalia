@@ -3016,34 +3016,56 @@ def _show_solfatara_news() -> None:
     with st.expander("🎬 Ultimi video — SolfataraNews", expanded=True):
         videos = _fetch_solfatara_rss()
         if videos:
-            cols_per_row = 3
-            for i in range(0, len(videos), cols_per_row):
-                row_vids = videos[i:i + cols_per_row]
-                cols = st.columns(len(row_vids))
-                for col, v in zip(cols, row_vids):
-                    with col:
-                        # Scarica thumbnail server-side → nessun blocco CSP nel browser
-                        try:
-                            img_resp = requests.get(v["thumb"], timeout=5)
-                            if img_resp.status_code == 200:
-                                import io
-                                st.image(io.BytesIO(img_resp.content),
-                                         use_container_width=True)
-                            else:
-                                st.markdown("🎬")
-                        except Exception:
-                            st.markdown("🎬")
-                        # Titolo + link
-                        title_short = v["title"][:65] + ("…" if len(v["title"]) > 65 else "")
-                        st.markdown(
-                            f"**[{title_short}]({v['url']})**  \n"
-                            f"<span style='font-size:0.75rem;color:#9CA3AF'>{v['pub']}</span>",
-                            unsafe_allow_html=True,
-                        )
+            import base64, concurrent.futures
+
+            @st.cache_data(ttl=1800, show_spinner=False)
+            def _thumb_b64_cached(url: str) -> str:
+                try:
+                    r = requests.get(url, timeout=5)
+                    if r.status_code == 200:
+                        return "data:image/jpeg;base64," + base64.b64encode(r.content).decode()
+                except Exception:
+                    pass
+                return ""
+
+            # Scarica tutti i thumbnail in parallelo
+            with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+                b64_list = list(pool.map(
+                    lambda v: _thumb_b64_cached(v["thumb"]), videos
+                ))
+
+            cards_html = "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:4px 0'>"
+            for v, b64 in zip(videos, b64_list):
+                img_tag = (
+                    f"<img src='{b64}' style='width:100%;aspect-ratio:16/9;"
+                    f"object-fit:cover;display:block;border-radius:7px 7px 0 0'>"
+                    if b64 else
+                    "<div style='width:100%;aspect-ratio:16/9;background:#1e293b;"
+                    "border-radius:7px 7px 0 0;display:flex;align-items:center;"
+                    "justify-content:center;font-size:1.8rem'>🎬</div>"
+                )
+                title_esc = v["title"][:72].replace("<","&lt;").replace(">","&gt;")
+                if len(v["title"]) > 72:
+                    title_esc += "…"
+                pub = v["pub"]
+                url = v["url"]
+                cards_html += (
+                    f"<a href='{url}' target='_blank' rel='noopener' "
+                    f"style='text-decoration:none;display:block'>"
+                    f"<div style='background:#1a2130;border-radius:8px;overflow:hidden;"
+                    f"border:1px solid #2d3a4a;transition:border-color .2s'>"
+                    f"{img_tag}"
+                    f"<div style='padding:10px 12px 12px'>"
+                    f"<div style='color:#e2e8f0;font-size:0.80rem;font-weight:600;"
+                    f"line-height:1.45;margin-bottom:6px'>{title_esc}</div>"
+                    f"<div style='color:#64748b;font-size:0.70rem'>📅 {pub}</div>"
+                    f"</div></div></a>"
+                )
+            cards_html += "</div>"
+            st.markdown(cards_html, unsafe_allow_html=True)
         else:
             st.info("Feed RSS temporaneamente non disponibile. "
                     "[→ Apri canale YouTube](https://www.youtube.com/@SolfataraNews)")
-
         st.caption("🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico")
 
     # ── Social links ──────────────────────────────────────────────────────────
