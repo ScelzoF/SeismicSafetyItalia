@@ -587,12 +587,12 @@ def show():
     # ════════════════════════════════════════════════════════════════════════════
     with tab_sai:
         st.markdown("""
-        <div style='background:#1e3a5f;color:white;padding:14px 18px;border-radius:8px;margin-bottom:16px;'>
-        <h3 style='margin:0;color:white !important;'>🆘 Sai cosa fare in caso di emergenza?</h3>
-        <p style='margin:6px 0 0 0;font-size:0.9em;opacity:0.9;color:white !important;'>
+        <div class='sos-header-box' style='background:#1e3a5f;padding:14px 18px;border-radius:8px;margin-bottom:16px;'>
+        <div style='margin:0;font-size:1.2em;font-weight:700;color:#ffffff;'>🆘 Sai cosa fare in caso di emergenza?</div>
+        <div style='margin:6px 0 0 0;font-size:0.9em;opacity:0.9;color:#ffffff;'>
         Guida personalizzata basata sui livelli di allerta INGV aggiornati in tempo reale.
         Scopri cosa fare ADESSO in base alla situazione vulcanica attuale.
-        </p></div>
+        </div></div>
         """, unsafe_allow_html=True)
 
         # ── Fetch livelli allerta INGV ─────────────────────────────────────────
