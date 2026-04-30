@@ -1737,7 +1737,9 @@ def _show_flegrei_tab(df, get_text):
             st.plotly_chart(fig, key="gps_rite_uplift")
             st.caption(f"{_gt('fonte_label')}: {gps_data['source']} | {_gt('station_label')}: {gps_data['station']}")
         else:
-            st.info(_gt("gps_unavailable"))
+            # NGL non raggiungibile — mostra curva live da bollettino INGV OV
+            st.caption("📡 GPS RITE — dati live INGV OV Bollettino (aggiornamento settimanale)")
+            _render_gps_chart(gps_data, "Campi Flegrei")
 
     elif param_option == _p_mag:
         _plot_magnitude_distribution(flegrei_data if not flegrei_data.empty else df,
@@ -2949,14 +2951,14 @@ def _show_ingv_official_links(area):
                       "https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/vesuvio/",
                       "rischi.protezionecivile.gov.it") +
             _link_row("🛰️ GPS Nevada Geodetic Lab",
-                      "http://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/",
+                      "https://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/",
                       "geodesy.unr.edu")
         )
         st.markdown(_table_start + rows + _table_end, unsafe_allow_html=True)
     elif area == "flegrei":
         rows = (
             _link_row("🛰️ GPS Stazione RITE (live)",
-                      "http://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/RITE.tenv3",
+                      "https://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/RITE.tenv3",
                       "geodesy.unr.edu RITE") +
             _link_row("🌍 Terremoti INGV live", "https://terremoti.ingv.it/", "terremoti.ingv.it") +
             _link_row("💨 Qualità aria (OpenAQ)", "https://openaq.org/#/countries/IT", "openaq.org") +
@@ -2978,7 +2980,7 @@ def _show_ingv_official_links(area):
                       "https://www.isprambiente.gov.it/it/attivita/suolo-e-territorio/pericolosita-e-rischio-idrogeologico",
                       "isprambiente.gov.it") +
             _link_row("📡 Rete INGV RING — Stazione ISCH",
-                      "http://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/ISCH.tenv3",
+                      "https://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/ISCH.tenv3",
                       "geodesy.unr.edu ISCH")
         )
         st.markdown(_table_start + rows + _table_end, unsafe_allow_html=True)

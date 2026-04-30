@@ -60,8 +60,8 @@ def fetch_latest_bulletin_url(area: str) -> str:
 # ─────────────────────────────────────────────────────────────
 
 def _fetch_ngl_tail(station: str, timeout: int = 3, tail_kb: int = 80) -> list:
-    """Scarica solo gli ultimi tail_kb KB del file tenv3 NGL via HTTP Range."""
-    url = f"http://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/{station}.tenv3"
+    """Scarica solo gli ultimi tail_kb KB del file tenv3 NGL via HTTPS Range."""
+    url = f"https://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/{station}.tenv3"
     try:
         resp = requests.get(
             url, timeout=timeout,
@@ -1609,8 +1609,16 @@ _SHAKEMAP_BBOX = {
     "vesuvio":       {"min_lat": 40.70, "max_lat": 41.00, "min_lon": 14.25, "max_lon": 14.62},
     "ischia":        {"min_lat": 40.68, "max_lat": 40.80, "min_lon": 13.80, "max_lon": 14.00},
     "campania":      {"min_lat": 39.90, "max_lat": 41.20, "min_lon": 13.50, "max_lon": 15.60},
-    "italia":        {"min_lat": 36.00, "max_lat": 47.50, "min_lon":  6.50, "max_lon": 18.50},
+    "italia":        {"min_lat": 36.50, "max_lat": 47.05, "min_lon":  6.70, "max_lon": 18.55},
 }
+
+# Parole chiave di paesi/zone NON italiani da escludere nelle ShakeMap "italia"
+_NON_ITALY_KEYWORDS = [
+    "AUSTRIA", "SVIZZERA", "SWITZERLAND", "SLOVENIA", "CROAZIA", "CROATIA",
+    "FRANCE", "FRANCIA", "GRECIA", "GREECE", "TUNISI", "TUNISIA", "ALGERIA",
+    "ALBANIA", "MONTENEGRO", "SERBIA", "MALTA (AREA)", "MEDITERRANEAN SEA",
+    "MARE IONIO (GRECIA", "MAR TIRRENO (FRANCE",
+]
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -1646,6 +1654,10 @@ def fetch_shakemap_events(area: str = "campania", min_mag: float = 2.5, n_events
                         lat = float(ev.get("lat", 0))
                         lon = float(ev.get("lon", 0))
                         mag = float(ev.get("mag", 0))
+                        desc_upper = ev.get("description", "").upper()
+                        # Per area "italia": escludi eventi fuori confine italiano
+                        if area == "italia" and any(kw in desc_upper for kw in _NON_ITALY_KEYWORDS):
+                            continue
                         if (min_lat <= lat <= max_lat
                                 and min_lon <= lon <= max_lon
                                 and mag >= min_mag):
