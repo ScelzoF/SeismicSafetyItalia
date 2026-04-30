@@ -3146,7 +3146,7 @@ def _show_vesuvio_news() -> None:
             "border-radius:10px;' "
             "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
             "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
-            height=580,
+            height=700,
         )
         st.caption(
             "📺 Per la visione ottimale aprire in un'altra scheda · "
@@ -3187,7 +3187,7 @@ def _show_ischia_news() -> None:
             "border-radius:10px;' "
             "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
             "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
-            height=580,
+            height=700,
         )
         st.caption(
             "📺 Per la visione ottimale aprire in un'altra scheda · "
@@ -3230,7 +3230,7 @@ def _show_solfatara_news() -> None:
             "border-radius:10px;' "
             "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
             "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
-            height=580,
+            height=700,
         )
         st.caption(
             "📺 Per la visione ottimale aprire in un'altra scheda · "
