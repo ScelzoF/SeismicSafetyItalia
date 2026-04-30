@@ -16,6 +16,22 @@ for _noisy in (
 ):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
+# Sopprimi il warning di deprecazione components.v1.html emesso da librerie
+# di terze parti (es. streamlit-folium) — il codice dell'app usa già st.iframe.
+class _FilterComponentsV1(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "components.v1.html" not in record.getMessage()
+
+for _st_logger_name in (
+    "streamlit", "streamlit.runtime", "streamlit.deprecation_util",
+    "tornado.access", "root", "",
+):
+    logging.getLogger(_st_logger_name).addFilter(_FilterComponentsV1())
+
+# Applica anche ai handler già registrati sul root logger
+for _h in logging.root.handlers:
+    _h.addFilter(_FilterComponentsV1())
+
 import data_service
 import visualization
 import emergenza

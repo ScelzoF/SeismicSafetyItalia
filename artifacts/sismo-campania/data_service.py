@@ -443,7 +443,7 @@ def _fetch_gossip_raw():
     try:
         r = _ingv_ov_get(
             "https://terremoti.ov.ingv.it/gossip/report.xml",
-            timeout=6,
+            timeout=2,
             headers={"User-Agent": "SeismicSafetyItalia/2.0"}
         )
         if r.status_code != 200 or len(r.content) < 100:

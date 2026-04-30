@@ -387,8 +387,8 @@ def _render_bradisismo_storico_cf(gps_data: dict | None = None) -> None:
     st.plotly_chart(fig, width="stretch", key="bradisismo_storico_cf")
     st.caption(
         "📚 Fonti: INGV OV Bollettini storici · Barberi et al. (1984) · Chiodini et al. (2017) · "
-        "GPS RITE Nevada Geodetic Lab (NGL). I valori 1950–2005 sono espressi rispetto al benchmark "
-        "Rione Terra; il ciclo attuale (arancio) è relativo al riferimento GPS RITE 2005=0."
+        "GPS RITE da bollettini INGV OV (rete RING — non su NGL). I valori 1950–2005 sono espressi "
+        "rispetto al benchmark Rione Terra; il ciclo attuale (arancio) è relativo al riferimento GPS RITE 2005=0."
     )
 
 
@@ -1331,6 +1331,17 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
         with st.expander("📈 Curva deformazione del suolo GPS", expanded=False):
             st.caption(badge)
             st.plotly_chart(fig, width='stretch', key=_key)
+            if gps_result.get("source_type") != "live":
+                _gps_page = {
+                    "Campi Flegrei": "https://www.ov.ingv.it/index.php/flegrei-stato-attuale",
+                    "Vesuvio":       "https://www.ov.ingv.it/index.php/stato-attuale",
+                    "Ischia":        "https://www.ov.ingv.it/index.php/ischia-stato-attuale",
+                }.get(area_name, "https://www.ov.ingv.it")
+                st.link_button(
+                    "📡 Dati GPS live su INGV OV →",
+                    _gps_page,
+                    width='stretch',
+                )
     except Exception as _e:
         st.warning(f"Grafico GPS non disponibile: {_e}")
 
