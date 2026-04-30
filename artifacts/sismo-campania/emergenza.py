@@ -790,28 +790,12 @@ def show():
                     use_container_width=True,
                 )
 
-        # ── Regole universali post-terremoto ──────────────────────────────────
+        # ── Rimando alle procedure dettagliate ────────────────────────────────
         st.markdown("---")
-        with st.expander("🌍 Cosa fare in caso di TERREMOTO (regole universali)", expanded=False):
-            st.markdown("""
-            **Durante la scossa:**
-            - 🛡️ Riparati **SOTTO un tavolo robusto** o nel vano di una porta portante
-            - 🚫 NON precipitarti verso le uscite durante la scossa
-            - 🚫 NON usare ascensori
-
-            **Subito dopo:**
-            - 🚶 Esci con prudenza usano le scale (non l'ascensore)
-            - 📍 Raggiungi l'**area di raccolta** indicata dal tuo Comune
-            - 📻 Sintonizzati su **RAI Radio 1** per informazioni ufficiali
-            - 🚗 Non usare l'auto nelle prime ore (strade riservate ai soccorsi)
-
-            **Non fare:**
-            - ❌ Non rientrare nell'edificio senza il via libera delle autorità
-            - ❌ Non diffondere notizie non verificate
-            - ❌ Non intasare le linee telefoniche (usa solo il 112 per emergenze reali)
-
-            📎 [Protezione Civile — rischio sismico](https://www.protezionecivile.gov.it/it/rischio/rischio-sismico/cosa-fare)
-            """)
+        st.info(
+            "📋 **Guide complete per ogni tipo di evento** (terremoto, eruzione, alluvione, frana…) "
+            "sono disponibili nel tab **⚠️ Procedure per Tipo di Evento** qui accanto."
+        )
 
     # ════════════════════════════════════════════════════════════════════════════
     # TAB VESUVIO
