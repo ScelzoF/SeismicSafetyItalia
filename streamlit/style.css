@@ -430,3 +430,12 @@ p, li, span, label, .stMarkdown p, .stMarkdown li,
 [data-testid="stSidebar"] a { color: #a8dadc !important; }
 [data-testid="stSidebar"] [data-testid="stMetricLabel"] { color: #a8dadc !important; }
 
+/* ── Eccezione: testo bianco esplicito nei box colorati ─── */
+[data-testid="stMarkdownContainer"] p[style*="color:white"],
+[data-testid="stMarkdownContainer"] span[style*="color:white"],
+[data-testid="stMarkdownContainer"] li[style*="color:white"],
+[data-testid="stMarkdownContainer"] h1[style*="color:white"],
+[data-testid="stMarkdownContainer"] h2[style*="color:white"],
+[data-testid="stMarkdownContainer"] h3[style*="color:white"],
+[data-testid="stMarkdownContainer"] h4[style*="color:white"] { color: white !important; }
+
