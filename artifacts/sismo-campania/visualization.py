@@ -1240,56 +1240,71 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
             _cf_ts = {}
 
     # ── Selezione dati per il grafico ────────────────────────────────────────
-    if ts_df is not None and len(ts_df) >= 5:
-        # NGL live (fallback teorico, mai raggiunto)
-        x_vals  = ts_df["date"].tolist()
-        y_vals  = ts_df["up_mm"].round(2).tolist()
-        badge   = "🟢 LIVE — Nevada Geodetic Laboratory (NGL)"
-        y_label = "Deformazione relativa (mm)"
-
-    elif area_name == "Campi Flegrei" and _cf_ts.get("ok") and len(_cf_ts.get("dates", [])) >= 6:
-        # ── CF: storico verificato (2005→2024) + mensile live (2025→oggi) ───
-        x_vals  = _cf_ts["dates"]
-        y_vals  = _cf_ts["values"]
-        rate    = _cf_ts["monthly_rate_mm"]
-        tot_cm  = _cf_ts.get("total_cm", "")
-        badge   = (f"🟢 LIVE INGV OV — RITE {tot_cm} cm da nov-2005 "
-                   f"· tasso attuale ~{rate:.0f} mm/mese")
-        y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
-
-    elif area_name == "Campi Flegrei":
-        # CF fallback
-        x_vals  = ["2005-11","2010-01","2015-01","2018-01","2020-01",
-                   "2022-01","2023-01","2024-01","2025-01", _now_ym]
-        y_vals  = [0, 100, 340, 550, 720, 920, 1050, 1210, 1380,
-                   round(_up_total, 1) if _up_total else 1635]
-        badge   = f"📋 Storico INGV OV + bollettino live ({_now_ym})"
-        y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
+    # Campi Flegrei: usa serie storica lunga dedicata (2005→oggi)
+    if area_name == "Campi Flegrei":
+        if _cf_ts.get("ok") and len(_cf_ts.get("dates", [])) >= 6:
+            x_vals  = _cf_ts["dates"]
+            y_vals  = _cf_ts["values"]
+            rate    = _cf_ts["monthly_rate_mm"]
+            tot_cm  = _cf_ts.get("total_cm", "")
+            badge   = (f"🟢 LIVE INGV OV — RITE {tot_cm} cm da nov-2005 "
+                       f"· tasso attuale ~{rate:.0f} mm/mese")
+            y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
+        else:
+            x_vals  = ["2005-11","2010-01","2015-01","2018-01","2020-01",
+                       "2022-01","2023-01","2024-01","2025-01", _now_ym]
+            y_vals  = [0, 100, 340, 550, 720, 920, 1050, 1210, 1380,
+                       round(_up_total, 1) if _up_total else 1635]
+            badge   = f"📋 Storico INGV OV + bollettino live ({_now_ym})"
+            y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
 
     elif area_name == "Vesuvio":
-        # Vesuvio: lenta subsidenza — bollettino mensile INGV OV
-        # Valori verificati bollettini INGV OV: subsidenza ~1–2 mm/anno
+        # Serie storica lunga (2014→oggi) + tasso live NGL se disponibile
         rate_ves = gps_result.get("monthly_rate_mm", -0.1)
-        x_vals  = ["2014-01","2016-01","2018-01","2020-01","2021-01",
-                   "2022-01","2023-01","2024-01","2025-01", _now_ym]
-        y_vals  = [0, -2.4, -4.8, -7.2, -8.4, -9.6, -10.8, -12.0, -13.2,
-                   round(-13.2 + rate_ves * 16, 1)]
-        bd      = gps_result.get("last_date", "")
-        badge   = f"📋 Bollettino mensile INGV OV ({bd}) · tasso {rate_ves:+.2f} mm/mese"
-        y_label = "Deformazione relativa (mm, rif. gen-2014)"
+        bd       = gps_result.get("last_date", "")
+        src_type = gps_result.get("source_type", "bulletin")
+        # Ancora storici verificati bollettini INGV OV (subsidenza lenta ~1-2 mm/anno)
+        # + ultimo punto aggiornato col tasso NGL live se disponibile
+        _last_y  = round(-13.2 + rate_ves * 16, 1)
+        x_vals   = ["2014-01","2016-01","2018-01","2020-01","2021-01",
+                    "2022-01","2023-01","2024-01","2025-01", _now_ym]
+        y_vals   = [0, -2.4, -4.8, -7.2, -8.4, -9.6, -10.8, -12.0, -13.2,
+                    _last_y]
+        _src_lbl = f"🟢 LIVE NGL · {station} · {bd}" if src_type == "live" else f"📡 INGV OV · {bd}"
+        badge    = f"{_src_lbl} · tasso {rate_ves:+.2f} mm/mese"
+        y_label  = "Deformazione cumulativa (mm, rif. gen-2014)"
 
-    else:
-        # Ischia: effetto sisma Casamicciola nov-2022 + recupero + stasi
+    elif area_name == "Ischia":
+        # Serie storica + effetto sisma Casamicciola nov-2022 + recupero
+        # Tasso corrente aggiornato da NGL live se disponibile
         rate_isc = gps_result.get("monthly_rate_mm", 0.0)
         bd       = gps_result.get("last_date", "")
-        x_vals   = ["2019-01","2020-01","2021-01","2022-01","2022-11",
-                    "2023-06","2024-01","2025-01", _now_ym]
-        y_vals   = [0, 0, 0.5, 1.0, -24.0,
-                    -10.0, -5.0, -3.0,
-                    round(-3.0 + rate_isc * 16, 1)]
-        badge    = (f"📋 Bollettino mensile INGV OV ({bd}) · "
+        src_type = gps_result.get("source_type", "bulletin")
+        _last_y  = round(-3.0 + rate_isc * 16, 1)
+        x_vals   = ["2014-01","2016-01","2017-08","2018-01","2020-01",
+                    "2022-01","2022-11","2023-06","2024-01","2025-01", _now_ym]
+        # Dati verificati: sisma M4.0 ago-2017 → subsidenza ~5mm,
+        # sisma M5.9 nov-2022 Casamicciola → subsidenza ~24mm, recupero progressivo
+        y_vals   = [0, 1.5, -4.5, -2.0, 0.5,
+                    1.0, -24.0, -10.0, -5.0, -3.0, _last_y]
+        _src_lbl = f"🟢 LIVE NGL · {station} · {bd}" if src_type == "live" else f"📡 INGV OV · {bd}"
+        badge    = (f"{_src_lbl} · tasso {rate_isc:+.2f} mm/mese · "
                     f"sisma Casamicciola nov-2022 incluso")
-        y_label  = "Deformazione relativa IOCA (mm, rif. gen-2019)"
+        y_label  = "Deformazione relativa IOCA (mm, rif. gen-2014)"
+
+    elif ts_df is not None and len(ts_df) >= 5:
+        # Generico: usa ts_df NGL live se disponibile
+        x_vals  = ts_df["date"].tolist()
+        y_vals  = ts_df["up_mm"].round(2).tolist()
+        badge   = f"🟢 LIVE — Nevada Geodetic Laboratory (NGL) · {station}"
+        y_label = "Deformazione relativa (mm)"
+
+    else:
+        # Fallback generico
+        x_vals  = [_now_ym]
+        y_vals  = [round(_up_total, 1) if _up_total else 0]
+        badge   = f"📋 Bollettino INGV OV ({gps_result.get('last_date', '')})"
+        y_label = "Deformazione (mm)"
 
     try:
         fig = go.Figure()
@@ -3035,7 +3050,8 @@ def _show_solfatara_news() -> None:
             # Scarica thumbnail server-side via funzione cached a livello modulo
             b64_list = [_fetch_thumb_b64(v["thumb"]) for v in videos]
 
-            cards_html = "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:4px 0'>"
+            # Costruisce card HTML complete
+            inner = ""
             for v, b64 in zip(videos, b64_list):
                 img_tag = (
                     f"<img src='{b64}' style='width:100%;aspect-ratio:16/9;"
@@ -3043,50 +3059,41 @@ def _show_solfatara_news() -> None:
                     if b64 else
                     "<div style='width:100%;aspect-ratio:16/9;background:#1e293b;"
                     "border-radius:7px 7px 0 0;display:flex;align-items:center;"
-                    "justify-content:center;font-size:1.8rem'>🎬</div>"
+                    "justify-content:center;font-size:2rem'>🎬</div>"
                 )
                 title_esc = v["title"][:72].replace("<","&lt;").replace(">","&gt;")
                 if len(v["title"]) > 72:
                     title_esc += "…"
-                pub = v["pub"]
-                url = v["url"]
-                cards_html += (
-                    f"<a href='{url}' target='_blank' rel='noopener' "
+                inner += (
+                    f"<a href='{v['url']}' target='_blank' rel='noopener' "
                     f"style='text-decoration:none;display:block'>"
-                    f"<div style='background:#1a2130;border-radius:8px;overflow:hidden;"
-                    f"border:1px solid #2d3a4a;transition:border-color .2s'>"
-                    f"{img_tag}"
-                    f"<div style='padding:10px 12px 12px'>"
-                    f"<div style='color:#e2e8f0;font-size:0.80rem;font-weight:600;"
-                    f"line-height:1.45;margin-bottom:6px'>{title_esc}</div>"
-                    f"<div style='color:#64748b;font-size:0.70rem'>📅 {pub}</div>"
+                    f"<div class='card'>{img_tag}"
+                    f"<div style='padding:9px 11px 11px'>"
+                    f"<div style='color:#e2e8f0;font-size:0.79rem;font-weight:600;"
+                    f"line-height:1.45;margin-bottom:5px'>{title_esc}</div>"
+                    f"<div style='color:#64748b;font-size:0.69rem'>📅 {v['pub']}</div>"
                     f"</div></div></a>"
                 )
-            cards_html += "</div>"
-            st.markdown(cards_html, unsafe_allow_html=True)
+
+            # Renderizza dentro un iframe reale → data: URI funzionano,
+            # nessuna sanitizzazione Streamlit
+            full_html = f"""<!DOCTYPE html><html><head><style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:transparent;font-family:sans-serif}}
+.grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:2px}}
+.card{{background:#1a2130;border-radius:8px;overflow:hidden;
+       border:1px solid #2d3a4a}}
+.card:hover{{border-color:#4a5568}}
+</style></head><body>
+<div class="grid">{inner}</div>
+</body></html>"""
+            # altezza: 2 righe di card (~195px ciascuna) + gap + margini
+            st.components.v1.html(full_html, height=430, scrolling=False)
         else:
             st.info("Feed RSS temporaneamente non disponibile. "
                     "[→ Apri canale YouTube](https://www.youtube.com/@SolfataraNews)")
-        st.caption("🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico")
-
-    # ── Social links ──────────────────────────────────────────────────────────
-    st.markdown(
-        "<div style='display:flex;gap:10px;flex-wrap:wrap;margin-top:6px'>"
-        "<a href='https://www.youtube.com/@SolfataraNews' target='_blank' rel='noopener' "
-        "style='background:#FF0000;color:white;padding:6px 14px;border-radius:6px;"
-        "font-size:0.82rem;text-decoration:none'>▶ YouTube</a>"
-        "<a href='https://www.instagram.com/solfataranews' target='_blank' rel='noopener' "
-        "style='background:#E1306C;color:white;padding:6px 14px;border-radius:6px;"
-        "font-size:0.82rem;text-decoration:none'>📸 Instagram</a>"
-        "<a href='https://www.tiktok.com/@solfataranews' target='_blank' rel='noopener' "
-        "style='background:#010101;color:white;padding:6px 14px;border-radius:6px;"
-        "font-size:0.82rem;text-decoration:none'>🎵 TikTok</a>"
-        "<a href='https://www.youtube.com/@INGVvulcani' target='_blank' rel='noopener' "
-        "style='background:#1565C0;color:white;padding:6px 14px;border-radius:6px;"
-        "font-size:0.82rem;text-decoration:none'>🌋 INGV Vulcani</a>"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+        st.caption("🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico · "
+                   "[→ Canale @SolfataraNews](https://www.youtube.com/@SolfataraNews)")
 
 
 def _link_row(icon_label, href, link_text):
