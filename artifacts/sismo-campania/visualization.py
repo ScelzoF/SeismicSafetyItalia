@@ -2949,6 +2949,22 @@ def _show_ingv_news(area: str = "all"):
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
+def _fetch_thumb_b64(url: str) -> str:
+    """
+    Scarica il thumbnail YouTube server-side e lo restituisce come data-URI base64.
+    Cache 30 min. Chiamare dal thread principale Streamlit (non da ThreadPoolExecutor).
+    """
+    import base64
+    try:
+        r = requests.get(url, timeout=6, headers={"User-Agent": "SeismicSafetyItalia/2.0"})
+        if r.status_code == 200 and r.headers.get("content-type","").startswith("image"):
+            return "data:image/jpeg;base64," + base64.b64encode(r.content).decode()
+    except Exception:
+        pass
+    return ""
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def _fetch_solfatara_rss() -> list:
     """Scarica i video recenti di SolfataraNews dal feed RSS YouTube."""
     import xml.etree.ElementTree as ET
@@ -3016,23 +3032,8 @@ def _show_solfatara_news() -> None:
     with st.expander("🎬 Ultimi video — SolfataraNews", expanded=True):
         videos = _fetch_solfatara_rss()
         if videos:
-            import base64, concurrent.futures
-
-            @st.cache_data(ttl=1800, show_spinner=False)
-            def _thumb_b64_cached(url: str) -> str:
-                try:
-                    r = requests.get(url, timeout=5)
-                    if r.status_code == 200:
-                        return "data:image/jpeg;base64," + base64.b64encode(r.content).decode()
-                except Exception:
-                    pass
-                return ""
-
-            # Scarica tutti i thumbnail in parallelo
-            with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
-                b64_list = list(pool.map(
-                    lambda v: _thumb_b64_cached(v["thumb"]), videos
-                ))
+            # Scarica thumbnail server-side via funzione cached a livello modulo
+            b64_list = [_fetch_thumb_b64(v["thumb"]) for v in videos]
 
             cards_html = "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:4px 0'>"
             for v, b64 in zip(videos, b64_list):
