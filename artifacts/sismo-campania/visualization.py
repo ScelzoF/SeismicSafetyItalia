@@ -9,7 +9,6 @@ import warnings
 import requests
 warnings.filterwarnings("ignore", message=".*components.v1.html.*")
 warnings.filterwarnings("ignore", message=".*st.iframe.*")
-warnings.filterwarnings("ignore", message=".*use_container_width.*")
 warnings.filterwarnings("ignore", message=".*width.*stretch.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="streamlit")
 
@@ -144,7 +143,7 @@ def _show_volcano_satellite_map(lat, lon, name, zoom=13, height=340):
         icon=folium.Icon(color="red", icon="fire", prefix="fa"),
     ).add_to(m)
     st.caption(f"🛰️ Immagine satellite reale — {name} | Fonte: Esri/USGS/NOAA")
-    st_folium(m, height=height, use_container_width=True, returned_objects=[])
+    st_folium(m, height=height, returned_objects=[])
 
 
 def _card(label, value, delta=None, help_text=None):
@@ -1118,7 +1117,7 @@ def _show_shakemap_widget(area: str, min_mag: float = 2.5) -> None:
                     f"Intensità sismica M{latest['mag']:.1f} — {latest['description']} "
                     f"({latest['datetime_str']}) · Profondità {latest['depth']:.1f} km"
                 ),
-                use_container_width=True,
+                width='stretch',
             )
 
         with col_info:
@@ -1133,7 +1132,7 @@ def _show_shakemap_widget(area: str, min_mag: float = 2.5) -> None:
             st.link_button(
                 "🔗 Apri su INGV ShakeMap",
                 latest["event_url"],
-                use_container_width=True,
+                width='stretch',
             )
 
         # ── Tabella eventi recenti ─────────────────────────────────────────────
@@ -1333,7 +1332,7 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
         _key = chart_key or f"gps_deform_{area_name.lower().replace(' ', '_')}"
         with st.expander("📈 Curva deformazione del suolo GPS", expanded=False):
             st.caption(badge)
-            st.plotly_chart(fig, use_container_width=True, key=_key)
+            st.plotly_chart(fig, width='stretch', key=_key)
     except Exception as _e:
         st.warning(f"Grafico GPS non disponibile: {_e}")
 
@@ -3043,7 +3042,7 @@ def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str =
                     try:
                         thumb_data = _fetch_thumb_bytes(thumb)
                         if thumb_data:
-                            st.image(thumb_data, use_container_width=True)
+                            st.image(thumb_data, width='stretch')
                         else:
                             st.markdown("🎬")
                     except Exception:
@@ -3128,7 +3127,7 @@ def _show_vesuvio_news() -> None:
             "Telecamera puntata sul Vesuvio (NA)</p>",
             unsafe_allow_html=True,
         )
-        st.components.v1.iframe(
+        st.iframe(
             "https://www.youtube.com/embed/RbI8JwrBZQA"
             "?autoplay=0&rel=0&modestbranding=1",
             height=380,
@@ -3163,7 +3162,7 @@ def _show_ischia_news() -> None:
             "Telecamera panoramica sull'isola di Ischia</p>",
             unsafe_allow_html=True,
         )
-        st.components.v1.iframe(
+        st.iframe(
             "https://www.youtube.com/embed/Hllyp_GlG64"
             "?autoplay=0&rel=0&modestbranding=1",
             height=380,
@@ -3200,7 +3199,7 @@ def _show_solfatara_news() -> None:
             "Telecamera puntata su Solfatara e area flegrea</p>",
             unsafe_allow_html=True,
         )
-        st.components.v1.iframe(
+        st.iframe(
             "https://www.youtube.com/embed/6Ie29xiu_SE"
             "?autoplay=0&rel=0&modestbranding=1",
             height=380,

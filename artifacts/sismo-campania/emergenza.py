@@ -761,19 +761,19 @@ def show():
                 st.link_button(
                     "📋 Piano Evacuazione DPC",
                     _piano_url,
-                    use_container_width=True,
+                    width='stretch',
                 )
             with _lnk2:
                 st.link_button(
                     "📡 IT-Alert — Allerta Nazionale",
                     "https://www.it-alert.it",
-                    use_container_width=True,
+                    width='stretch',
                 )
             with _lnk3:
                 st.link_button(
                     "🌋 INGV — Monitoraggio Live",
                     "https://www.ingv.it",
-                    use_container_width=True,
+                    width='stretch',
                 )
 
         # ── Rimando alle procedure dettagliate ────────────────────────────────
