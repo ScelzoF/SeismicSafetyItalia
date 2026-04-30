@@ -380,51 +380,36 @@ def _get_curiosita_ai(date_key: str) -> tuple[str, str] | None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# RENDER PRINCIPALE
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# RENDER PRINCIPALE — expander nativi Streamlit, contenuto completo
+# RENDER PRINCIPALE — riquadri nativi Streamlit, layout verticale, no troncature
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render_bacheca(today: _date | None = None) -> None:
     """
-    Bacheca del Giorno — tre expander nativi Streamlit.
-    Tutto il contenuto è sempre leggibile: nessun testo troncato.
+    Bacheca del Giorno — tre riquadri colorati nativi (info / warning / success).
+    Layout verticale a piena larghezza: testo mai troncato, zero HTML custom.
     """
     if today is None:
         today = _date.today()
 
     mesi_it = [
-        "gennaio","febbraio","marzo","aprile","maggio","giugno",
-        "luglio","agosto","settembre","ottobre","novembre","dicembre",
+        "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
+        "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
     ]
     data_fmt = f"{today.day} {mesi_it[today.month - 1]} {today.year}"
 
-    st.markdown(
-        f"<p style='font-size:0.78rem;color:#6b7280;font-weight:600;"
-        f"text-transform:uppercase;letter-spacing:.07em;margin:0 0 6px 0'>"
-        f"📅 Bacheca del giorno — {data_fmt}</p>",
-        unsafe_allow_html=True,
-    )
-
-    col1, col2, col3 = st.columns(3, gap="medium")
+    st.caption(f"📅 BACHECA DEL GIORNO — {data_fmt.upper()}")
 
     # ── 1. Santo del giorno ──────────────────────────────────────────────────
     nome_santo, nota_santo = _get_santo(today)
     has_volcano = bool(nota_santo and ("🌋" in nota_santo or "⚠️" in nota_santo))
     s_icon = "🌋" if has_volcano else "✝️"
-
-    with col1:
-        with st.expander(f"{s_icon} **{nome_santo}**", expanded=True):
-            st.caption("✝️ SANTO DEL GIORNO")
-            if nota_santo:
-                st.markdown(nota_santo)
-            else:
-                st.markdown(
-                    "_Nessuna nota specifica per questo giorno. "
-                    "Consultare il Martirologio Romano._"
-                )
+    body_santo = (
+        f"**✝️ Santo del giorno — {nome_santo}**\n\n{nota_santo}"
+        if nota_santo else
+        f"**✝️ Santo del giorno — {nome_santo}**\n\n"
+        "_Nessuna nota specifica per questo giorno liturgico._"
+    )
+    st.info(body_santo, icon=s_icon)
 
     # ── 2. Oggi nella storia ─────────────────────────────────────────────────
     eventi   = _STORIA.get((today.month, today.day), [])
@@ -439,63 +424,61 @@ def render_bacheca(today: _date | None = None) -> None:
             ev_main    = ev_near
             offset     = ev_near["_offset"]
             nd         = ev_near["_near_date"]
-            nd_str     = f"{nd.day} {mesi_it[nd.month-1]}"
+            nd_str     = f"{nd.day} {mesi_it[nd.month - 1]}"
             near_label = (
-                f"⬅ {abs(offset)} giorni fa, {nd_str}"
+                f"⬅ {abs(offset)} giorni fa — {nd_str}"
                 if offset < 0 else
-                f"➡ tra {offset} giorni, {nd_str}"
+                f"➡ tra {offset} giorni — {nd_str}"
             )
         else:
             ev_main    = None
             near_label = ""
 
-    with col2:
-        if ev_main:
-            a = ev_main["anno"]
-            anno_disp = (f"{abs(a)} a.C." if a < 0
-                         else f"{a} d.C." if a < 1000
-                         else str(a))
-            icona_ev = ev_main.get("icona", "🕰️")
-            cat_label = "🕰️ OGGI NELLA STORIA" if is_today else "🕰️ ANNIVERSARIO VICINO"
-            with st.expander(f"{icona_ev} **{anno_disp}**", expanded=True):
-                st.caption(cat_label)
-                if near_label:
-                    st.caption(f"📌 {near_label}")
-                st.markdown(ev_main["testo"])
-                # eventuali eventi aggiuntivi nello stesso giorno
-                for ev_extra in eventi[1:]:
-                    st.divider()
-                    a2 = ev_extra["anno"]
-                    anno2 = (f"{abs(a2)} a.C." if a2 < 0
-                             else f"{a2} d.C." if a2 < 1000
-                             else str(a2))
-                    st.markdown(f"**{ev_extra.get('icona','🕰️')} {anno2}** — {ev_extra['testo']}")
-        else:
-            with st.expander("🕰️ **Oggi nella storia**", expanded=True):
-                st.caption("🕰️ ARCHIVIO SISMICO CAMPANO")
-                st.markdown(
-                    "_Nessun evento sismico o vulcanico campano di rilievo "
-                    "trovato nell'arco dei prossimi 90 giorni._"
-                )
+    if ev_main:
+        a         = ev_main["anno"]
+        anno_disp = (
+            f"{abs(a)} a.C." if a < 0 else
+            f"{a} d.C."      if a < 1000 else
+            str(a)
+        )
+        icona_ev  = ev_main.get("icona", "🕰️")
+        cat_label = (
+            "🕰️ Oggi nella storia"
+            if is_today else
+            f"🕰️ Anniversario vicino ({near_label})"
+        )
+        body_storia = f"**{cat_label} — {anno_disp}**\n\n{ev_main['testo']}"
+        for ev_extra in eventi[1:]:
+            a2      = ev_extra["anno"]
+            anno2   = (
+                f"{abs(a2)} a.C." if a2 < 0 else
+                f"{a2} d.C."      if a2 < 1000 else
+                str(a2)
+            )
+            body_storia += (
+                f"\n\n---\n\n"
+                f"**{ev_extra.get('icona', '🕰️')} {anno2}** — {ev_extra['testo']}"
+            )
+        st.warning(body_storia, icon=icona_ev)
+    else:
+        st.warning(
+            "**🕰️ Oggi nella storia**\n\n"
+            "_Nessun evento sismico o vulcanico campano di rilievo "
+            "registrato per questo periodo dell'anno._",
+            icon="🕰️",
+        )
 
     # ── 3. Curiosità vulcanologica ───────────────────────────────────────────
-    date_key      = today.strftime("%Y%m%d")
-    idx_fb        = int(hashlib.md5(date_key.encode()).hexdigest(), 16) % len(_CURIOSITA_POOL)
+    date_key         = today.strftime("%Y%m%d")
+    idx_fb           = int(hashlib.md5(date_key.encode()).hexdigest(), 16) % len(_CURIOSITA_POOL)
     titolo_fb, testo_fb = _CURIOSITA_POOL[idx_fb]
 
     ai_result = _get_curiosita_ai(date_key)
     if ai_result:
         titolo_c, testo_c = ai_result
-        ai_note = "✨ _Curiosità generata oggi dall'AI_"
+        header = f"**🌋 Curiosità vulcanologica — {titolo_c}** ✨"
     else:
         titolo_c, testo_c = titolo_fb, testo_fb
-        ai_note = ""
+        header = f"**🌋 Curiosità vulcanologica — {titolo_c}**"
 
-    with col3:
-        with st.expander(f"🌋 **{titolo_c}**", expanded=True):
-            st.caption("🌋 CURIOSITÀ VULCANOLOGICA")
-            if ai_note:
-                st.caption(ai_note)
-            st.markdown(testo_c)
-
-    st.markdown("<div style='margin-bottom:4px'></div>", unsafe_allow_html=True)
+    st.success(f"{header}\n\n{testo_c}", icon="🌋")
