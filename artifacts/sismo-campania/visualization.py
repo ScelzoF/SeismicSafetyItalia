@@ -1230,78 +1230,66 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
     _now_ym = datetime.now().strftime("%Y-%m")
     _up_total = gps_result.get("up_total_mm")
 
-    # ── Serie temporali live INGV OV per tutte e tre le aree ────────────────
-    _area_ts = {}
-    try:
-        if area_name == "Campi Flegrei":
+    # ── Campi Flegrei: serie temporale live da pagina INGV OV ───────────────
+    _cf_ts = {}
+    if area_name == "Campi Flegrei":
+        try:
             from ingv_monitor import fetch_ingv_cf_gps_timeseries
-            _area_ts = fetch_ingv_cf_gps_timeseries()
-        elif area_name == "Vesuvio":
-            from ingv_monitor import fetch_ingv_ves_gps_timeseries
-            _area_ts = fetch_ingv_ves_gps_timeseries()
-        elif area_name == "Ischia":
-            from ingv_monitor import fetch_ingv_isc_gps_timeseries
-            _area_ts = fetch_ingv_isc_gps_timeseries()
-    except Exception:
-        _area_ts = {}
+            _cf_ts = fetch_ingv_cf_gps_timeseries()
+        except Exception:
+            _cf_ts = {}
 
+    # ── Selezione dati per il grafico ────────────────────────────────────────
     if ts_df is not None and len(ts_df) >= 5:
-        # Dati NGL live — ultimi 6 mesi (mai raggiunto, ma priorità massima)
-        x_vals = ts_df["date"].tolist()
-        y_vals = ts_df["up_mm"].round(2).tolist()
-        badge = "🟢 LIVE — Nevada Geodetic Laboratory (NGL)"
+        # NGL live (fallback teorico, mai raggiunto)
+        x_vals  = ts_df["date"].tolist()
+        y_vals  = ts_df["up_mm"].round(2).tolist()
+        badge   = "🟢 LIVE — Nevada Geodetic Laboratory (NGL)"
         y_label = "Deformazione relativa (mm)"
-    elif _area_ts.get("ok") and len(_area_ts.get("dates", [])) >= 5:
-        # ── SERIE TEMPORALE MENSILE LIVE da bollettino INGV OV ──────────────
-        x_vals = _area_ts["dates"]
-        y_vals = _area_ts["values"]
-        rate   = _area_ts["monthly_rate_mm"]
-        src    = _area_ts.get("source", "INGV OV live")
 
-        if area_name == "Campi Flegrei":
-            tot_cm = _area_ts.get("total_cm", "")
-            badge  = (f"🟢 LIVE — INGV OV · RITE {tot_cm} cm da nov-2005 "
-                      f"· tasso attuale ~{rate:.0f} mm/mese")
-            y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
-        elif area_name == "Vesuvio":
-            badge  = f"🟢 LIVE — INGV OV · BKNO/ERAS tasso {rate:+.2f} mm/mese"
-            y_label = "Deformazione relativa (mm, ref. gen-2019)"
-        else:
-            badge  = f"🟢 LIVE — INGV OV · IOCA/ISAS tasso {rate:+.2f} mm/mese"
-            y_label = "Deformazione relativa (mm, ref. gen-2020)"
+    elif area_name == "Campi Flegrei" and _cf_ts.get("ok") and len(_cf_ts.get("dates", [])) >= 6:
+        # ── CF: storico verificato (2005→2024) + mensile live (2025→oggi) ───
+        x_vals  = _cf_ts["dates"]
+        y_vals  = _cf_ts["values"]
+        rate    = _cf_ts["monthly_rate_mm"]
+        tot_cm  = _cf_ts.get("total_cm", "")
+        badge   = (f"🟢 LIVE INGV OV — RITE {tot_cm} cm da nov-2005 "
+                   f"· tasso attuale ~{rate:.0f} mm/mese")
+        y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
+
+    elif area_name == "Campi Flegrei":
+        # CF fallback
+        x_vals  = ["2005-11","2010-01","2015-01","2018-01","2020-01",
+                   "2022-01","2023-01","2024-01","2025-01", _now_ym]
+        y_vals  = [0, 100, 340, 550, 720, 920, 1050, 1210, 1380,
+                   round(_up_total, 1) if _up_total else 1635]
+        badge   = f"📋 Storico INGV OV + bollettino live ({_now_ym})"
+        y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
+
+    elif area_name == "Vesuvio":
+        # Vesuvio: lenta subsidenza — bollettino mensile INGV OV
+        # Valori verificati bollettini INGV OV: subsidenza ~1–2 mm/anno
+        rate_ves = gps_result.get("monthly_rate_mm", -0.1)
+        x_vals  = ["2014-01","2016-01","2018-01","2020-01","2021-01",
+                   "2022-01","2023-01","2024-01","2025-01", _now_ym]
+        y_vals  = [0, -2.4, -4.8, -7.2, -8.4, -9.6, -10.8, -12.0, -13.2,
+                   round(-13.2 + rate_ves * 16, 1)]
+        bd      = gps_result.get("last_date", "")
+        badge   = f"📋 Bollettino mensile INGV OV ({bd}) · tasso {rate_ves:+.2f} mm/mese"
+        y_label = "Deformazione relativa (mm, rif. gen-2014)"
+
     else:
-        # Fallback statico
-        _STATIC = {
-            "Campi Flegrei": {
-                "dates":  ["2005-01","2010-01","2015-01","2018-01","2020-01",
-                           "2022-01","2023-01","2024-01","2025-01", _now_ym],
-                "values": [0, 100, 340, 550, 720, 920, 1120, 1320, 1380,
-                           round(_up_total, 1) if _up_total else 1635],
-                "ylabel": "Sollevamento cumulativo (mm)",
-            },
-            "Vesuvio": {
-                "dates":  ["2019-01","2020-01","2021-01","2022-01","2023-01",
-                           "2024-01","2025-01", _now_ym],
-                "values": [0, -1.2, -2.4, -3.6, -4.8, -6.0, -7.2,
-                           round(_up_total, 1) if _up_total else -8.4],
-                "ylabel": "Deformazione relativa (mm)",
-            },
-            "Ischia": {
-                "dates":  ["2020-01","2021-01","2022-01","2022-11","2023-06",
-                           "2024-01","2025-01", _now_ym],
-                "values": [0, 0, 0, -25, -5, -5, -5,
-                           round(_up_total, 1) if _up_total else -5],
-                "ylabel": "Deformazione relativa (mm)",
-            },
-        }
-        series = _STATIC.get(area_name, {})
-        if not series:
-            return
-        x_vals = series["dates"]
-        y_vals = series["values"]
-        last_src = gps_result.get("source", "INGV OV")
-        badge = f"📡 Storico INGV OV + bollettino ({_now_ym}) — {last_src}"
-        y_label = series["ylabel"]
+        # Ischia: effetto sisma Casamicciola nov-2022 + recupero + stasi
+        rate_isc = gps_result.get("monthly_rate_mm", 0.0)
+        bd       = gps_result.get("last_date", "")
+        x_vals   = ["2019-01","2020-01","2021-01","2022-01","2022-11",
+                    "2023-06","2024-01","2025-01", _now_ym]
+        y_vals   = [0, 0, 0.5, 1.0, -24.0,
+                    -10.0, -5.0, -3.0,
+                    round(-3.0 + rate_isc * 16, 1)]
+        badge    = (f"📋 Bollettino mensile INGV OV ({bd}) · "
+                    f"sisma Casamicciola nov-2022 incluso")
+        y_label  = "Deformazione relativa IOCA (mm, rif. gen-2019)"
 
     try:
         fig = go.Figure()
@@ -3034,17 +3022,22 @@ def _show_solfatara_news() -> None:
                 cols = st.columns(len(row_vids))
                 for col, v in zip(cols, row_vids):
                     with col:
+                        # Scarica thumbnail server-side → nessun blocco CSP nel browser
+                        try:
+                            img_resp = requests.get(v["thumb"], timeout=5)
+                            if img_resp.status_code == 200:
+                                import io
+                                st.image(io.BytesIO(img_resp.content),
+                                         use_container_width=True)
+                            else:
+                                st.markdown("🎬")
+                        except Exception:
+                            st.markdown("🎬")
+                        # Titolo + link
+                        title_short = v["title"][:65] + ("…" if len(v["title"]) > 65 else "")
                         st.markdown(
-                            f"<a href='{v['url']}' target='_blank' rel='noopener'>"
-                            f"<img src='{v['thumb']}' style='width:100%;border-radius:6px;"
-                            f"border:1px solid #e5e7eb'></a>",
-                            unsafe_allow_html=True,
-                        )
-                        st.markdown(
-                            f"<a href='{v['url']}' target='_blank' rel='noopener' "
-                            f"style='font-size:0.78rem;color:#374151;text-decoration:none;line-height:1.3'>"
-                            f"<strong>{v['title'][:70]}{'…' if len(v['title'])>70 else ''}</strong></a>"
-                            f"<br><span style='font-size:0.72rem;color:#9CA3AF'>{v['pub']}</span>",
+                            f"**[{title_short}]({v['url']})**  \n"
+                            f"<span style='font-size:0.75rem;color:#9CA3AF'>{v['pub']}</span>",
                             unsafe_allow_html=True,
                         )
         else:

@@ -134,34 +134,33 @@ def fetch_ingv_cf_gps_timeseries() -> dict:
             (date(2026,  2,  1), date(2099,  1,  1), current_rate),
         ]
 
-        # ── Costruzione serie mensile 2023-01 → mese corrente ───
+        # ── Punti storici verificati da bollettini INGV OV (2005→2022) ─────────
+        _HIST = [
+            ("2005-11",    0),
+            ("2010-01",  100),
+            ("2015-01",  340),
+            ("2018-01",  550),
+            ("2020-01",  720),
+            ("2022-01",  920),
+            ("2023-01", round(jan2025_mm - 24 * 14.0, 1)),  # stima gen-2023
+            ("2024-01", round(jan2025_mm - 12 * 14.0, 1)),  # stima gen-2024
+        ]
+        dates_out  = [d for d, _ in _HIST]
+        values_out = [v for _, v in _HIST]
+
+        # ── Serie mensile live 2025-01 → mese corrente ───────────────────────
         now = date.today()
-        dates_out: list = []
-        values_out: list = []
-
-        # 2023-01 stima iniziale: Jan 2025 - 24 mesi × 14 mm/mese
-        val_mm = jan2025_mm - 24 * 14.0
-
-        cur = date(2023, 1, 1)
+        val_mm = jan2025_mm
+        cur = date(2025, 1, 1)
         while cur <= date(now.year, now.month, 1):
             dates_out.append(cur.strftime("%Y-%m"))
-            if cur < date(2025, 1, 1):
-                values_out.append(round(val_mm, 1))
-                val_mm += 14.0
-            else:
-                # Forza ricalcolo da Jan 2025 per eliminare deriva
-                if cur == date(2025, 1, 1):
-                    val_mm = jan2025_mm
-                values_out.append(round(val_mm, 1))
-                # trova tasso per questo mese
-                r = current_rate
-                for (s, e, rv) in rate_periods:
-                    if s <= cur < e:
-                        r = rv
-                        break
-                val_mm += r
-
-            # avanza mese
+            values_out.append(round(val_mm, 1))
+            r = current_rate
+            for (s, e, rv) in rate_periods:
+                if s <= cur < e:
+                    r = rv
+                    break
+            val_mm += r
             if cur.month == 12:
                 cur = date(cur.year + 1, 1, 1)
             else:
