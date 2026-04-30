@@ -368,7 +368,7 @@ def _get_curiosita_ai(date_key: str) -> tuple[str, str] | None:
                 "role": "user",
                 "content": f"Scrivi una curiosità su: {tema}",
             }],
-            max_tokens=220,
+            max_tokens=400,
             temperature=0.7,
         )
         text = (resp.choices[0].message.content or "").strip()
