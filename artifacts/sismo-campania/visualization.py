@@ -746,8 +746,6 @@ def _render_seismogram_widget(area: str) -> None:
 
 def _render_rsam_widget(area: str) -> None:
     """Tremore vulcanico (RSAM) — portale INGV OV."""
-    import streamlit.components.v1 as _comp
-
     _RSAM_IMAGES = {
         "vesuvio":       [
             ("VBKEBB_EHZ", "VBKE — Sommitale (EHZ)"),
