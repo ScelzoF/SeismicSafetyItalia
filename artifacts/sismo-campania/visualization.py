@@ -2951,15 +2951,15 @@ def _show_ingv_official_links(area):
             _link_row("🚨 Protezione Civile — Vesuvio",
                       "https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/vesuvio/",
                       "rischi.protezionecivile.gov.it") +
-            _link_row("🛰️ GPS Nevada Geodetic Lab",
-                      "https://geodesy.unr.edu/gps_timeseries/IGS14/tenv3/",
+            _link_row("🛰️ GPS Nevada Geodetic Lab (portale)",
+                      "https://geodesy.unr.edu/PlugNPlayPortal.php",
                       "geodesy.unr.edu")
         )
         st.markdown(_table_start + rows + _table_end, unsafe_allow_html=True)
     elif area == "flegrei":
         rows = (
-            _link_row("🛰️ GPS Stazione RITE — NGL",
-                      "https://geodesy.unr.edu/gps_timeseries/IGS14/tenv3/",
+            _link_row("🛰️ GPS RITE — Portale NGL",
+                      "https://geodesy.unr.edu/PlugNPlayPortal.php",
                       "geodesy.unr.edu") +
             _link_row("🌍 Terremoti INGV live", "https://terremoti.ingv.it/", "terremoti.ingv.it") +
             _link_row("💨 Qualità aria (OpenAQ)", "https://openaq.org/#/countries/IT", "openaq.org") +
@@ -2980,8 +2980,8 @@ def _show_ingv_official_links(area):
             _link_row("🌊 ISPRA — Rischio frane Ischia",
                       "https://www.isprambiente.gov.it/it/attivita/suolo-e-territorio/pericolosita-e-rischio-idrogeologico",
                       "isprambiente.gov.it") +
-            _link_row("📡 GPS Stazione ISCH — NGL",
-                      "https://geodesy.unr.edu/gps_timeseries/IGS14/tenv3/",
+            _link_row("📡 GPS ISCH — Portale NGL",
+                      "https://geodesy.unr.edu/PlugNPlayPortal.php",
                       "geodesy.unr.edu")
         )
         st.markdown(_table_start + rows + _table_end, unsafe_allow_html=True)
