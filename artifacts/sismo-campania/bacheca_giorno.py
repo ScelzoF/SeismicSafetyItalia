@@ -381,141 +381,16 @@ def _get_curiosita_ai(date_key: str) -> tuple[str, str] | None:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RENDER PRINCIPALE
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-
-_CSS = """
-<style>
-/* ── Bacheca del Giorno — dark dashboard card ── */
-.bd-wrap {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 6px;
-}
-.bd-card {
-  flex: 1;
-  min-width: 0;
-  background: #131c2e;
-  border: 1px solid rgba(99,130,191,0.18);
-  border-radius: 16px;
-  padding: 18px 18px 16px;
-  box-shadow: 0 6px 28px rgba(0,0,0,0.35);
-  position: relative;
-  overflow: hidden;
-}
-.bd-card::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 3px;
-  border-radius: 16px 16px 0 0;
-}
-.bd-card.c-santo::before  { background: linear-gradient(90deg,#6d28d9,#8b5cf6); }
-.bd-card.c-storia::before { background: linear-gradient(90deg,#b91c1c,#ef4444); }
-.bd-card.c-fact::before   { background: linear-gradient(90deg,#c2410c,#f97316); }
-
-.bd-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.bd-icon-box {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-.c-santo  .bd-icon-box { background: rgba(109,40,217,.25); }
-.c-storia .bd-icon-box { background: rgba(185,28,28,.25); }
-.c-fact   .bd-icon-box { background: rgba(194,65,12,.25); }
-
-.bd-cat {
-  font-size: 0.63rem;
-  text-transform: uppercase;
-  letter-spacing: .1em;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-.c-santo  .bd-cat { color: #a78bfa; }
-.c-storia .bd-cat { color: #f87171; }
-.c-fact   .bd-cat { color: #fb923c; }
-
-.bd-title {
-  font-size: 1.0rem;
-  font-weight: 700;
-  color: #f1f5f9;
-  line-height: 1.3;
-  margin-bottom: 10px;
-}
-.bd-divider {
-  border: none;
-  border-top: 1px solid rgba(255,255,255,0.07);
-  margin: 0 0 10px 0;
-}
-.bd-text {
-  font-size: 0.82rem;
-  color: #94a3b8;
-  line-height: 1.65;
-}
-.bd-pill {
-  display: inline-block;
-  font-size: 0.68rem;
-  font-weight: 600;
-  padding: 2px 9px;
-  border-radius: 20px;
-  margin-bottom: 9px;
-}
-.bd-pill-near  { background: rgba(99,102,241,.18); color: #a5b4fc; }
-.bd-pill-ai    { background: rgba(34,197,94,.15);  color: #86efac; }
-.bd-pill-multi { background: rgba(251,191,36,.12); color: #fcd34d; margin-top:8px; }
-.bd-year {
-  font-size: 1.7rem;
-  font-weight: 800;
-  color: #f1f5f9;
-  letter-spacing: -1px;
-  line-height: 1;
-  margin-bottom: 10px;
-}
-</style>
-"""
-
-
-def _card(css_class: str, icon: str, category: str,
-          title: str, text: str,
-          year: str = "", pill_html: str = "", multi_html: str = "") -> str:
-    """
-    Costruisce una singola card dark-dashboard.
-    year       — se presente, sostituisce il titolo grande con un anno stile numero
-    pill_html  — badge opzionale sopra il testo (near-date, AI, ecc.)
-    multi_html — nota opzionale in fondo
-    """
-    title_block = (
-        f"<div class='bd-year'>{year}</div>"
-        f"<div class='bd-title' style='font-size:0.88rem;margin-bottom:8px'>{title}</div>"
-        if year else
-        f"<div class='bd-title'>{title}</div>"
-    )
-    return f"""
-<div class="bd-card {css_class}">
-  <div class="bd-top">
-    <div>
-      <div class="bd-cat">{category}</div>
-      {title_block}
-    </div>
-    <div class="bd-icon-box">{icon}</div>
-  </div>
-  <hr class="bd-divider">
-  {pill_html}
-  <div class="bd-text">{text}</div>
-  {multi_html}
-</div>"""
-
+# RENDER PRINCIPALE — expander nativi Streamlit, contenuto completo
+# ─────────────────────────────────────────────────────────────────────────────
 
 def render_bacheca(today: _date | None = None) -> None:
     """
-    Renderizza la Bacheca del Giorno nella sezione Comunità.
-    Tre card: Santo, Oggi nella storia, Curiosità vulcanologica.
+    Bacheca del Giorno — tre expander nativi Streamlit.
+    Tutto il contenuto è sempre leggibile: nessun testo troncato.
     """
     if today is None:
         today = _date.today()
@@ -526,74 +401,82 @@ def render_bacheca(today: _date | None = None) -> None:
     ]
     data_fmt = f"{today.day} {mesi_it[today.month - 1]} {today.year}"
 
-    st.markdown(_CSS, unsafe_allow_html=True)
     st.markdown(
-        f"<p style='font-size:0.75rem;color:#64748b;text-transform:uppercase;"
-        f"letter-spacing:.08em;font-weight:600;margin:0 0 8px 0'>"
-        f"📅 Bacheca del giorno &mdash; {data_fmt}</p>",
+        f"<p style='font-size:0.78rem;color:#6b7280;font-weight:600;"
+        f"text-transform:uppercase;letter-spacing:.07em;margin:0 0 6px 0'>"
+        f"📅 Bacheca del giorno — {data_fmt}</p>",
         unsafe_allow_html=True,
     )
+
+    col1, col2, col3 = st.columns(3, gap="medium")
 
     # ── 1. Santo del giorno ──────────────────────────────────────────────────
     nome_santo, nota_santo = _get_santo(today)
     has_volcano = bool(nota_santo and ("🌋" in nota_santo or "⚠️" in nota_santo))
-    s_icon  = "🌋" if has_volcano else "✝️"
-    s_text  = nota_santo if nota_santo else "Consultare il Martirologio Romano per approfondire questo giorno liturgico."
-    card_santo = _card(
-        css_class="c-santo",
-        icon=s_icon,
-        category="✝️  Santo del giorno",
-        title=nome_santo,
-        text=s_text,
-    )
+    s_icon = "🌋" if has_volcano else "✝️"
+
+    with col1:
+        with st.expander(f"{s_icon} **{nome_santo}**", expanded=True):
+            st.caption("✝️ SANTO DEL GIORNO")
+            if nota_santo:
+                st.markdown(nota_santo)
+            else:
+                st.markdown(
+                    "_Nessuna nota specifica per questo giorno. "
+                    "Consultare il Martirologio Romano._"
+                )
 
     # ── 2. Oggi nella storia ─────────────────────────────────────────────────
     eventi   = _STORIA.get((today.month, today.day), [])
     is_today = bool(eventi)
+
     if eventi:
-        ev         = eventi[0]
+        ev_main    = eventi[0]
         near_label = ""
     else:
         ev_near = _find_nearest_event(today)
         if ev_near:
-            ev     = ev_near
-            offset = ev_near["_offset"]
-            nd     = ev_near["_near_date"]
-            nd_str = f"{nd.day} {mesi_it[nd.month-1]}"
-            near_label = (f"⬅ {abs(offset)} giorni fa — {nd_str}"
-                         if offset < 0 else f"➡ tra {offset} giorni — {nd_str}")
+            ev_main    = ev_near
+            offset     = ev_near["_offset"]
+            nd         = ev_near["_near_date"]
+            nd_str     = f"{nd.day} {mesi_it[nd.month-1]}"
+            near_label = (
+                f"⬅ {abs(offset)} giorni fa, {nd_str}"
+                if offset < 0 else
+                f"➡ tra {offset} giorni, {nd_str}"
+            )
         else:
-            ev         = None
+            ev_main    = None
             near_label = ""
 
-    if ev:
-        a = ev["anno"]
-        anno_disp = (f"{abs(a)} a.C." if a < 0 else f"{a} d.C." if a < 1000 else str(a))
-        icona_ev  = ev.get("icona", "🕰️")
-        testo_ev  = ev["testo"]
-        pill_h    = (f"<div class='bd-pill bd-pill-near'>{near_label}</div><br>"
-                     if near_label else "")
-        multi_h   = (f"<div class='bd-pill bd-pill-multi'>+{len(eventi)-1} eventi in questa data</div>"
-                     if len(eventi) > 1 else "")
-        cat_label = "🕰️  Oggi nella storia" if is_today else "🕰️  Anniversario vicino"
-        card_storia = _card(
-            css_class="c-storia",
-            icon=icona_ev,
-            category=cat_label,
-            title=testo_ev[:180] + ("…" if len(testo_ev) > 180 else ""),
-            text="",
-            year=anno_disp,
-            pill_html=pill_h,
-            multi_html=multi_h,
-        )
-    else:
-        card_storia = _card(
-            css_class="c-storia",
-            icon="🕰️",
-            category="🕰️  Oggi nella storia",
-            title="Archivio",
-            text="Nessun evento sismico o vulcanico campano registrato in quest'area del calendario.",
-        )
+    with col2:
+        if ev_main:
+            a = ev_main["anno"]
+            anno_disp = (f"{abs(a)} a.C." if a < 0
+                         else f"{a} d.C." if a < 1000
+                         else str(a))
+            icona_ev = ev_main.get("icona", "🕰️")
+            cat_label = "🕰️ OGGI NELLA STORIA" if is_today else "🕰️ ANNIVERSARIO VICINO"
+            with st.expander(f"{icona_ev} **{anno_disp}**", expanded=True):
+                st.caption(cat_label)
+                if near_label:
+                    st.caption(f"📌 {near_label}")
+                st.markdown(ev_main["testo"])
+                # eventuali eventi aggiuntivi nello stesso giorno
+                for ev_extra in eventi[1:]:
+                    st.divider()
+                    a2 = ev_extra["anno"]
+                    anno2 = (f"{abs(a2)} a.C." if a2 < 0
+                             else f"{a2} d.C." if a2 < 1000
+                             else str(a2))
+                    st.markdown(f"**{ev_extra.get('icona','🕰️')} {anno2}** — {ev_extra['testo']}")
+        else:
+            with st.expander("🕰️ **Oggi nella storia**", expanded=True):
+                st.caption("🕰️ ARCHIVIO SISMICO CAMPANO")
+                st.markdown(
+                    "_Nessun evento sismico o vulcanico campano di rilievo "
+                    "trovato nell'arco dei prossimi 90 giorni._"
+                )
 
     # ── 3. Curiosità vulcanologica ───────────────────────────────────────────
     date_key      = today.strftime("%Y%m%d")
@@ -603,23 +486,16 @@ def render_bacheca(today: _date | None = None) -> None:
     ai_result = _get_curiosita_ai(date_key)
     if ai_result:
         titolo_c, testo_c = ai_result
-        pill_ai = "<div class='bd-pill bd-pill-ai'>✨ generata dall'AI</div><br>"
+        ai_note = "✨ _Curiosità generata oggi dall'AI_"
     else:
         titolo_c, testo_c = titolo_fb, testo_fb
-        pill_ai = ""
+        ai_note = ""
 
-    card_fact = _card(
-        css_class="c-fact",
-        icon="🌋",
-        category="🌋  Curiosità vulcanologica",
-        title=titolo_c,
-        text=testo_c[:340] + ("…" if len(testo_c) > 340 else ""),
-        pill_html=pill_ai,
-    )
+    with col3:
+        with st.expander(f"🌋 **{titolo_c}**", expanded=True):
+            st.caption("🌋 CURIOSITÀ VULCANOLOGICA")
+            if ai_note:
+                st.caption(ai_note)
+            st.markdown(testo_c)
 
-    # ── Render le 3 card in un unico blocco HTML ─────────────────────────────
-    st.markdown(
-        f"<div class='bd-wrap'>{card_santo}{card_storia}{card_fact}</div>",
-        unsafe_allow_html=True,
-    )
     st.markdown("<div style='margin-bottom:4px'></div>", unsafe_allow_html=True)
