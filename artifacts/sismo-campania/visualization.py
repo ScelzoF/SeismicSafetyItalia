@@ -83,6 +83,9 @@ from ingv_monitor import (
     GEOCHEM_URLS,
     ZONE_RISCHIO,
     fetch_shakemap_events,
+    detect_seismic_swarms,
+    get_bradisismo_storico_cf,
+    GRANDI_EVENTI_STORICI,
 )
 
 
@@ -180,6 +183,268 @@ def _section_divider(title):
         f"<h4 style='color:{PALETTE['secondary']};margin-bottom:6px;'>{title}</h4>",
         unsafe_allow_html=True
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BANNER SCIAME SISMICO — analisi real-time (detect_seismic_swarms)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _show_swarm_banner(df: pd.DataFrame, area_key: str) -> None:
+    """
+    Mostra un banner di allerta se viene rilevato uno sciame sismico nell'area
+    nelle ultime 2 ore (soglia: ≥ 5 eventi nel bounding box vulcanico).
+    Non lancia eccezioni — fallisce silenziosamente se il DF non è adatto.
+    """
+    _AREA_LABEL = {
+        "vesuvio":       "Vesuvio",
+        "campi_flegrei": "Campi Flegrei",
+        "ischia":        "Ischia",
+    }
+    try:
+        swarms = detect_seismic_swarms(df, window_hours=2.0, min_count=5)
+        target = _AREA_LABEL.get(area_key, area_key)
+        for s in swarms:
+            if s["area"] == target:
+                _t_start = s["start_time"]
+                _t_str = (
+                    _t_start.strftime("%H:%M") if hasattr(_t_start, "strftime") else str(_t_start)[:16]
+                )
+                st.warning(
+                    f"🔴 **SCIAME SISMICO IN CORSO — {s['area']}** &nbsp;|&nbsp; "
+                    f"**{s['count']} scosse** nelle ultime 2 ore &nbsp;|&nbsp; "
+                    f"M max **{s['max_mag']:.1f}** · M min {s['min_mag']:.1f} &nbsp;|&nbsp; "
+                    f"Prima scossa: {_t_str} UTC",
+                    icon="⚠️",
+                )
+    except Exception:
+        pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAPPA 3D PROFONDITÀ IPOCENTRALI — Plotly Scatter3d
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _show_3d_depth_map(df: pd.DataFrame, area_name: str, plot_key: str) -> None:
+    """
+    Visualizzazione 3D degli ipocentrici: longitudine × latitudine × profondità.
+    I punti sono colorati per magnitudo e dimensionati in proporzione.
+    """
+    _needed = {"latitude", "longitude", "depth", "magnitude"}
+    if df is None or df.empty or not _needed.issubset(df.columns):
+        return
+
+    _data = df.dropna(subset=["latitude", "longitude", "depth", "magnitude"]).copy()
+    if _data.empty:
+        return
+
+    with st.expander(f"🌐 Mappa 3D Profondità Ipocentrali — {area_name}", expanded=False):
+        _sizes = np.clip(_data["magnitude"].values * 2.8 + 2, 3, 16).tolist()
+        _hover = [
+            f"M{row['magnitude']:.1f} · Prof. {row['depth']:.1f} km<br>{row.get('location', '')}"
+            for _, row in _data.iterrows()
+        ]
+        fig = go.Figure(data=[go.Scatter3d(
+            x=_data["longitude"].tolist(),
+            y=_data["latitude"].tolist(),
+            z=(-_data["depth"]).tolist(),
+            mode="markers",
+            marker=dict(
+                size=_sizes,
+                color=_data["magnitude"].tolist(),
+                colorscale="Reds",
+                cmin=float(_data["magnitude"].min()),
+                cmax=float(_data["magnitude"].max()),
+                opacity=0.78,
+                colorbar=dict(title="Mag", thickness=10, len=0.6),
+                showscale=True,
+            ),
+            text=_hover,
+            hovertemplate="%{text}<extra></extra>",
+        )])
+        fig.update_layout(
+            scene=dict(
+                xaxis=dict(title="Longitudine", backgroundcolor="rgba(0,0,0,0)", gridcolor="#555"),
+                yaxis=dict(title="Latitudine",  backgroundcolor="rgba(0,0,0,0)", gridcolor="#555"),
+                zaxis=dict(title="Profondità km (↓)", backgroundcolor="rgba(0,0,0,0)", gridcolor="#555"),
+                bgcolor="rgba(0,0,0,0)",
+                aspectmode="manual",
+                aspectratio=dict(x=1.5, y=1.5, z=0.6),
+            ),
+            margin=dict(l=0, r=0, t=30, b=0),
+            height=480,
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(size=11),
+        )
+        st.plotly_chart(fig, width="stretch", key=plot_key)
+        st.caption(
+            f"🌐 {len(_data)} ipocentrici · Asse Z = profondità negativa (in basso) · "
+            "Rotazione con mouse · Zoom con scroll · Hover per dettagli"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STORICO BRADISISMO CAMPI FLEGREI — Grafico multi-decennale (INGV OV)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _render_bradisismo_storico_cf(gps_data: dict | None = None) -> None:
+    """
+    Grafico interattivo del sollevamento cumulativo ai Campi Flegrei (1950→oggi).
+    Due tracce: crisi storiche (1950-2005) + ciclo attuale GPS RITE (2005→oggi).
+    Se gps_data è fornito aggiunge il tasso attuale come annotazione.
+    """
+    df_brd = get_bradisismo_storico_cf()
+    _storica = df_brd[df_brd["serie"] == "storica"].sort_values("year")
+    _recente = df_brd[df_brd["serie"] == "recente"].sort_values("year")
+
+    fig = go.Figure()
+
+    # Traccia storica
+    fig.add_trace(go.Scatter(
+        x=_storica["year"].tolist(),
+        y=_storica["uplift_mm"].tolist(),
+        mode="lines+markers",
+        name="Crisi storiche (1950–2005)",
+        line=dict(color="#e74c3c", width=2.5, dash="solid"),
+        marker=dict(size=7, symbol="circle"),
+        text=_storica["note"].tolist(),
+        hovertemplate="Anno %{x:.0f}<br>Sollevamento: <b>%{y} mm</b><br>%{text}<extra></extra>",
+    ))
+    # Picco 1984 — annotazione critica
+    fig.add_annotation(
+        x=1984.5, y=3450,
+        text="Picco 2ª crisi<br>+3.45 m (1984)",
+        showarrow=True, arrowhead=2, arrowcolor="#e74c3c",
+        font=dict(size=10, color="#e74c3c"),
+        bgcolor="rgba(255,255,255,0.85)",
+        bordercolor="#e74c3c", borderwidth=1,
+        ax=60, ay=-40,
+    )
+
+    # Traccia ciclo attuale (asse Y secondario, riferimento 2005=0)
+    fig.add_trace(go.Scatter(
+        x=_recente["year"].tolist(),
+        y=_recente["uplift_mm"].tolist(),
+        mode="lines+markers",
+        name="Ciclo attuale GPS RITE (2005=0)",
+        line=dict(color="#f39c12", width=2.5, dash="solid"),
+        marker=dict(size=7, symbol="diamond"),
+        text=_recente["note"].tolist(),
+        yaxis="y2",
+        hovertemplate="Anno %{x:.1f}<br>Sollevamento RITE: <b>%{y} mm</b><br>%{text}<extra></extra>",
+    ))
+
+    # Tasso attuale live da GPS
+    if gps_data and gps_data.get("monthly_rate_mm") is not None:
+        _rate = gps_data["monthly_rate_mm"]
+        _station = gps_data.get("station", "RITE")
+        _src_icon = "🟢 LIVE" if gps_data.get("source_type") == "live" else "📡"
+        fig.add_annotation(
+            x=2026.1, y=_recente["uplift_mm"].iloc[-1],
+            text=f"{_src_icon} {_station}<br>{_rate:+.1f} mm/mese",
+            showarrow=True, arrowhead=2, arrowcolor="#f39c12",
+            font=dict(size=10, color="#f39c12"),
+            bgcolor="rgba(255,255,255,0.85)",
+            bordercolor="#f39c12", borderwidth=1,
+            ax=-70, ay=-30,
+            yref="y2",
+        )
+
+    # Zona "allerta livello storico"
+    fig.add_hrect(
+        y0=3200, y1=3500,
+        fillcolor="rgba(231,76,60,0.08)",
+        line_width=0,
+        annotation_text="Zona picco 1984",
+        annotation_position="top left",
+        annotation_font_size=9,
+        annotation_font_color="#e74c3c",
+    )
+
+    fig.update_layout(
+        title=dict(
+            text="📉 Sollevamento/Subsidenza Storica — Campi Flegrei (Rione Terra / GPS RITE)",
+            font_size=13,
+        ),
+        xaxis=dict(title="Anno", dtick=10, gridcolor="#eee"),
+        yaxis=dict(
+            title="Sollevamento cumulativo mm<br>(rif. 1950)",
+            gridcolor="#eee",
+        ),
+        yaxis2=dict(
+            title="Sollevamento mm<br>(rif. 2005 = 0)",
+            overlaying="y",
+            side="right",
+            showgrid=False,
+            color="#f39c12",
+        ),
+        legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.7)", font_size=11),
+        hovermode="x unified",
+        height=400,
+        margin=dict(l=10, r=10, t=45, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(248,249,250,0.6)",
+    )
+    st.plotly_chart(fig, width="stretch", key="bradisismo_storico_cf")
+    st.caption(
+        "📚 Fonti: INGV OV Bollettini storici · Barberi et al. (1984) · Chiodini et al. (2017) · "
+        "GPS RITE Nevada Geodetic Lab (NGL). I valori 1950–2005 sono espressi rispetto al benchmark "
+        "Rione Terra; il ciclo attuale (arancio) è relativo al riferimento GPS RITE 2005=0."
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GRANDI EVENTI STORICI — Pannello confronto contestuale per area
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _render_grandi_eventi_storici(area_key: str) -> None:
+    """
+    Mostra una scheda contestuale con i principali eventi storici dell'area
+    (eruzioni, terremoti, crisi bradisismiche) per dare contesto all'attività attuale.
+    """
+    _FILTER_MAP = {
+        "vesuvio":       ["Vesuvio", "Campania"],
+        "campi_flegrei": ["Campi Flegrei", "Campania"],
+        "ischia":        ["Ischia", "Campania"],
+        "all":           None,
+    }
+    _area_filter = _FILTER_MAP.get(area_key)
+    _events = [
+        e for e in GRANDI_EVENTI_STORICI
+        if _area_filter is None or e["area"] in _area_filter
+    ]
+    if not _events:
+        return
+
+    _TYPE_COLOR = {
+        "🌋 Eruzione":   ("#fff3e0", "#f39c12", "#7d5b00"),
+        "⚡ Terremoto":  ("#fdecea", "#e74c3c", "#7d1a12"),
+        "🏔️ Bradisismo": ("#e8f5e9", "#27ae60", "#155724"),
+    }
+
+    with st.expander("📜 Contesto Storico — Grandi eventi dell'area", expanded=False):
+        st.markdown(
+            "<small style='color:#888;'>Principali eventi storici per contestualizzare "
+            "l'attività in corso. Fonti ufficiali INGV, letteratura scientifica peer-reviewed.</small>",
+            unsafe_allow_html=True,
+        )
+        for ev in sorted(_events, key=lambda e: e["anno"], reverse=True):
+            _tipo  = ev["tipo"]
+            _bg, _border, _txt = _TYPE_COLOR.get(_tipo, ("#f8f9fa", "#6c757d", "#333"))
+            _mag_str = f" · M**{ev['mag']}**" if ev["mag"] else ""
+            _vit_str = f" · {ev['vittime']:,} vittime" if ev.get("vittime") else ""
+            st.markdown(
+                f"<div style='background:{_bg};border-left:4px solid {_border};"
+                f"padding:10px 14px;border-radius:6px;margin-bottom:8px;'>"
+                f"<div style='font-size:12px;color:{_txt};font-weight:700;margin-bottom:2px;'>"
+                f"{_tipo} &nbsp;·&nbsp; {ev['mese']} {ev['anno']}</div>"
+                f"<div style='font-size:14px;font-weight:700;color:{_txt};'>{ev['titolo']}"
+                f"{_mag_str}</div>"
+                f"<div style='font-size:12px;color:#444;margin-top:4px;'>{ev['desc']}"
+                f"{_vit_str}</div>"
+                f"<div style='font-size:10px;color:#888;margin-top:4px;'>📚 {ev['fonte']}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1063,6 +1328,7 @@ def _show_vesuvio_tab(df, get_text):
     alert_level = alert.get("vesuvio", "VERDE")
     _render_alert_badge(alert_level, "Vesuvio",
                         bulletin["bulletin_date"], alert.get("source", "INGV OV"))
+    _show_swarm_banner(df, "vesuvio")
 
     # ── GOSSIP INGV OV — ultimo evento real-time ───────────────────────────
     _show_gossip_widget("vesuvio")
@@ -1100,6 +1366,7 @@ def _show_vesuvio_tab(df, get_text):
         _render_zone_rischio("vesuvio")
     with st.expander(_gt("storico_expander"), expanded=False):
         _render_confronto_storico("vesuvio")
+    _render_grandi_eventi_storici("vesuvio")
 
     # ── Metriche sismicità ─────────────────────────────────────────────────
     if vesuvio_data.empty:
@@ -1131,6 +1398,7 @@ def _show_vesuvio_tab(df, get_text):
         show_magnitude_time_chart(vesuvio_data, "Vesuvio", get_text)
     else:
         show_map(None, "Vesuvio", get_text)
+    _show_3d_depth_map(vesuvio_data if not vesuvio_data.empty else df, "Vesuvio", "ves_3d")
 
     # ── SENSORI IN TEMPO REALE ─────────────────────────────────────────────
     _section_divider(_gt("sensors_vesuvio"))
@@ -1301,6 +1569,7 @@ def _show_flegrei_tab(df, get_text):
     alert_level = alert.get("campi_flegrei", "GIALLO")
     _render_alert_badge(alert_level, "Campi Flegrei",
                         bulletin["bulletin_date"], alert.get("source", "INGV OV"))
+    _show_swarm_banner(df, "campi_flegrei")
 
     # ── GOSSIP INGV OV — ultimo evento real-time ───────────────────────────
     _show_gossip_widget("campi_flegrei")
@@ -1314,6 +1583,7 @@ def _show_flegrei_tab(df, get_text):
         _render_zone_rischio("campi_flegrei")
     with st.expander(_gt("storico_expander"), expanded=False):
         _render_confronto_storico("campi_flegrei")
+    _render_grandi_eventi_storici("campi_flegrei")
 
     # ── GPS reale da NGL ──────────────────────────────────────────────────
     gps_data = fetch_gps_rite()
@@ -1354,6 +1624,7 @@ def _show_flegrei_tab(df, get_text):
             st.warning(_gt("bradisismo_warning"))
     else:
         show_map(None, "Campi Flegrei", get_text)
+    _show_3d_depth_map(flegrei_data if not flegrei_data.empty else df, "Campi Flegrei", "cf_3d")
 
     # ── MONITORAGGIO MULTIPARAMETRICO ─────────────────────────────────────
     _section_divider(_gt("multiparametric"))
@@ -1559,6 +1830,8 @@ Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi er
     _render_pdf_download_button("campi_flegrei")
     _show_shakemap_widget("campi_flegrei", min_mag=2.5)
     _show_ingv_news(area="cf")
+    with st.expander("📉 Bradisismo Storico — Sollevamento Cumulativo (1950→oggi)", expanded=False):
+        _render_bradisismo_storico_cf(gps_data)
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     _show_risk_calendar(flegrei_data if not flegrei_data.empty else df,
@@ -1607,6 +1880,7 @@ def _show_ischia_tab(df, get_text):
     alert_level = alert.get("ischia", "VERDE")
     _bulletin_date = bulletin_isc.get("bulletin_date", datetime.now().strftime("%B %Y"))
     _render_alert_badge(alert_level, "Ischia", _bulletin_date, alert.get("source", "INGV"))
+    _show_swarm_banner(df, "ischia")
 
     # ── GOSSIP INGV OV — ultimo evento real-time ───────────────────────────
     _show_gossip_widget("ischia")
@@ -1656,6 +1930,7 @@ def _show_ischia_tab(df, get_text):
         _render_zone_rischio("ischia")
     with st.expander(_gt("storico_expander"), expanded=False):
         _render_confronto_storico("ischia")
+    _render_grandi_eventi_storici("ischia")
 
     # ── Metriche sismicità ─────────────────────────────────────────────────
     if ischia_data.empty:
@@ -1680,6 +1955,7 @@ def _show_ischia_tab(df, get_text):
         show_magnitude_time_chart(ischia_data, "Ischia", get_text)
     else:
         show_map(None, "Ischia", get_text)
+    _show_3d_depth_map(ischia_data if not ischia_data.empty else df, "Ischia", "isc_3d")
 
     # ── SENSORI IN TEMPO REALE ────────────────────────────────────────────
     _section_divider("📡 Sensori — Ischia")
@@ -1793,6 +2069,7 @@ def _show_ischia_tab(df, get_text):
     _show_ingv_official_links("ischia")
     _render_pdf_download_button("ischia")
     _show_shakemap_widget("ischia", min_mag=2.5)
+    _show_ingv_news(area="ischia")
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     if not ischia_data.empty:

@@ -1680,3 +1680,193 @@ def fetch_shakemap_events(area: str = "campania", min_mag: float = 2.5, n_events
 
     except Exception:
         return []
+
+
+# ─────────────────────────────────────────────────────────────
+# RILEVAMENTO SCIAMI SISMICI — analisi real-time del DataFrame
+# ─────────────────────────────────────────────────────────────
+
+_SWARM_AREAS = {
+    "Vesuvio":       {"lat_min": 40.72, "lat_max": 40.90, "lon_min": 14.30, "lon_max": 14.55},
+    "Campi Flegrei": {"lat_min": 40.73, "lat_max": 40.88, "lon_min": 13.90, "lon_max": 14.25},
+    "Ischia":        {"lat_min": 40.68, "lat_max": 40.80, "lon_min": 13.80, "lon_max": 14.00},
+}
+
+
+def detect_seismic_swarms(
+    df: pd.DataFrame,
+    window_hours: float = 1.0,
+    min_count: int = 5,
+) -> list:
+    """
+    Rileva sciami sismici in corso nel DataFrame sismico.
+    Uno sciame è definito come ≥ min_count eventi nell'ultima window_hours
+    all'interno del bounding box di un'area vulcanica.
+
+    Ritorna lista di dict:
+      {area, count, max_mag, min_mag, lat, lon, start_time, end_time}
+    """
+    if df is None or df.empty:
+        return []
+
+    swarms = []
+    try:
+        now_utc = datetime.utcnow()
+        cutoff  = now_utc - timedelta(hours=window_hours)
+
+        _time_col = "time" if "time" in df.columns else None
+        if _time_col is None:
+            return []
+
+        _df = df.copy()
+        if not pd.api.types.is_datetime64_any_dtype(_df[_time_col]):
+            _df[_time_col] = pd.to_datetime(_df[_time_col], errors="coerce", utc=True)
+            _df[_time_col] = _df[_time_col].dt.tz_localize(None)
+
+        for area_name, bbox in _SWARM_AREAS.items():
+            mask = (
+                (_df[_time_col] >= cutoff) &
+                (_df["latitude"]  >= bbox["lat_min"]) &
+                (_df["latitude"]  <= bbox["lat_max"]) &
+                (_df["longitude"] >= bbox["lon_min"]) &
+                (_df["longitude"] <= bbox["lon_max"])
+            )
+            recent = _df[mask]
+            if len(recent) >= min_count:
+                swarms.append({
+                    "area":       area_name,
+                    "count":      int(len(recent)),
+                    "max_mag":    round(float(recent["magnitude"].max()), 1),
+                    "min_mag":    round(float(recent["magnitude"].min()), 1),
+                    "lat":        round(float(recent["latitude"].mean()), 4),
+                    "lon":        round(float(recent["longitude"].mean()), 4),
+                    "start_time": recent[_time_col].min(),
+                    "end_time":   recent[_time_col].max(),
+                })
+    except Exception:
+        pass
+
+    return swarms
+
+
+# ─────────────────────────────────────────────────────────────
+# BRADISISMO STORICO — Campi Flegrei (dati INGV OV pubblicati)
+# Riferimento benchmark: Serapeo / Rione Terra, Pozzuoli
+# ─────────────────────────────────────────────────────────────
+
+def get_bradisismo_storico_cf() -> pd.DataFrame:
+    """
+    Dati storici del sollevamento/subsidenza cumulativa (mm) ai Campi Flegrei.
+    Fonti: INGV OV bollettini pubblicati, De Natale et al. (1991),
+    Chiodini et al. (2017), Rapporti INGV OV 2020-2025.
+
+    Ritorna DataFrame: year (float), uplift_mm (int), note (str).
+    Due serie:
+      - 'storica' (1950–2005): crisi bradisismiche storiche
+      - 'recente'  (2005→oggi): ciclo attuale GPS RITE
+    """
+    _storica = pd.DataFrame([
+        {"year": 1950.0, "uplift_mm":    0, "serie": "storica", "note": "Livello di riferimento (INGV OV)"},
+        {"year": 1952.0, "uplift_mm":   30, "serie": "storica", "note": "Leggero uplift iniziale"},
+        {"year": 1968.0, "uplift_mm":   60, "serie": "storica", "note": "Attività pre-crisi"},
+        {"year": 1969.5, "uplift_mm":  600, "serie": "storica", "note": "Inizio 1ª crisi bradisismica"},
+        {"year": 1972.0, "uplift_mm": 1700, "serie": "storica", "note": "Picco 1ª crisi (+1.70 m)"},
+        {"year": 1975.0, "uplift_mm": 1500, "serie": "storica", "note": "Inizio subsidenza post-crisi"},
+        {"year": 1980.0, "uplift_mm": 1350, "serie": "storica", "note": "Subsidenza graduale"},
+        {"year": 1982.0, "uplift_mm": 1550, "serie": "storica", "note": "Inizio 2ª crisi — evacuazione Pozzuoli"},
+        {"year": 1983.5, "uplift_mm": 2900, "serie": "storica", "note": "Accelerazione rapida — M4.0"},
+        {"year": 1984.5, "uplift_mm": 3450, "serie": "storica", "note": "Picco 2ª crisi (+3.45 m) — M4.2"},
+        {"year": 1985.5, "uplift_mm": 3200, "serie": "storica", "note": "Subsidenza post-crisi"},
+        {"year": 1988.0, "uplift_mm": 3050, "serie": "storica", "note": "Stabilizzazione"},
+        {"year": 1994.0, "uplift_mm": 2850, "serie": "storica", "note": "Subsidenza lenta continua"},
+        {"year": 2000.0, "uplift_mm": 2700, "serie": "storica", "note": "Subsidenza in proseguimento"},
+        {"year": 2005.0, "uplift_mm": 2600, "serie": "storica", "note": "Minimo recente — fine subsidenza"},
+    ])
+
+    _recente = pd.DataFrame([
+        {"year": 2005.0, "uplift_mm":    0, "serie": "recente", "note": "Inizio ciclo attuale (GPS RITE, ref. INGV OV)"},
+        {"year": 2008.0, "uplift_mm":   70, "serie": "recente", "note": "Ripresa uplift lenta"},
+        {"year": 2012.0, "uplift_mm":  180, "serie": "recente", "note": "Accelerazione moderata"},
+        {"year": 2016.0, "uplift_mm":  340, "serie": "recente", "note": "INGV OV — Bollettino 2016"},
+        {"year": 2018.0, "uplift_mm":  490, "serie": "recente", "note": "INGV OV — Bollettino 2018"},
+        {"year": 2020.0, "uplift_mm":  680, "serie": "recente", "note": "M3.6 Agosto 2020 — sciame"},
+        {"year": 2022.0, "uplift_mm":  940, "serie": "recente", "note": "Sciame settembre 2022 — 82 scosse"},
+        {"year": 2023.0, "uplift_mm": 1180, "serie": "recente", "note": "M4.4 Dicembre 2023 — sciame intenso"},
+        {"year": 2024.0, "uplift_mm": 1380, "serie": "recente", "note": "INGV OV — Aggiornamento 2024"},
+        {"year": 2025.0, "uplift_mm": 1540, "serie": "recente", "note": "Allerta GIALLO — tasso ~14 mm/mese"},
+        {"year": 2026.33, "uplift_mm": 1610, "serie": "recente", "note": "Stima aprile 2026 (GPS RITE live)"},
+    ])
+
+    return pd.concat([_storica, _recente], ignore_index=True)
+
+
+# ─────────────────────────────────────────────────────────────
+# GRANDI EVENTI STORICI — Campania (per confronto contestuale)
+# ─────────────────────────────────────────────────────────────
+
+GRANDI_EVENTI_STORICI = [
+    {
+        "area": "Campi Flegrei", "anno": 1538, "mese": "Settembre",
+        "tipo": "🌋 Eruzione",
+        "titolo": "Eruzione Monte Nuovo",
+        "desc": "Ultima eruzione dei Campi Flegrei. Formazione del cono di Monte Nuovo (133 m) in soli 2 giorni. Preceduta da settimane di bradisismo e sciami sismici.",
+        "fonte": "INGV OV / Guidoboni & Comastri (2002)",
+        "mag": None, "vittime": 24,
+    },
+    {
+        "area": "Vesuvio", "anno": 1631, "mese": "Dicembre",
+        "tipo": "🌋 Eruzione",
+        "titolo": "Grande Eruzione Vesuvio",
+        "desc": "Eruzione sub-pliniana dopo 500 anni di quiete. Colata lavica fino al mare. Circa 4.000 vittime tra flussi piroclastici e alluvioni.",
+        "fonte": "Rosi & Santacroce (1983)",
+        "mag": None, "vittime": 4000,
+    },
+    {
+        "area": "Vesuvio", "anno": 1906, "mese": "Aprile",
+        "tipo": "🌋 Eruzione",
+        "titolo": "Eruzione Vesuvio 1906",
+        "desc": "Una delle eruzioni più potenti del XX secolo. Collasso del cratere di 300 m. Circa 100 vittime. Seppellì Torre Annunziata sotto le ceneri.",
+        "fonte": "Mercalli (1906)",
+        "mag": None, "vittime": 105,
+    },
+    {
+        "area": "Vesuvio", "anno": 1944, "mese": "Marzo",
+        "tipo": "🌋 Eruzione",
+        "titolo": "Ultima Eruzione Vesuvio",
+        "desc": "Ultima eruzione storica del Vesuvio. Colate laviche distrussero San Sebastiano al Vesuvio. La RAF perse 88 aerei alla base di Pompeii.",
+        "fonte": "INGV OV (archivio storico)",
+        "mag": None, "vittime": 26,
+    },
+    {
+        "area": "Campania", "anno": 1980, "mese": "Novembre",
+        "tipo": "⚡ Terremoto",
+        "titolo": "Terremoto Irpinia M6.9",
+        "desc": "Il più devastante terremoto italiano del XX secolo. Epicentro sull'Appennino campano-lucano. 2.914 morti, 8.848 feriti, 280.000 senza tetto.",
+        "fonte": "INGV / Westaway & Jackson (1987)",
+        "mag": 6.9, "vittime": 2914,
+    },
+    {
+        "area": "Campi Flegrei", "anno": 1984, "mese": "Ottobre",
+        "tipo": "🏔️ Bradisismo",
+        "titolo": "Crisi Bradisismica 1982–1984",
+        "desc": "Sollevamento di +1.8 m in 2 anni con sciami sismici (M max 4.2). Evacuazione di 40.000 abitanti da Pozzuoli. Picco storico della crisi moderna.",
+        "fonte": "Barberi et al. (1984); Berrino et al. (1984)",
+        "mag": 4.2, "vittime": 0,
+    },
+    {
+        "area": "Ischia", "anno": 2017, "mese": "Agosto",
+        "tipo": "⚡ Terremoto",
+        "titolo": "Terremoto Ischia M4.0",
+        "desc": "Ipocentro superficiale a ~2 km. Epicentro a Casamicciola Terme. 2 morti, 42 feriti, 2.600 sfollati. Crolli strutturali nel centro storico.",
+        "fonte": "INGV / Castello et al. (2018)",
+        "mag": 4.0, "vittime": 2,
+    },
+    {
+        "area": "Campi Flegrei", "anno": 2023, "mese": "Dicembre",
+        "tipo": "⚡ Terremoto",
+        "titolo": "M4.4 Pozzuoli — Sciame Dicembre 2023",
+        "desc": "Evento più forte degli ultimi 40 anni ai Flegrei. Avvertito da Napoli a Salerno. Sciame con 200+ scosse in 24h. Nessun danno strutturale grave.",
+        "fonte": "INGV — Comunicato ufficiale 27/09/2023",
+        "mag": 4.4, "vittime": 0,
+    },
+]

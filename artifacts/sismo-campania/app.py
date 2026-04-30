@@ -1207,12 +1207,55 @@ elif page == "about":
     👥 **Visite totali:** {_visit_count:,} &nbsp;|&nbsp; © {datetime.now().year} Monitoraggio Sismico Campania
     """)
 
-# Check for significant earthquakes and show alert if notifications are enabled
+# ── NOTIFICHE SMART — solo nuovi eventi, no spam ──────────────────────────
+if 'notified_event_ids'   not in st.session_state:
+    st.session_state.notified_event_ids   = set()
+if 'prev_alert_levels'    not in st.session_state:
+    st.session_state.prev_alert_levels    = {}
+if 'swarm_notified_areas' not in st.session_state:
+    st.session_state.swarm_notified_areas = set()
+
 if st.session_state.notification_enabled and st.session_state.earthquake_data is not None:
-    significant_eq = data_service.get_significant_earthquakes(st.session_state.earthquake_data)
+    _eq_data = st.session_state.earthquake_data
+
+    # 1. Nuovi terremoti significativi (M≥4.0 in Campania, M≥5.0 altrove)
+    significant_eq = data_service.get_significant_earthquakes(_eq_data)
     if not significant_eq.empty:
         for _, eq in significant_eq.iterrows():
-            st.toast(f"⚠️ {get_text('magnitude')}: {eq['magnitude']} - {eq['location']}")
+            _eid = str(eq.get("id", f"{eq.get('magnitude',0):.1f}_{eq.get('location','')}_{str(eq.get('time',''))[:13]}"))
+            if _eid not in st.session_state.notified_event_ids:
+                st.toast(
+                    f"🔴 Nuovo evento M**{eq.get('magnitude',0):.1f}** — {eq.get('location', 'area sconosciuta')}",
+                    icon="🌋",
+                )
+                st.session_state.notified_event_ids.add(_eid)
+
+    # 2. Variazione livello allerta INGV
+    _cur_alert = st.session_state.alert_level_cache or {}
+    _area_labels = {"vesuvio": "Vesuvio", "campi_flegrei": "Campi Flegrei", "ischia": "Ischia"}
+    for _ak, _al in _cur_alert.items():
+        if isinstance(_al, str) and _ak in _area_labels:
+            _prev = st.session_state.prev_alert_levels.get(_ak)
+            if _prev and _prev != _al:
+                st.toast(
+                    f"🚨 Allerta **{_area_labels[_ak]}** cambiata: {_prev} → **{_al}**",
+                    icon="🚨",
+                )
+            st.session_state.prev_alert_levels[_ak] = _al
+
+    # 3. Sciame sismico in corso
+    try:
+        _swarms = ingv_monitor.detect_seismic_swarms(_eq_data, window_hours=1.0, min_count=5)
+        for _sw in _swarms:
+            _sw_key = f"{_sw['area']}_{str(_sw.get('start_time',''))[:13]}"
+            if _sw_key not in st.session_state.swarm_notified_areas:
+                st.toast(
+                    f"⚠️ Sciame sismico **{_sw['area']}** — {_sw['count']} scosse/1h · M max {_sw['max_mag']:.1f}",
+                    icon="⚠️",
+                )
+                st.session_state.swarm_notified_areas.add(_sw_key)
+    except Exception:
+        pass
 
 # === AUTO-REFRESH DATI ===
 # Forza il refresh dei dati sismici ogni 15 minuti anche senza interazione
