@@ -568,6 +568,26 @@ def _render_ai_panel(anomaly, pattern, bvalue, gps_corr):
         _ai_card(icon, "Correlazione GPS + Sismicità", hl, body, color)
 
 
+# ── Banner promozionale SismaVer2 ─────────────────────────────────────────
+st.markdown(
+    "<div style='background:linear-gradient(135deg,#1a237e 0%,#0d47a1 100%);"
+    "color:white;padding:11px 18px;border-radius:10px;margin-bottom:14px;"
+    "display:flex;align-items:center;justify-content:space-between;gap:12px;'>"
+    "<div style='flex:1;'>"
+    "<div style='font-size:0.78rem;opacity:0.85;margin-bottom:2px;'>"
+    "🇮🇹 Monitori anche il resto d'Italia?</div>"
+    "<div style='font-weight:700;font-size:0.93rem;'>"
+    "SismaVer2 — Sistema Nazionale di Monitoraggio Rischi</div>"
+    "</div>"
+    "<a href='https://sos-italia.streamlit.app' target='_blank' "
+    "style='background:#FF6B00;color:white;padding:8px 16px;border-radius:8px;"
+    "font-weight:700;text-decoration:none;font-size:0.83rem;white-space:nowrap;"
+    "box-shadow:0 2px 6px rgba(255,107,0,0.4);flex-shrink:0;'>"
+    "🔗 Visita ora →</a>"
+    "</div>",
+    unsafe_allow_html=True
+)
+
 # Display the selected page content
 if page == "monitoring":
     visualization.show_monitoring_page(st.session_state.earthquake_data, get_text)
