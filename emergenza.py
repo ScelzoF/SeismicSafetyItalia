@@ -636,8 +636,8 @@ def show():
                     unsafe_allow_html=True,
                 )
         st.markdown(
-            f"<div style='color:#6c757d;font-size:0.75rem;margin-top:6px;"
-            f"padding-left:2px;clear:both;'>📋 Fonte: {_ALERT_SRC}</div>",
+            f"<div style='color:#6c757d;font-size:0.75rem;margin-top:20px;"
+            f"margin-bottom:4px;padding-left:2px;clear:both;'>📋 Fonte: {_ALERT_SRC}</div>",
             unsafe_allow_html=True
         )
         st.markdown("---")
