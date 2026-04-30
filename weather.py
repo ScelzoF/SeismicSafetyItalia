@@ -440,6 +440,18 @@ def show_meteo():
     """Entry point — sezione meteo completa."""
     st.subheader(_gt("weather_title"))
 
+    # Suggerimento contestuale SismaVer2
+    st.markdown(
+        "<div style='background:#EFF6FF;border-left:4px solid #3B82F6;border-radius:0 8px 8px 0;"
+        "padding:9px 14px;margin-bottom:14px;font-size:0.85rem;'>"
+        "🌦️ <b>Dati meteo per tutta Italia?</b> "
+        "<a href='https://sos-italia.streamlit.app' target='_blank' "
+        "style='color:#1D4ED8;font-weight:700;text-decoration:none;'>"
+        "SismaVer2 →</a> integra meteo nazionale, qualità dell'aria e allerte su ogni regione."
+        "</div>",
+        unsafe_allow_html=True
+    )
+
     # Leggi coordinate GPS dai query params (settati dal JS geolocation)
     params = st.query_params
     geo_lat = params.get("geo_lat")
