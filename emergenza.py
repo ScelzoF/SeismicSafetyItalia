@@ -1157,6 +1157,80 @@ def show():
         4. Salva i numeri di emergenza nel cellulare
         """)
 
+        st.markdown("---")
+
+        # ── Kit Amazon Affiliati ───────────────────────────────────────────────
+        st.subheader("🛒 Acquista il Tuo Kit di Emergenza")
+        st.info(
+            "💡 **Acquistando i prodotti tramite questi link, supporti SismoCampania senza costi "
+            "aggiuntivi per te.** I link sono affiliati Amazon: riceviamo una piccola commissione "
+            "ad ogni acquisto."
+        )
+
+        _kit_amazon = [
+            {"emoji": "🎒", "nome": "Zaino da Emergenza 72h",
+             "desc": "Kit sopravvivenza completo per tutta la famiglia — raccomandato dalla Protezione Civile.",
+             "link": "https://www.amazon.it/s?k=zaino+emergenza+sopravvivenza+protezione+civile&tag=sismoitalia-21",
+             "tag": "Best seller", "tc": "#DBEAFE", "tt": "#1E40AF"},
+            {"emoji": "🔦", "nome": "Torcia LED da Emergenza",
+             "desc": "Torcia ricaricabile con dinamo, pannello solare e radio FM — indispensabile senza corrente.",
+             "link": "https://www.amazon.it/s?k=torcia+led+emergenza+dinamo+solare+radio&tag=sismoitalia-21",
+             "tag": "Essenziale", "tc": "#DCFCE7", "tt": "#166534"},
+            {"emoji": "💊", "nome": "Cassetta Pronto Soccorso",
+             "desc": "Kit medicale professionale conforme al DL 388/2003 per famiglie e aziende.",
+             "link": "https://www.amazon.it/s?k=cassetta+pronto+soccorso+professionale+dlgs&tag=sismoitalia-21",
+             "tag": "Obbligatoria", "tc": "#FEE2E2", "tt": "#991B1B"},
+            {"emoji": "📻", "nome": "Radio di Emergenza",
+             "desc": "Radio AM/FM portatile con pila e dinamo per ricevere allerte in caso di blackout.",
+             "link": "https://www.amazon.it/s?k=radio+emergenza+portatile+dinamo+batteria&tag=sismoitalia-21",
+             "tag": "Consigliata", "tc": "#FEF3C7", "tt": "#92400E"},
+            {"emoji": "💧", "nome": "Filtro Acqua Portatile",
+             "desc": "Sistema filtrazione acqua potabile di emergenza — filtra fino a 1.500 litri.",
+             "link": "https://www.amazon.it/s?k=filtro+acqua+portatile+emergenza+sopravvivenza&tag=sismoitalia-21",
+             "tag": "Vita o morte", "tc": "#EDE9FE", "tt": "#5B21B6"},
+            {"emoji": "🔋", "nome": "Power Bank Solare",
+             "desc": "Caricatore solare ad alta capacità per ricaricare telefoni e dispositivi d'emergenza.",
+             "link": "https://www.amazon.it/s?k=power+bank+solare+alta+capacita+emergenza&tag=sismoitalia-21",
+             "tag": "Top rated", "tc": "#D1FAE5", "tt": "#065F46"},
+            {"emoji": "😷", "nome": "Mascherine FFP2 — Cenere Vulcanica",
+             "desc": "Protezione certificata da cenere vulcanica, polveri fini e gas. Essenziale per Campi Flegrei e Vesuvio.",
+             "link": "https://www.amazon.it/s?k=mascherine+ffp2+protezione+polvere+cenere&tag=sismoitalia-21",
+             "tag": "🌋 Campania", "tc": "#FEF9C3", "tt": "#713F12"},
+            {"emoji": "🌡️", "nome": "Coperta Termica Emergenza",
+             "desc": "Coperta isotermica monouso — protegge dal freddo e dal calore, salvavita in situazioni estreme.",
+             "link": "https://www.amazon.it/s?k=coperta+termica+emergenza+isotermica&tag=sismoitalia-21",
+             "tag": "Essenziale", "tc": "#DCFCE7", "tt": "#166534"},
+            {"emoji": "🎽", "nome": "Zaino Evacuazione Rapida",
+             "desc": "Zaino compatto e resistente per documenti e kit essenziale — pronto in 2 minuti per l'evacuazione.",
+             "link": "https://www.amazon.it/s?k=zaino+evacuazione+emergenza+leggero+documenti&tag=sismoitalia-21",
+             "tag": "🔥 Evacuazione", "tc": "#FEE2E2", "tt": "#991B1B"},
+        ]
+
+        _kit_cols = st.columns(3)
+        for _i, _item in enumerate(_kit_amazon):
+            with _kit_cols[_i % 3]:
+                _card = (
+                    f'<div style="border:1px solid #E2E8F0;border-radius:12px;padding:14px;'
+                    f'margin-bottom:12px;background:white;">'
+                    f'<div style="font-size:1.8rem;margin-bottom:6px;">{_item["emoji"]}</div>'
+                    f'<div style="font-weight:700;color:#1E293B;margin-bottom:4px;">{_item["nome"]}</div>'
+                    f'<span style="background:{_item["tc"]};color:{_item["tt"]};border-radius:10px;'
+                    f'padding:2px 8px;font-size:0.72rem;font-weight:600;">{_item["tag"]}</span>'
+                    f'<div style="font-size:0.83rem;color:#64748B;margin:8px 0;">{_item["desc"]}</div>'
+                    f'<a href="{_item["link"]}" target="_blank" '
+                    f'style="background:#FF9900;color:white;padding:7px 14px;border-radius:8px;'
+                    f'font-weight:700;text-decoration:none;font-size:0.85rem;display:inline-block;">'
+                    f'🛒 Vedi su Amazon</a>'
+                    f'</div>'
+                )
+                st.markdown(_card, unsafe_allow_html=True)
+
+        st.markdown(
+            "<div style='font-size:0.75rem;color:#94A3B8;margin-top:4px;'>"
+            "⚠️ I link Amazon sono affiliati. L'acquisto non ha costi aggiuntivi per te.</div>",
+            unsafe_allow_html=True
+        )
+
     st.markdown("---")
 
     # ══ LINK RAPIDI ═══════════════════════════════════════════════════════════
