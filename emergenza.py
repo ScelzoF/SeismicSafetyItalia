@@ -1143,19 +1143,23 @@ def show():
             """)
 
         st.markdown("---")
-        st.markdown("""
-        **📦 Dove tenere il kit:**
-        - Borsa pronta vicino alla porta d'uscita
-        - Verificare scadenze medicinali ogni 6 mesi
-        - Tenere documenti in busta impermeabile
-        - Caricare il power bank ogni mese
-
-        **🏠 Prepara ora:**
-        1. Identifica le 2 vie di uscita dalla tua abitazione
-        2. Accordati con la famiglia su dove incontrarsi fuori casa
-        3. Conosci il punto di raccolta del tuo Comune
-        4. Salva i numeri di emergenza nel cellulare
-        """)
+        _dk1, _dk2 = st.columns(2)
+        with _dk1:
+            st.markdown("""
+**📦 Dove tenere il kit:**
+- Borsa pronta vicino alla porta d'uscita
+- Verificare scadenze medicinali ogni 6 mesi
+- Tenere documenti in busta impermeabile
+- Caricare il power bank ogni mese
+""")
+        with _dk2:
+            st.markdown("""
+**🏠 Prepara ora:**
+1. Identifica le 2 vie di uscita dalla tua abitazione
+2. Accordati con la famiglia su dove incontrarsi fuori casa
+3. Conosci il punto di raccolta del tuo Comune
+4. Salva i numeri di emergenza nel cellulare
+""")
 
         st.markdown("---")
 
@@ -1210,18 +1214,24 @@ def show():
         for _i, _item in enumerate(_kit_amazon):
             with _kit_cols[_i % 3]:
                 _card = (
-                    f'<div style="border:1px solid #E2E8F0;border-radius:12px;padding:14px;'
-                    f'margin-bottom:12px;background:white;">'
-                    f'<div style="font-size:1.8rem;margin-bottom:6px;">{_item["emoji"]}</div>'
-                    f'<div style="font-weight:700;color:#1E293B;margin-bottom:4px;">{_item["nome"]}</div>'
+                    f'<div style="border:1px solid #E2E8F0;border-radius:14px;padding:18px 16px 16px 16px;'
+                    f'margin-bottom:16px;background:white;box-shadow:0 1px 4px rgba(0,0,0,0.07);'
+                    f'display:flex;flex-direction:column;min-height:220px;">'
+                    f'<div style="font-size:2.2rem;margin-bottom:8px;line-height:1;">{_item["emoji"]}</div>'
+                    f'<div style="font-weight:700;font-size:0.97rem;color:#1E293B;margin-bottom:6px;'
+                    f'line-height:1.3;">{_item["nome"]}</div>'
                     f'<span style="background:{_item["tc"]};color:{_item["tt"]};border-radius:10px;'
-                    f'padding:2px 8px;font-size:0.72rem;font-weight:600;">{_item["tag"]}</span>'
-                    f'<div style="font-size:0.83rem;color:#64748B;margin:8px 0;">{_item["desc"]}</div>'
+                    f'padding:3px 10px;font-size:0.71rem;font-weight:700;display:inline-block;'
+                    f'margin-bottom:8px;">{_item["tag"]}</span>'
+                    f'<div style="font-size:0.82rem;color:#64748B;line-height:1.5;flex-grow:1;">'
+                    f'{_item["desc"]}</div>'
+                    f'<div style="margin-top:14px;">'
                     f'<a href="{_item["link"]}" target="_blank" '
-                    f'style="background:#FF9900;color:white;padding:7px 14px;border-radius:8px;'
-                    f'font-weight:700;text-decoration:none;font-size:0.85rem;display:inline-block;">'
+                    f'style="background:#FF9900;color:white;padding:8px 16px;border-radius:8px;'
+                    f'font-weight:700;text-decoration:none;font-size:0.84rem;display:inline-block;'
+                    f'box-shadow:0 2px 4px rgba(255,153,0,0.3);">'
                     f'🛒 Vedi su Amazon</a>'
-                    f'</div>'
+                    f'</div></div>'
                 )
                 st.markdown(_card, unsafe_allow_html=True)
 
