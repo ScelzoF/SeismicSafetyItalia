@@ -16,6 +16,22 @@ for _noisy in (
 ):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
+# Sopprimi il warning di deprecazione components.v1.html emesso da librerie
+# di terze parti (es. streamlit-folium) — il codice dell'app usa già st.iframe.
+class _FilterComponentsV1(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "components.v1.html" not in record.getMessage()
+
+for _st_logger_name in (
+    "streamlit", "streamlit.runtime", "streamlit.deprecation_util",
+    "tornado.access", "root", "",
+):
+    logging.getLogger(_st_logger_name).addFilter(_FilterComponentsV1())
+
+# Applica anche ai handler già registrati sul root logger
+for _h in logging.root.handlers:
+    _h.addFilter(_FilterComponentsV1())
+
 import data_service
 import visualization
 import emergenza
@@ -24,6 +40,7 @@ import forum
 import utils
 import ai_analysis
 import ai_chat
+import ingv_monitor
 
 # Impostiamo la localizzazione italiana per i nomi dei giorni
 try:
@@ -236,22 +253,34 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
 
     st.markdown("---")
 
-    # ── Alert livelli allerta ───────────────────────────────────────────────
+    # ── Alert livelli allerta — LIVE da INGV ───────────────────────────────
+    _sb_alert_styles = {
+        "VERDE":     ("rgba(39,174,96,0.25)",  "#27ae60", "#d4f7e0", "🟢"),
+        "GIALLO":    ("rgba(243,156,18,0.25)", "#f39c12", "#fff3cd", "🟡"),
+        "ARANCIONE": ("rgba(230,126,34,0.25)", "#e67e22", "#fde8d8", "🟠"),
+        "ROSSO":     ("rgba(231,76,60,0.25)",  "#e74c3c", "#f8d7da", "🔴"),
+    }
+    def _sb_badge_html(area_name, level):
+        lvl = level.upper() if level else "VERDE"
+        bg, border, txt, icon = _sb_alert_styles.get(lvl, _sb_alert_styles["VERDE"])
+        return (
+            f"<div style='background:{bg};border:1px solid {border};"
+            f"border-radius:7px;padding:6px 10px;'>"
+            f"<span style='font-size:12px;font-weight:700;color:{txt};'>{icon} {area_name}</span>"
+            f"<span style='font-size:11px;color:{txt};float:right;'>{lvl}</span>"
+            f"</div>"
+        )
+    _sb_alert_data = st.session_state.alert_level_cache or ingv_monitor.fetch_ingv_alert_level() or {}
+    _sb_ves = _sb_alert_data.get("vesuvio", "VERDE")
+    _sb_cf  = _sb_alert_data.get("campi_flegrei", "GIALLO")
+    _sb_isc = _sb_alert_data.get("ischia", "VERDE")
     st.markdown(f"**🚨 {get_text('alert_levels')}**")
     st.markdown(
         f"""<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:4px;">
-<div style="background:rgba(39,174,96,0.25);border:1px solid #27ae60;border-radius:7px;padding:6px 10px;">
-  <span style="font-size:12px;font-weight:700;color:#d4f7e0;">🟢 Vesuvio</span>
-  <span style="font-size:11px;color:#d4f7e0;float:right;">{get_text('alert_verde')}</span>
+{_sb_badge_html("Vesuvio", _sb_ves)}
+{_sb_badge_html("Campi Flegrei", _sb_cf)}
+{_sb_badge_html("Ischia", _sb_isc)}
 </div>
-<div style="background:rgba(243,156,18,0.25);border:1px solid #f39c12;border-radius:7px;padding:6px 10px;">
-  <span style="font-size:12px;font-weight:700;color:#fff3cd;">🟡 Campi Flegrei</span>
-  <span style="font-size:11px;color:#fff3cd;float:right;">{get_text('alert_giallo')}</span>
-</div>
-<div style="background:rgba(39,174,96,0.25);border:1px solid #27ae60;border-radius:7px;padding:6px 10px;">
-  <span style="font-size:12px;font-weight:700;color:#d4f7e0;">🟢 Ischia</span>
-  <span style="font-size:11px;color:#d4f7e0;float:right;">{get_text('alert_verde')}</span>
-</div></div>
 <p style="font-size:10px;color:rgba(255,255,255,0.6);margin:0;">{get_text('fonte_ingv_ov')}</p>""",
         unsafe_allow_html=True,
     )
@@ -1194,12 +1223,55 @@ elif page == "about":
     👥 **Visite totali:** {_visit_count:,} &nbsp;|&nbsp; © {datetime.now().year} Monitoraggio Sismico Campania
     """)
 
-# Check for significant earthquakes and show alert if notifications are enabled
+# ── NOTIFICHE SMART — solo nuovi eventi, no spam ──────────────────────────
+if 'notified_event_ids'   not in st.session_state:
+    st.session_state.notified_event_ids   = set()
+if 'prev_alert_levels'    not in st.session_state:
+    st.session_state.prev_alert_levels    = {}
+if 'swarm_notified_areas' not in st.session_state:
+    st.session_state.swarm_notified_areas = set()
+
 if st.session_state.notification_enabled and st.session_state.earthquake_data is not None:
-    significant_eq = data_service.get_significant_earthquakes(st.session_state.earthquake_data)
+    _eq_data = st.session_state.earthquake_data
+
+    # 1. Nuovi terremoti significativi (M≥4.0 in Campania, M≥5.0 altrove)
+    significant_eq = data_service.get_significant_earthquakes(_eq_data)
     if not significant_eq.empty:
         for _, eq in significant_eq.iterrows():
-            st.toast(f"⚠️ {get_text('magnitude')}: {eq['magnitude']} - {eq['location']}")
+            _eid = str(eq.get("id", f"{eq.get('magnitude',0):.1f}_{eq.get('location','')}_{str(eq.get('time',''))[:13]}"))
+            if _eid not in st.session_state.notified_event_ids:
+                st.toast(
+                    f"🔴 Nuovo evento M**{eq.get('magnitude',0):.1f}** — {eq.get('location', 'area sconosciuta')}",
+                    icon="🌋",
+                )
+                st.session_state.notified_event_ids.add(_eid)
+
+    # 2. Variazione livello allerta INGV
+    _cur_alert = st.session_state.alert_level_cache or {}
+    _area_labels = {"vesuvio": "Vesuvio", "campi_flegrei": "Campi Flegrei", "ischia": "Ischia"}
+    for _ak, _al in _cur_alert.items():
+        if isinstance(_al, str) and _ak in _area_labels:
+            _prev = st.session_state.prev_alert_levels.get(_ak)
+            if _prev and _prev != _al:
+                st.toast(
+                    f"🚨 Allerta **{_area_labels[_ak]}** cambiata: {_prev} → **{_al}**",
+                    icon="🚨",
+                )
+            st.session_state.prev_alert_levels[_ak] = _al
+
+    # 3. Sciame sismico in corso
+    try:
+        _swarms = ingv_monitor.detect_seismic_swarms(_eq_data, window_hours=1.0, min_count=5)
+        for _sw in _swarms:
+            _sw_key = f"{_sw['area']}_{str(_sw.get('start_time',''))[:13]}"
+            if _sw_key not in st.session_state.swarm_notified_areas:
+                st.toast(
+                    f"⚠️ Sciame sismico **{_sw['area']}** — {_sw['count']} scosse/1h · M max {_sw['max_mag']:.1f}",
+                    icon="⚠️",
+                )
+                st.session_state.swarm_notified_areas.add(_sw_key)
+    except Exception:
+        pass
 
 # === AUTO-REFRESH DATI ===
 # Forza il refresh dei dati sismici ogni 15 minuti anche senza interazione
