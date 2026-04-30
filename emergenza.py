@@ -1241,7 +1241,9 @@ def show():
             unsafe_allow_html=True
         )
 
+    st.markdown("<div style='margin-top:32px;'></div>", unsafe_allow_html=True)
     st.markdown("---")
+    st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
 
     # ══ LINK RAPIDI ═══════════════════════════════════════════════════════════
     st.subheader("🔗 Link Ufficiali")
