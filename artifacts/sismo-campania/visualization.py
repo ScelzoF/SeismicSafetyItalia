@@ -1205,7 +1205,7 @@ def _show_italia_tab(df, get_text):
 # HELPER — Grafico deformazione GPS (ts_df da NGL o bollettino)
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _render_gps_chart(gps_result: dict, area_name: str) -> None:
+def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> None:
     """
     Mostra la curva di deformazione del suolo.
     Se ts_df è disponibile (dati NGL live) usa quelli, altrimenti usa i dati
@@ -1295,9 +1295,10 @@ def _render_gps_chart(gps_result: dict, area_name: str) -> None:
             height=320, plot_bgcolor="#f9fafb", paper_bgcolor="white",
             hovermode="x unified", margin=dict(l=40, r=20, t=50, b=40)
         )
+        _key = chart_key or f"gps_deform_{area_name.lower().replace(' ', '_')}"
         with st.expander("📈 Curva deformazione del suolo GPS", expanded=False):
             st.caption(badge)
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True, key=_key)
     except Exception as _e:
         st.warning(f"Grafico GPS non disponibile: {_e}")
 
@@ -1614,7 +1615,7 @@ def _show_flegrei_tab(df, get_text):
         f"{_gps_cf_icon} · {gps_data['station']} · {gps_data.get('last_date','')}",
         help=gps_data["source"]
     )
-    _render_gps_chart(gps_data, "Campi Flegrei")
+    _render_gps_chart(gps_data, "Campi Flegrei", chart_key="gps_cf_main")
 
     if not flegrei_data.empty:
         show_map(flegrei_data, "Campi Flegrei", get_text)
@@ -1739,7 +1740,7 @@ def _show_flegrei_tab(df, get_text):
         else:
             # NGL non raggiungibile — mostra curva live da bollettino INGV OV
             st.caption("📡 GPS RITE — dati live INGV OV Bollettino (aggiornamento settimanale)")
-            _render_gps_chart(gps_data, "Campi Flegrei")
+            _render_gps_chart(gps_data, "Campi Flegrei", chart_key="gps_cf_selector")
 
     elif param_option == _p_mag:
         _plot_magnitude_distribution(flegrei_data if not flegrei_data.empty else df,
