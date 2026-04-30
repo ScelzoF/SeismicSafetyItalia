@@ -635,7 +635,11 @@ def show():
                     f"</div>",
                     unsafe_allow_html=True,
                 )
-        st.caption(f"Fonte: {_ALERT_SRC}")
+        st.markdown(
+            f"<div style='color:#6c757d;font-size:0.75rem;margin-top:6px;"
+            f"padding-left:2px;clear:both;'>📋 Fonte: {_ALERT_SRC}</div>",
+            unsafe_allow_html=True
+        )
         st.markdown("---")
 
         # ── Selezione area utente ──────────────────────────────────────────────
