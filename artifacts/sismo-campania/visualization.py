@@ -1564,6 +1564,7 @@ def _show_vesuvio_tab(df, get_text):
     _render_pdf_download_button("vesuvio")
     _show_shakemap_widget("vesuvio", min_mag=2.5)
     _show_ingv_news(area="vesuvio")
+    _show_ingv_vulcani_news("Vesuvio News")
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     _show_risk_calendar(vesuvio_data if not vesuvio_data.empty else df,
@@ -2109,6 +2110,9 @@ def _show_ischia_tab(df, get_text):
     _render_pdf_download_button("ischia")
     _show_shakemap_widget("ischia", min_mag=2.5)
     _show_ingv_news(area="ischia")
+    _show_ingv_vulcani_news("Ischia News",
+                             channel_id="UCWcylY2YDfioFmDAULj3vgA",
+                             channel_handle="INGVterremoti")
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     if not ischia_data.empty:
@@ -3015,6 +3019,126 @@ def _fetch_solfatara_rss() -> list:
         return []
 
 
+def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str = "") -> None:
+    """
+    Renderizza una griglia di card video YouTube.
+    Usa URL diretti dei thumbnail (nessun base64, nessuna sanitizzazione).
+    """
+    if not videos:
+        msg = "Feed RSS temporaneamente non disponibile."
+        if fallback_url:
+            msg += f" [→ Apri canale YouTube]({fallback_url})"
+        st.info(msg)
+        return
+
+    inner = ""
+    for v in videos:
+        thumb_url = v.get("thumb", "")
+        img_tag = (
+            f"<img src='{thumb_url}' style='width:100%;aspect-ratio:16/9;"
+            f"object-fit:cover;display:block;border-radius:7px 7px 0 0' "
+            f"onerror=\"this.style.display='none';this.nextSibling.style.display='flex'\">"
+            f"<div style='width:100%;aspect-ratio:16/9;background:#1e293b;"
+            f"border-radius:7px 7px 0 0;display:none;align-items:center;"
+            f"justify-content:center;font-size:2rem'>🎬</div>"
+        ) if thumb_url else (
+            "<div style='width:100%;aspect-ratio:16/9;background:#1e293b;"
+            "border-radius:7px 7px 0 0;display:flex;align-items:center;"
+            "justify-content:center;font-size:2rem'>🎬</div>"
+        )
+        title_esc = v["title"][:72].replace("<","&lt;").replace(">","&gt;")
+        if len(v["title"]) > 72:
+            title_esc += "…"
+        inner += (
+            f"<a href='{v['url']}' target='_blank' rel='noopener' "
+            f"style='text-decoration:none;display:block'>"
+            f"<div class='card'>{img_tag}"
+            f"<div style='padding:9px 11px 11px'>"
+            f"<div style='color:#e2e8f0;font-size:0.79rem;font-weight:600;"
+            f"line-height:1.45;margin-bottom:5px'>{title_esc}</div>"
+            f"<div style='color:#64748b;font-size:0.69rem'>📅 {v['pub']}</div>"
+            f"</div></div></a>"
+        )
+
+    rows = (len(videos) + 2) // 3
+    full_html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:transparent;font-family:sans-serif;padding:2px}}
+.grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}
+.card{{background:#1a2130;border-radius:8px;overflow:hidden;border:1px solid #2d3a4a}}
+.card:hover{{border-color:#4a5568}}
+</style></head><body>
+<div class="grid">{inner}</div>
+</body></html>"""
+    height = max(220, rows * 200 + 30)
+    st.components.v1.html(full_html, height=height, scrolling=False)
+    cap = "🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico"
+    if caption_suffix:
+        cap += " · " + caption_suffix
+    st.caption(cap)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _fetch_yt_rss(channel_id: str, keyword_filter: str = "") -> list:
+    """
+    Scarica ultimi video dal feed RSS YouTube di un canale.
+    Filtra opzionalmente per keyword nel titolo.
+    """
+    import xml.etree.ElementTree as ET
+    ns = {
+        "atom": "http://www.w3.org/2005/Atom",
+        "yt":   "http://www.youtube.com/xml/schemas/2015",
+        "media":"http://search.yahoo.com/mrss/",
+    }
+    try:
+        url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
+        r = requests.get(url, timeout=8, headers={"User-Agent": "SeismicSafetyItalia/2.0"})
+        if r.status_code != 200:
+            return []
+        root = ET.fromstring(r.text)
+        videos = []
+        kw = keyword_filter.lower() if keyword_filter else ""
+        for entry in root.findall("atom:entry", ns):
+            title_el = entry.find("atom:title", ns)
+            vid_el   = entry.find("yt:videoId", ns)
+            pub_el   = entry.find("atom:published", ns)
+            if title_el is None or vid_el is None:
+                continue
+            title = title_el.text or ""
+            if kw and kw not in title.lower():
+                continue
+            vid_id = vid_el.text
+            pub    = (pub_el.text or "")[:10] if pub_el is not None else ""
+            videos.append({
+                "title": title,
+                "thumb": f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg",
+                "url":   f"https://www.youtube.com/watch?v={vid_id}",
+                "pub":   pub,
+            })
+        return videos[:6]
+    except Exception:
+        return []
+
+
+def _show_ingv_vulcani_news(area_title: str, keyword_filter: str = "",
+                             channel_id: str = "UC3GnD1b5hO8a-ag0yKr_uqw",
+                             channel_handle: str = "INGVvulcani") -> None:
+    """
+    Sezione video INGV per Vesuvio / Ischia / area generica.
+    Default: canale INGVvulcani (UC3GnD1b5hO8a-ag0yKr_uqw).
+    Per Ischia si può usare INGVterremoti (UCWcylY2YDfioFmDAULj3vgA).
+    """
+    yt_url = f"https://www.youtube.com/@{channel_handle}"
+    _section_divider(f"📡 {area_title} — INGV News")
+    with st.expander(f"🎬 Ultimi video — @{channel_handle}", expanded=True):
+        videos = _fetch_yt_rss(channel_id, keyword_filter=keyword_filter)
+        _render_yt_cards(
+            videos,
+            fallback_url=yt_url,
+            caption_suffix=f"[→ Canale @{channel_handle}]({yt_url})",
+        )
+
+
 def _show_solfatara_news() -> None:
     """
     Sezione SolfataraNews nel tab Campi Flegrei:
@@ -3046,54 +3170,9 @@ def _show_solfatara_news() -> None:
     # ── Video recenti ─────────────────────────────────────────────────────────
     with st.expander("🎬 Ultimi video — SolfataraNews", expanded=True):
         videos = _fetch_solfatara_rss()
-        if videos:
-            # Scarica thumbnail server-side via funzione cached a livello modulo
-            b64_list = [_fetch_thumb_b64(v["thumb"]) for v in videos]
-
-            # Costruisce card HTML complete
-            inner = ""
-            for v, b64 in zip(videos, b64_list):
-                img_tag = (
-                    f"<img src='{b64}' style='width:100%;aspect-ratio:16/9;"
-                    f"object-fit:cover;display:block;border-radius:7px 7px 0 0'>"
-                    if b64 else
-                    "<div style='width:100%;aspect-ratio:16/9;background:#1e293b;"
-                    "border-radius:7px 7px 0 0;display:flex;align-items:center;"
-                    "justify-content:center;font-size:2rem'>🎬</div>"
-                )
-                title_esc = v["title"][:72].replace("<","&lt;").replace(">","&gt;")
-                if len(v["title"]) > 72:
-                    title_esc += "…"
-                inner += (
-                    f"<a href='{v['url']}' target='_blank' rel='noopener' "
-                    f"style='text-decoration:none;display:block'>"
-                    f"<div class='card'>{img_tag}"
-                    f"<div style='padding:9px 11px 11px'>"
-                    f"<div style='color:#e2e8f0;font-size:0.79rem;font-weight:600;"
-                    f"line-height:1.45;margin-bottom:5px'>{title_esc}</div>"
-                    f"<div style='color:#64748b;font-size:0.69rem'>📅 {v['pub']}</div>"
-                    f"</div></div></a>"
-                )
-
-            # Renderizza dentro un iframe reale → data: URI funzionano,
-            # nessuna sanitizzazione Streamlit
-            full_html = f"""<!DOCTYPE html><html><head><style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:transparent;font-family:sans-serif}}
-.grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:2px}}
-.card{{background:#1a2130;border-radius:8px;overflow:hidden;
-       border:1px solid #2d3a4a}}
-.card:hover{{border-color:#4a5568}}
-</style></head><body>
-<div class="grid">{inner}</div>
-</body></html>"""
-            # altezza: 2 righe di card (~195px ciascuna) + gap + margini
-            st.components.v1.html(full_html, height=430, scrolling=False)
-        else:
-            st.info("Feed RSS temporaneamente non disponibile. "
-                    "[→ Apri canale YouTube](https://www.youtube.com/@SolfataraNews)")
-        st.caption("🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico · "
-                   "[→ Canale @SolfataraNews](https://www.youtube.com/@SolfataraNews)")
+        _render_yt_cards(videos,
+                         fallback_url="https://www.youtube.com/@SolfataraNews",
+                         caption_suffix="[→ Canale @SolfataraNews](https://www.youtube.com/@SolfataraNews)")
 
 
 def _link_row(icon_label, href, link_text):
