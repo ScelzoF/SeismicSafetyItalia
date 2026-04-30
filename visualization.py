@@ -3136,10 +3136,17 @@ def _show_vesuvio_news() -> None:
             "Telecamera puntata sul Vesuvio (NA)</p>",
             unsafe_allow_html=True,
         )
-        st.iframe(
-            "https://www.youtube.com/embed/RbI8JwrBZQA"
-            "?autoplay=0&rel=0&modestbranding=1",
-            height=380,
+        st.components.v1.html(
+            "<style>*{margin:0;padding:0;box-sizing:border-box}"
+            "html,body{width:100%;overflow:hidden;background:transparent}</style>"
+            "<div style='position:relative;width:100%;padding-bottom:56.25%;'>"
+            "<iframe src='https://www.youtube.com/embed/RbI8JwrBZQA"
+            "?autoplay=0&rel=0&modestbranding=1&vq=hd1080' "
+            "style='position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
+            "border-radius:10px;' "
+            "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
+            "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
+            height=580,
         )
         st.caption(
             "📺 Per la visione ottimale aprire in un'altra scheda · "
@@ -3170,10 +3177,17 @@ def _show_ischia_news() -> None:
             "Telecamera panoramica sull'isola di Ischia</p>",
             unsafe_allow_html=True,
         )
-        st.iframe(
-            "https://www.youtube.com/embed/Hllyp_GlG64"
-            "?autoplay=0&rel=0&modestbranding=1",
-            height=380,
+        st.components.v1.html(
+            "<style>*{margin:0;padding:0;box-sizing:border-box}"
+            "html,body{width:100%;overflow:hidden;background:transparent}</style>"
+            "<div style='position:relative;width:100%;padding-bottom:56.25%;'>"
+            "<iframe src='https://www.youtube.com/embed/Hllyp_GlG64"
+            "?autoplay=0&rel=0&modestbranding=1&vq=hd1080' "
+            "style='position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
+            "border-radius:10px;' "
+            "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
+            "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
+            height=580,
         )
         st.caption(
             "📺 Per la visione ottimale aprire in un'altra scheda · "
@@ -3206,10 +3220,17 @@ def _show_solfatara_news() -> None:
             "Telecamera puntata su Solfatara e area flegrea</p>",
             unsafe_allow_html=True,
         )
-        st.iframe(
-            "https://www.youtube.com/embed/6Ie29xiu_SE"
-            "?autoplay=0&rel=0&modestbranding=1",
-            height=380,
+        st.components.v1.html(
+            "<style>*{margin:0;padding:0;box-sizing:border-box}"
+            "html,body{width:100%;overflow:hidden;background:transparent}</style>"
+            "<div style='position:relative;width:100%;padding-bottom:56.25%;'>"
+            "<iframe src='https://www.youtube.com/embed/6Ie29xiu_SE"
+            "?autoplay=0&rel=0&modestbranding=1&vq=hd1080' "
+            "style='position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
+            "border-radius:10px;' "
+            "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
+            "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
+            height=580,
         )
         st.caption(
             "📺 Per la visione ottimale aprire in un'altra scheda · "
