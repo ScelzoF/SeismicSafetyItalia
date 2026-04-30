@@ -6,9 +6,9 @@ qualità aria reale da OpenAQ/ARPA Campania.
 """
 
 import warnings
-import requests
 warnings.filterwarnings("ignore", message=".*components.v1.html.*")
 warnings.filterwarnings("ignore", message=".*st.iframe.*")
+warnings.filterwarnings("ignore", message=".*use_container_width.*")
 warnings.filterwarnings("ignore", message=".*width.*stretch.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="streamlit")
 
@@ -82,10 +82,6 @@ from ingv_monitor import (
     RSAM_URLS,
     GEOCHEM_URLS,
     ZONE_RISCHIO,
-    fetch_shakemap_events,
-    detect_seismic_swarms,
-    get_bradisismo_storico_cf,
-    GRANDI_EVENTI_STORICI,
 )
 
 
@@ -143,7 +139,7 @@ def _show_volcano_satellite_map(lat, lon, name, zoom=13, height=340):
         icon=folium.Icon(color="red", icon="fire", prefix="fa"),
     ).add_to(m)
     st.caption(f"🛰️ Immagine satellite reale — {name} | Fonte: Esri/USGS/NOAA")
-    st_folium(m, height=height, returned_objects=[])
+    st_folium(m, height=height, use_container_width=True, returned_objects=[])
 
 
 def _card(label, value, delta=None, help_text=None):
@@ -183,268 +179,6 @@ def _section_divider(title):
         f"<h4 style='color:{PALETTE['secondary']};margin-bottom:6px;'>{title}</h4>",
         unsafe_allow_html=True
     )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BANNER SCIAME SISMICO — analisi real-time (detect_seismic_swarms)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _show_swarm_banner(df: pd.DataFrame, area_key: str) -> None:
-    """
-    Mostra un banner di allerta se viene rilevato uno sciame sismico nell'area
-    nelle ultime 2 ore (soglia: ≥ 5 eventi nel bounding box vulcanico).
-    Non lancia eccezioni — fallisce silenziosamente se il DF non è adatto.
-    """
-    _AREA_LABEL = {
-        "vesuvio":       "Vesuvio",
-        "campi_flegrei": "Campi Flegrei",
-        "ischia":        "Ischia",
-    }
-    try:
-        swarms = detect_seismic_swarms(df, window_hours=2.0, min_count=5)
-        target = _AREA_LABEL.get(area_key, area_key)
-        for s in swarms:
-            if s["area"] == target:
-                _t_start = s["start_time"]
-                _t_str = (
-                    _t_start.strftime("%H:%M") if hasattr(_t_start, "strftime") else str(_t_start)[:16]
-                )
-                st.warning(
-                    f"🔴 **SCIAME SISMICO IN CORSO — {s['area']}** &nbsp;|&nbsp; "
-                    f"**{s['count']} scosse** nelle ultime 2 ore &nbsp;|&nbsp; "
-                    f"M max **{s['max_mag']:.1f}** · M min {s['min_mag']:.1f} &nbsp;|&nbsp; "
-                    f"Prima scossa: {_t_str} UTC",
-                    icon="⚠️",
-                )
-    except Exception:
-        pass
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MAPPA 3D PROFONDITÀ IPOCENTRALI — Plotly Scatter3d
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _show_3d_depth_map(df: pd.DataFrame, area_name: str, plot_key: str) -> None:
-    """
-    Visualizzazione 3D degli ipocentrici: longitudine × latitudine × profondità.
-    I punti sono colorati per magnitudo e dimensionati in proporzione.
-    """
-    _needed = {"latitude", "longitude", "depth", "magnitude"}
-    if df is None or df.empty or not _needed.issubset(df.columns):
-        return
-
-    _data = df.dropna(subset=["latitude", "longitude", "depth", "magnitude"]).copy()
-    if _data.empty:
-        return
-
-    with st.expander(f"🌐 Mappa 3D Profondità Ipocentrali — {area_name}", expanded=False):
-        _sizes = np.clip(_data["magnitude"].values * 2.8 + 2, 3, 16).tolist()
-        _hover = [
-            f"M{row['magnitude']:.1f} · Prof. {row['depth']:.1f} km<br>{row.get('location', '')}"
-            for _, row in _data.iterrows()
-        ]
-        fig = go.Figure(data=[go.Scatter3d(
-            x=_data["longitude"].tolist(),
-            y=_data["latitude"].tolist(),
-            z=(-_data["depth"]).tolist(),
-            mode="markers",
-            marker=dict(
-                size=_sizes,
-                color=_data["magnitude"].tolist(),
-                colorscale="Reds",
-                cmin=float(_data["magnitude"].min()),
-                cmax=float(_data["magnitude"].max()),
-                opacity=0.78,
-                colorbar=dict(title="Mag", thickness=10, len=0.6),
-                showscale=True,
-            ),
-            text=_hover,
-            hovertemplate="%{text}<extra></extra>",
-        )])
-        fig.update_layout(
-            scene=dict(
-                xaxis=dict(title="Longitudine", backgroundcolor="rgba(0,0,0,0)", gridcolor="#555"),
-                yaxis=dict(title="Latitudine",  backgroundcolor="rgba(0,0,0,0)", gridcolor="#555"),
-                zaxis=dict(title="Profondità km (↓)", backgroundcolor="rgba(0,0,0,0)", gridcolor="#555"),
-                bgcolor="rgba(0,0,0,0)",
-                aspectmode="manual",
-                aspectratio=dict(x=1.5, y=1.5, z=0.6),
-            ),
-            margin=dict(l=0, r=0, t=30, b=0),
-            height=480,
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(size=11),
-        )
-        st.plotly_chart(fig, width="stretch", key=plot_key)
-        st.caption(
-            f"🌐 {len(_data)} ipocentrici · Asse Z = profondità negativa (in basso) · "
-            "Rotazione con mouse · Zoom con scroll · Hover per dettagli"
-        )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# STORICO BRADISISMO CAMPI FLEGREI — Grafico multi-decennale (INGV OV)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _render_bradisismo_storico_cf(gps_data: dict | None = None) -> None:
-    """
-    Grafico interattivo del sollevamento cumulativo ai Campi Flegrei (1950→oggi).
-    Due tracce: crisi storiche (1950-2005) + ciclo attuale GPS RITE (2005→oggi).
-    Se gps_data è fornito aggiunge il tasso attuale come annotazione.
-    """
-    df_brd = get_bradisismo_storico_cf()
-    _storica = df_brd[df_brd["serie"] == "storica"].sort_values("year")
-    _recente = df_brd[df_brd["serie"] == "recente"].sort_values("year")
-
-    fig = go.Figure()
-
-    # Traccia storica
-    fig.add_trace(go.Scatter(
-        x=_storica["year"].tolist(),
-        y=_storica["uplift_mm"].tolist(),
-        mode="lines+markers",
-        name="Crisi storiche (1950–2005)",
-        line=dict(color="#e74c3c", width=2.5, dash="solid"),
-        marker=dict(size=7, symbol="circle"),
-        text=_storica["note"].tolist(),
-        hovertemplate="Anno %{x:.0f}<br>Sollevamento: <b>%{y} mm</b><br>%{text}<extra></extra>",
-    ))
-    # Picco 1984 — annotazione critica
-    fig.add_annotation(
-        x=1984.5, y=3450,
-        text="Picco 2ª crisi<br>+3.45 m (1984)",
-        showarrow=True, arrowhead=2, arrowcolor="#e74c3c",
-        font=dict(size=10, color="#e74c3c"),
-        bgcolor="rgba(255,255,255,0.85)",
-        bordercolor="#e74c3c", borderwidth=1,
-        ax=60, ay=-40,
-    )
-
-    # Traccia ciclo attuale (asse Y secondario, riferimento 2005=0)
-    fig.add_trace(go.Scatter(
-        x=_recente["year"].tolist(),
-        y=_recente["uplift_mm"].tolist(),
-        mode="lines+markers",
-        name="Ciclo attuale GPS RITE (2005=0)",
-        line=dict(color="#f39c12", width=2.5, dash="solid"),
-        marker=dict(size=7, symbol="diamond"),
-        text=_recente["note"].tolist(),
-        yaxis="y2",
-        hovertemplate="Anno %{x:.1f}<br>Sollevamento RITE: <b>%{y} mm</b><br>%{text}<extra></extra>",
-    ))
-
-    # Tasso attuale live da GPS
-    if gps_data and gps_data.get("monthly_rate_mm") is not None:
-        _rate = gps_data["monthly_rate_mm"]
-        _station = gps_data.get("station", "RITE")
-        _src_icon = "🟢 LIVE" if gps_data.get("source_type") == "live" else "📡"
-        fig.add_annotation(
-            x=2026.1, y=_recente["uplift_mm"].iloc[-1],
-            text=f"{_src_icon} {_station}<br>{_rate:+.1f} mm/mese",
-            showarrow=True, arrowhead=2, arrowcolor="#f39c12",
-            font=dict(size=10, color="#f39c12"),
-            bgcolor="rgba(255,255,255,0.85)",
-            bordercolor="#f39c12", borderwidth=1,
-            ax=-70, ay=-30,
-            yref="y2",
-        )
-
-    # Zona "allerta livello storico"
-    fig.add_hrect(
-        y0=3200, y1=3500,
-        fillcolor="rgba(231,76,60,0.08)",
-        line_width=0,
-        annotation_text="Zona picco 1984",
-        annotation_position="top left",
-        annotation_font_size=9,
-        annotation_font_color="#e74c3c",
-    )
-
-    fig.update_layout(
-        title=dict(
-            text="📉 Sollevamento/Subsidenza Storica — Campi Flegrei (Rione Terra / GPS RITE)",
-            font_size=13,
-        ),
-        xaxis=dict(title="Anno", dtick=10, gridcolor="#eee"),
-        yaxis=dict(
-            title="Sollevamento cumulativo mm<br>(rif. 1950)",
-            gridcolor="#eee",
-        ),
-        yaxis2=dict(
-            title="Sollevamento mm<br>(rif. 2005 = 0)",
-            overlaying="y",
-            side="right",
-            showgrid=False,
-            color="#f39c12",
-        ),
-        legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.7)", font_size=11),
-        hovermode="x unified",
-        height=400,
-        margin=dict(l=10, r=10, t=45, b=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(248,249,250,0.6)",
-    )
-    st.plotly_chart(fig, width="stretch", key="bradisismo_storico_cf")
-    st.caption(
-        "📚 Fonti: INGV OV Bollettini storici · Barberi et al. (1984) · Chiodini et al. (2017) · "
-        "GPS RITE da bollettini INGV OV (rete RING — non su NGL). I valori 1950–2005 sono espressi "
-        "rispetto al benchmark Rione Terra; il ciclo attuale (arancio) è relativo al riferimento GPS RITE 2005=0."
-    )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GRANDI EVENTI STORICI — Pannello confronto contestuale per area
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _render_grandi_eventi_storici(area_key: str) -> None:
-    """
-    Mostra una scheda contestuale con i principali eventi storici dell'area
-    (eruzioni, terremoti, crisi bradisismiche) per dare contesto all'attività attuale.
-    """
-    _FILTER_MAP = {
-        "vesuvio":       ["Vesuvio", "Campania"],
-        "campi_flegrei": ["Campi Flegrei", "Campania"],
-        "ischia":        ["Ischia", "Campania"],
-        "all":           None,
-    }
-    _area_filter = _FILTER_MAP.get(area_key)
-    _events = [
-        e for e in GRANDI_EVENTI_STORICI
-        if _area_filter is None or e["area"] in _area_filter
-    ]
-    if not _events:
-        return
-
-    _TYPE_COLOR = {
-        "🌋 Eruzione":   ("#fff3e0", "#f39c12", "#7d5b00"),
-        "⚡ Terremoto":  ("#fdecea", "#e74c3c", "#7d1a12"),
-        "🏔️ Bradisismo": ("#e8f5e9", "#27ae60", "#155724"),
-    }
-
-    with st.expander("📜 Contesto Storico — Grandi eventi dell'area", expanded=False):
-        st.markdown(
-            "<small style='color:#888;'>Principali eventi storici per contestualizzare "
-            "l'attività in corso. Fonti ufficiali INGV, letteratura scientifica peer-reviewed.</small>",
-            unsafe_allow_html=True,
-        )
-        for ev in sorted(_events, key=lambda e: e["anno"], reverse=True):
-            _tipo  = ev["tipo"]
-            _bg, _border, _txt = _TYPE_COLOR.get(_tipo, ("#f8f9fa", "#6c757d", "#333"))
-            _mag_str = f" · M**{ev['mag']}**" if ev["mag"] else ""
-            _vit_str = f" · {ev['vittime']:,} vittime" if ev.get("vittime") else ""
-            st.markdown(
-                f"<div style='background:{_bg};border-left:4px solid {_border};"
-                f"padding:10px 14px;border-radius:6px;margin-bottom:8px;'>"
-                f"<div style='font-size:12px;color:{_txt};font-weight:700;margin-bottom:2px;'>"
-                f"{_tipo} &nbsp;·&nbsp; {ev['mese']} {ev['anno']}</div>"
-                f"<div style='font-size:14px;font-weight:700;color:{_txt};'>{ev['titolo']}"
-                f"{_mag_str}</div>"
-                f"<div style='font-size:12px;color:#444;margin-top:4px;'>{ev['desc']}"
-                f"{_vit_str}</div>"
-                f"<div style='font-size:10px;color:#888;margin-top:4px;'>📚 {ev['fonte']}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -746,6 +480,8 @@ def _render_seismogram_widget(area: str) -> None:
 
 def _render_rsam_widget(area: str) -> None:
     """Tremore vulcanico (RSAM) — portale INGV OV."""
+    import streamlit.components.v1 as _comp
+
     _RSAM_IMAGES = {
         "vesuvio":       [
             ("VBKEBB_EHZ", "VBKE — Sommitale (EHZ)"),
@@ -1068,97 +804,6 @@ def _render_pdf_download_button(area: str) -> None:
         )
 
 
-def _show_shakemap_widget(area: str, min_mag: float = 2.5) -> None:
-    """
-    Mostra la ShakeMap automatica INGV per l'area specificata.
-    Immagine intensità più recente + lista eventi recenti con link.
-    """
-    events = fetch_shakemap_events(area=area, min_mag=min_mag, n_events=6)
-
-    _AREA_LABELS = {
-        "campi_flegrei": "Campi Flegrei",
-        "vesuvio": "Vesuvio",
-        "ischia": "Ischia",
-        "campania": "Campania",
-        "italia": "Italia",
-    }
-    area_label = _AREA_LABELS.get(area, area.replace("_", " ").title())
-
-    with st.expander(f"🗺️ ShakeMap Automatica INGV — {area_label}", expanded=False):
-        st.caption(
-            "Mappe di scuotimento automatiche INGV ShakeMap v4 · "
-            "Aggiornamento ogni 30 min · "
-            "[shakemap.ingv.it](https://shakemap.ingv.it)"
-        )
-
-        if not events:
-            st.info(
-                f"Nessuna ShakeMap disponibile per {area_label} "
-                f"(M≥{min_mag:.1f}) negli ultimi anni. "
-                "Le ShakeMap vengono generate automaticamente per eventi M≥2.5."
-            )
-            return
-
-        # ── Evento più recente — immagine prominente ──────────────────────────
-        latest = events[0]
-        col_img, col_info = st.columns([2, 1])
-
-        with col_img:
-            st.markdown(
-                f"**Evento più recente con ShakeMap disponibile**  \n"
-                f"M **{latest['mag']:.1f}** · {latest['description']} · "
-                f"{latest['datetime_str']}"
-            )
-            st.image(
-                latest["img_url"],
-                caption=(
-                    f"Intensità sismica M{latest['mag']:.1f} — {latest['description']} "
-                    f"({latest['datetime_str']}) · Profondità {latest['depth']:.1f} km"
-                ),
-                width='stretch',
-            )
-
-        with col_info:
-            st.markdown("**Dettagli evento**")
-            st.markdown(
-                f"- 📍 **Luogo:** {latest['description']}\n"
-                f"- 📏 **Magnitudo:** M {latest['mag']:.1f}\n"
-                f"- ⏰ **Data/ora:** {latest['datetime_str']}\n"
-                f"- 🌊 **Profondità:** {latest['depth']:.1f} km\n"
-                f"- 🌍 **Coord.:** {latest['lat']:.3f}°N, {latest['lon']:.3f}°E"
-            )
-            st.link_button(
-                "🔗 Apri su INGV ShakeMap",
-                latest["event_url"],
-                width='stretch',
-            )
-
-        # ── Tabella eventi recenti ─────────────────────────────────────────────
-        if len(events) > 1:
-            st.markdown("**Ultimi eventi con ShakeMap:**")
-            for ev in events:
-                _mag_color = (
-                    "#DC2626" if ev["mag"] >= 4.0
-                    else "#D97706" if ev["mag"] >= 3.0
-                    else "#059669"
-                )
-                st.markdown(
-                    f"<div style='display:flex;align-items:center;gap:10px;"
-                    f"padding:5px 0;border-bottom:1px solid #e5e7eb;'>"
-                    f"<span style='background:{_mag_color};color:white;border-radius:4px;"
-                    f"padding:2px 6px;font-weight:700;font-size:0.85em;min-width:42px;text-align:center;'>"
-                    f"M {ev['mag']:.1f}</span>"
-                    f"<span style='flex:1;font-size:0.85em;'>{ev['description']}</span>"
-                    f"<span style='font-size:0.78em;color:#6B7280;white-space:nowrap;'>"
-                    f"{ev['datetime_str']}</span>"
-                    f"<a href='{ev['event_url']}' target='_blank' "
-                    f"style='font-size:0.78em;color:#2563EB;text-decoration:none;'>"
-                    f"↗ mappa</a>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-
-
 def _show_italia_tab(df, get_text):
     _it_img = _ZONA_IMG["italia"]
     _it_title = _gt("monitoring_italy")
@@ -1195,7 +840,6 @@ def _show_italia_tab(df, get_text):
 
     _plot_daily_activity(df)
     _show_risk_calendar(df, area_name="Italia", plot_key="italia")
-    _show_shakemap_widget("italia", min_mag=3.0)
     _show_ingv_news(area="all")
 
 
@@ -1203,7 +847,7 @@ def _show_italia_tab(df, get_text):
 # HELPER — Grafico deformazione GPS (ts_df da NGL o bollettino)
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> None:
+def _render_gps_chart(gps_result: dict, area_name: str) -> None:
     """
     Mostra la curva di deformazione del suolo.
     Se ts_df è disponibile (dati NGL live) usa quelli, altrimenti usa i dati
@@ -1223,85 +867,51 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
     }
     color = _COLORS.get(area_name, "#059669")
 
-    # Ultimo punto dinamico: mese corrente
+    # Ultimo punto dinamico: mese corrente + valore reale dal bollettino live
     _now_ym = datetime.now().strftime("%Y-%m")
     _up_total = gps_result.get("up_total_mm")
 
-    # ── Campi Flegrei: serie temporale live da pagina INGV OV ───────────────
-    _cf_ts = {}
-    if area_name == "Campi Flegrei":
-        try:
-            from ingv_monitor import fetch_ingv_cf_gps_timeseries
-            _cf_ts = fetch_ingv_cf_gps_timeseries()
-        except Exception:
-            _cf_ts = {}
+    # Dati storici bollettini INGV come riferimento (punti fissi verificati)
+    _BULLETIN_SERIES = {
+        "Vesuvio": {
+            "dates":  ["2000-01","2005-01","2010-01","2015-01","2018-01",
+                       "2020-01","2022-01","2024-01","2025-01", _now_ym],
+            "values": [0, -1, -2, -3, -4, -4.5, -5, -5.5, -6,
+                       round(_up_total, 1) if _up_total else -6.5],
+            "ylabel": "Deformazione cumulativa (mm)",
+        },
+        "Campi Flegrei": {
+            "dates":  ["2005-01","2010-01","2015-01","2018-01","2020-01",
+                       "2022-01","2023-01","2024-01","2025-01", _now_ym],
+            "values": [0, 100, 340, 550, 720, 920, 1120, 1320, 1520,
+                       round(_up_total, 1) if _up_total else 1740],
+            "ylabel": "Sollevamento cumulativo (mm)",
+        },
+        "Ischia": {
+            "dates":  ["2015-01","2017-01","2017-08","2018-01","2020-01",
+                       "2022-01","2022-11","2023-01","2024-01", _now_ym],
+            "values": [0, 10, -30, -20, 0, 10, -40, -20, -10,
+                       round(_up_total, 1) if _up_total else 0],
+            "ylabel": "Deformazione relativa (mm)",
+        },
+    }
 
-    # ── Selezione dati per il grafico ────────────────────────────────────────
-    # Campi Flegrei: usa serie storica lunga dedicata (2005→oggi)
-    if area_name == "Campi Flegrei":
-        if _cf_ts.get("ok") and len(_cf_ts.get("dates", [])) >= 6:
-            x_vals  = _cf_ts["dates"]
-            y_vals  = _cf_ts["values"]
-            rate    = _cf_ts["monthly_rate_mm"]
-            tot_cm  = _cf_ts.get("total_cm", "")
-            badge   = (f"🟢 LIVE INGV OV — RITE {tot_cm} cm da nov-2005 "
-                       f"· tasso attuale ~{rate:.0f} mm/mese")
-            y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
-        else:
-            x_vals  = ["2005-11","2010-01","2015-01","2018-01","2020-01",
-                       "2022-01","2023-01","2024-01","2025-01", _now_ym]
-            y_vals  = [0, 100, 340, 550, 720, 920, 1050, 1210, 1380,
-                       round(_up_total, 1) if _up_total else 1635]
-            badge   = f"📋 Storico INGV OV + bollettino live ({_now_ym})"
-            y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
-
-    elif area_name == "Vesuvio":
-        # Serie storica lunga (2014→oggi) + tasso live NGL se disponibile
-        rate_ves = gps_result.get("monthly_rate_mm", -0.1)
-        bd       = gps_result.get("last_date", "")
-        src_type = gps_result.get("source_type", "bulletin")
-        # Ancora storici verificati bollettini INGV OV (subsidenza lenta ~1-2 mm/anno)
-        # + ultimo punto aggiornato col tasso NGL live se disponibile
-        _last_y  = round(-13.2 + rate_ves * 16, 1)
-        x_vals   = ["2014-01","2016-01","2018-01","2020-01","2021-01",
-                    "2022-01","2023-01","2024-01","2025-01", _now_ym]
-        y_vals   = [0, -2.4, -4.8, -7.2, -8.4, -9.6, -10.8, -12.0, -13.2,
-                    _last_y]
-        _src_lbl = f"🟢 LIVE NGL · {station} · {bd}" if src_type == "live" else f"📡 INGV OV · {bd}"
-        badge    = f"{_src_lbl} · tasso {rate_ves:+.2f} mm/mese"
-        y_label  = "Deformazione cumulativa (mm, rif. gen-2014)"
-
-    elif area_name == "Ischia":
-        # Serie storica + effetto sisma Casamicciola nov-2022 + recupero
-        # Tasso corrente aggiornato da NGL live se disponibile
-        rate_isc = gps_result.get("monthly_rate_mm", 0.0)
-        bd       = gps_result.get("last_date", "")
-        src_type = gps_result.get("source_type", "bulletin")
-        _last_y  = round(-3.0 + rate_isc * 16, 1)
-        x_vals   = ["2014-01","2016-01","2017-08","2018-01","2020-01",
-                    "2022-01","2022-11","2023-06","2024-01","2025-01", _now_ym]
-        # Dati verificati: sisma M4.0 ago-2017 → subsidenza ~5mm,
-        # sisma M5.9 nov-2022 Casamicciola → subsidenza ~24mm, recupero progressivo
-        y_vals   = [0, 1.5, -4.5, -2.0, 0.5,
-                    1.0, -24.0, -10.0, -5.0, -3.0, _last_y]
-        _src_lbl = f"🟢 LIVE NGL · {station} · {bd}" if src_type == "live" else f"📡 INGV OV · {bd}"
-        badge    = (f"{_src_lbl} · tasso {rate_isc:+.2f} mm/mese · "
-                    f"sisma Casamicciola nov-2022 incluso")
-        y_label  = "Deformazione relativa IOCA (mm, rif. gen-2014)"
-
-    elif ts_df is not None and len(ts_df) >= 5:
-        # Generico: usa ts_df NGL live se disponibile
-        x_vals  = ts_df["date"].tolist()
-        y_vals  = ts_df["up_mm"].round(2).tolist()
-        badge   = f"🟢 LIVE — Nevada Geodetic Laboratory (NGL) · {station}"
+    if ts_df is not None and len(ts_df) >= 5:
+        # Dati NGL live — ultimi 6 mesi
+        x_vals = ts_df["date"].tolist()
+        y_vals = ts_df["up_mm"].round(2).tolist()
+        badge = "🟢 LIVE — Nevada Geodetic Laboratory (NGL)"
         y_label = "Deformazione relativa (mm)"
-
     else:
-        # Fallback generico
-        x_vals  = [_now_ym]
-        y_vals  = [round(_up_total, 1) if _up_total else 0]
-        badge   = f"📋 Bollettino INGV OV ({gps_result.get('last_date', '')})"
-        y_label = "Deformazione (mm)"
+        # Fallback: dati storici INGV OV + ultimo punto dal bollettino live
+        series = _BULLETIN_SERIES.get(area_name, {})
+        if not series:
+            return
+        x_vals = series["dates"]
+        y_vals = series["values"]
+        last_src = gps_result.get("source", "INGV OV")
+        badge = f"📡 Storico INGV OV + bollettino live ({_now_ym}) — {last_src}"
+        y_label = series["ylabel"]
 
     try:
         fig = go.Figure()
@@ -1327,21 +937,9 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
             height=320, plot_bgcolor="#f9fafb", paper_bgcolor="white",
             hovermode="x unified", margin=dict(l=40, r=20, t=50, b=40)
         )
-        _key = chart_key or f"gps_deform_{area_name.lower().replace(' ', '_')}"
         with st.expander("📈 Curva deformazione del suolo GPS", expanded=False):
             st.caption(badge)
-            st.plotly_chart(fig, width='stretch', key=_key)
-            if gps_result.get("source_type") != "live":
-                _gps_page = {
-                    "Campi Flegrei": "https://www.ov.ingv.it/index.php/flegrei-stato-attuale",
-                    "Vesuvio":       "https://www.ov.ingv.it/index.php/stato-attuale",
-                    "Ischia":        "https://www.ov.ingv.it/index.php/ischia-stato-attuale",
-                }.get(area_name, "https://www.ov.ingv.it")
-                st.link_button(
-                    "📡 Dati GPS live su INGV OV →",
-                    _gps_page,
-                    width='stretch',
-                )
+            st.plotly_chart(fig, width='stretch')
     except Exception as _e:
         st.warning(f"Grafico GPS non disponibile: {_e}")
 
@@ -1372,7 +970,6 @@ def _show_vesuvio_tab(df, get_text):
     alert_level = alert.get("vesuvio", "VERDE")
     _render_alert_badge(alert_level, "Vesuvio",
                         bulletin["bulletin_date"], alert.get("source", "INGV OV"))
-    _show_swarm_banner(df, "vesuvio")
 
     # ── GOSSIP INGV OV — ultimo evento real-time ───────────────────────────
     _show_gossip_widget("vesuvio")
@@ -1410,7 +1007,6 @@ def _show_vesuvio_tab(df, get_text):
         _render_zone_rischio("vesuvio")
     with st.expander(_gt("storico_expander"), expanded=False):
         _render_confronto_storico("vesuvio")
-    _render_grandi_eventi_storici("vesuvio")
 
     # ── Metriche sismicità ─────────────────────────────────────────────────
     if vesuvio_data.empty:
@@ -1442,7 +1038,6 @@ def _show_vesuvio_tab(df, get_text):
         show_magnitude_time_chart(vesuvio_data, "Vesuvio", get_text)
     else:
         show_map(None, "Vesuvio", get_text)
-    _show_3d_depth_map(vesuvio_data if not vesuvio_data.empty else df, "Vesuvio", "ves_3d")
 
     # ── SENSORI IN TEMPO REALE ─────────────────────────────────────────────
     _section_divider(_gt("sensors_vesuvio"))
@@ -1570,9 +1165,7 @@ def _show_vesuvio_tab(df, get_text):
     _section_divider(_gt("official_monitoring"))
     _show_ingv_official_links("vesuvio")
     _render_pdf_download_button("vesuvio")
-    _show_shakemap_widget("vesuvio", min_mag=2.5)
     _show_ingv_news(area="vesuvio")
-    _show_vesuvio_news()
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     _show_risk_calendar(vesuvio_data if not vesuvio_data.empty else df,
@@ -1614,7 +1207,6 @@ def _show_flegrei_tab(df, get_text):
     alert_level = alert.get("campi_flegrei", "GIALLO")
     _render_alert_badge(alert_level, "Campi Flegrei",
                         bulletin["bulletin_date"], alert.get("source", "INGV OV"))
-    _show_swarm_banner(df, "campi_flegrei")
 
     # ── GOSSIP INGV OV — ultimo evento real-time ───────────────────────────
     _show_gossip_widget("campi_flegrei")
@@ -1628,7 +1220,6 @@ def _show_flegrei_tab(df, get_text):
         _render_zone_rischio("campi_flegrei")
     with st.expander(_gt("storico_expander"), expanded=False):
         _render_confronto_storico("campi_flegrei")
-    _render_grandi_eventi_storici("campi_flegrei")
 
     # ── GPS reale da NGL ──────────────────────────────────────────────────
     gps_data = fetch_gps_rite()
@@ -1659,7 +1250,7 @@ def _show_flegrei_tab(df, get_text):
         f"{_gps_cf_icon} · {gps_data['station']} · {gps_data.get('last_date','')}",
         help=gps_data["source"]
     )
-    _render_gps_chart(gps_data, "Campi Flegrei", chart_key="gps_cf_main")
+    _render_gps_chart(gps_data, "Campi Flegrei")
 
     if not flegrei_data.empty:
         show_map(flegrei_data, "Campi Flegrei", get_text)
@@ -1669,7 +1260,6 @@ def _show_flegrei_tab(df, get_text):
             st.warning(_gt("bradisismo_warning"))
     else:
         show_map(None, "Campi Flegrei", get_text)
-    _show_3d_depth_map(flegrei_data if not flegrei_data.empty else df, "Campi Flegrei", "cf_3d")
 
     # ── MONITORAGGIO MULTIPARAMETRICO ─────────────────────────────────────
     _section_divider(_gt("multiparametric"))
@@ -1782,9 +1372,7 @@ def _show_flegrei_tab(df, get_text):
             st.plotly_chart(fig, key="gps_rite_uplift")
             st.caption(f"{_gt('fonte_label')}: {gps_data['source']} | {_gt('station_label')}: {gps_data['station']}")
         else:
-            # NGL non raggiungibile — mostra curva live da bollettino INGV OV
-            st.caption("📡 GPS RITE — dati live INGV OV Bollettino (aggiornamento settimanale)")
-            _render_gps_chart(gps_data, "Campi Flegrei", chart_key="gps_cf_selector")
+            st.info(_gt("gps_unavailable"))
 
     elif param_option == _p_mag:
         _plot_magnitude_distribution(flegrei_data if not flegrei_data.empty else df,
@@ -1875,11 +1463,7 @@ Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi er
     _section_divider(_gt("official_monitoring"))
     _show_ingv_official_links("flegrei")
     _render_pdf_download_button("campi_flegrei")
-    _show_shakemap_widget("campi_flegrei", min_mag=2.5)
     _show_ingv_news(area="cf")
-    _show_solfatara_news()
-    with st.expander("📉 Bradisismo Storico — Sollevamento Cumulativo (1950→oggi)", expanded=False):
-        _render_bradisismo_storico_cf(gps_data)
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     _show_risk_calendar(flegrei_data if not flegrei_data.empty else df,
@@ -1928,7 +1512,6 @@ def _show_ischia_tab(df, get_text):
     alert_level = alert.get("ischia", "VERDE")
     _bulletin_date = bulletin_isc.get("bulletin_date", datetime.now().strftime("%B %Y"))
     _render_alert_badge(alert_level, "Ischia", _bulletin_date, alert.get("source", "INGV"))
-    _show_swarm_banner(df, "ischia")
 
     # ── GOSSIP INGV OV — ultimo evento real-time ───────────────────────────
     _show_gossip_widget("ischia")
@@ -1978,7 +1561,6 @@ def _show_ischia_tab(df, get_text):
         _render_zone_rischio("ischia")
     with st.expander(_gt("storico_expander"), expanded=False):
         _render_confronto_storico("ischia")
-    _render_grandi_eventi_storici("ischia")
 
     # ── Metriche sismicità ─────────────────────────────────────────────────
     if ischia_data.empty:
@@ -2003,7 +1585,6 @@ def _show_ischia_tab(df, get_text):
         show_magnitude_time_chart(ischia_data, "Ischia", get_text)
     else:
         show_map(None, "Ischia", get_text)
-    _show_3d_depth_map(ischia_data if not ischia_data.empty else df, "Ischia", "isc_3d")
 
     # ── SENSORI IN TEMPO REALE ────────────────────────────────────────────
     _section_divider("📡 Sensori — Ischia")
@@ -2116,9 +1697,6 @@ def _show_ischia_tab(df, get_text):
     _section_divider("🔗 Monitoraggio Ufficiale")
     _show_ingv_official_links("ischia")
     _render_pdf_download_button("ischia")
-    _show_shakemap_widget("ischia", min_mag=2.5)
-    _show_ingv_news(area="ischia")
-    _show_ischia_news()
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     if not ischia_data.empty:
@@ -2973,257 +2551,6 @@ def _show_ingv_news(area: str = "all"):
         )
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
-def _fetch_thumb_b64(url: str) -> str:
-    """
-    Scarica il thumbnail YouTube server-side e lo restituisce come data-URI base64.
-    Cache 30 min. Chiamare dal thread principale Streamlit (non da ThreadPoolExecutor).
-    """
-    import base64
-    try:
-        r = requests.get(url, timeout=6, headers={"User-Agent": "SeismicSafetyItalia/2.0"})
-        if r.status_code == 200 and r.headers.get("content-type","").startswith("image"):
-            return "data:image/jpeg;base64," + base64.b64encode(r.content).decode()
-    except Exception:
-        pass
-    return ""
-
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _fetch_solfatara_rss() -> list:
-    """Scarica i video recenti di SolfataraNews dal feed RSS YouTube."""
-    import xml.etree.ElementTree as ET
-    url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCC1XzjkXRz0DLJfH-69t1vQ"
-    ns = {
-        "atom": "http://www.w3.org/2005/Atom",
-        "yt":   "http://www.youtube.com/xml/schemas/2015",
-        "media":"http://search.yahoo.com/mrss/",
-    }
-    try:
-        r = requests.get(url, timeout=8, headers={"User-Agent": "SeismicSafetyItalia/2.0"})
-        if r.status_code != 200:
-            return []
-        root = ET.fromstring(r.text)
-        videos = []
-        for entry in root.findall("atom:entry", ns)[:6]:
-            vid_el   = entry.find("yt:videoId", ns)
-            title_el = entry.find("atom:title", ns)
-            pub_el   = entry.find("atom:published", ns)
-            if vid_el is None:
-                continue
-            vid_id = vid_el.text
-            if not vid_id:
-                continue
-            title = title_el.text if title_el is not None else ""
-            pub   = pub_el.text[:10] if pub_el is not None else ""
-            videos.append({
-                "id":    vid_id,
-                "title": title,
-                "pub":   pub,
-                "thumb": f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg",
-                "url":   f"https://www.youtube.com/watch?v={vid_id}",
-            })
-        return videos
-    except Exception:
-        return []
-
-
-def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str = "") -> None:
-    """
-    Renderizza una griglia 3-colonne di card video YouTube.
-    Usa st.image() per i thumbnail — caricamento server-side, nessun problema CSP.
-    """
-    if not videos:
-        msg = "Feed RSS temporaneamente non disponibile."
-        if fallback_url:
-            msg += f" [→ Apri canale YouTube]({fallback_url})"
-        st.info(msg)
-        return
-
-    # Griglia 3 colonne
-    for row_start in range(0, len(videos), 3):
-        row_videos = videos[row_start:row_start + 3]
-        cols = st.columns(3)
-        for col, v in zip(cols, row_videos):
-            with col:
-                thumb = v.get("thumb", "")
-                if thumb:
-                    try:
-                        thumb_data = _fetch_thumb_bytes(thumb)
-                        if thumb_data:
-                            st.image(thumb_data, width='stretch')
-                        else:
-                            st.markdown("🎬")
-                    except Exception:
-                        st.markdown("🎬")
-                title_short = v["title"][:68] + ("…" if len(v["title"]) > 68 else "")
-                st.markdown(f"**[{title_short}]({v['url']})**")
-                st.caption(f"📅 {v['pub']}")
-
-    cap = "🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico"
-    if caption_suffix:
-        cap += " · " + caption_suffix
-    st.caption(cap)
-    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-def _fetch_thumb_bytes(url: str) -> bytes | None:
-    """Scarica thumbnail lato server e restituisce i bytes. Evita il blocco CSP del browser."""
-    try:
-        r = requests.get(url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200 and r.content:
-            return r.content
-        return None
-    except Exception:
-        return None
-
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _fetch_yt_rss(channel_id: str, keyword_filter: str = "") -> list:
-    """
-    Scarica ultimi video dal feed RSS YouTube di un canale.
-    Filtra opzionalmente per keyword nel titolo.
-    """
-    import xml.etree.ElementTree as ET
-    ns = {
-        "atom": "http://www.w3.org/2005/Atom",
-        "yt":   "http://www.youtube.com/xml/schemas/2015",
-        "media":"http://search.yahoo.com/mrss/",
-    }
-    try:
-        url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-        r = requests.get(url, timeout=8, headers={"User-Agent": "SeismicSafetyItalia/2.0"})
-        if r.status_code != 200:
-            return []
-        root = ET.fromstring(r.text)
-        videos = []
-        kw = keyword_filter.lower() if keyword_filter else ""
-        for entry in root.findall("atom:entry", ns):
-            title_el = entry.find("atom:title", ns)
-            vid_el   = entry.find("yt:videoId", ns)
-            pub_el   = entry.find("atom:published", ns)
-            if title_el is None or vid_el is None:
-                continue
-            title = title_el.text or ""
-            if kw and kw not in title.lower():
-                continue
-            vid_id = vid_el.text
-            pub    = (pub_el.text or "")[:10] if pub_el is not None else ""
-            videos.append({
-                "title": title,
-                "thumb": f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg",
-                "url":   f"https://www.youtube.com/watch?v={vid_id}",
-                "pub":   pub,
-            })
-        return videos[:6]
-    except Exception:
-        return []
-
-
-def _show_vesuvio_news() -> None:
-    """
-    Sezione Vesuvio News: webcam live H24 + ultimi video INGV Vulcani.
-    Webcam: 'Webcam Live Vulcano Vesuvio' by Paesaggi Digitali (RbI8JwrBZQA).
-    Video RSS: canale INGVvulcani (UC3GnD1b5hO8a-ag0yKr_uqw).
-    """
-    _section_divider("📡 Vesuvio News — Live & INGV")
-
-    with st.expander("📹 Webcam LIVE H24 — Vesuvio", expanded=True):
-        st.markdown(
-            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
-            "Diretta YouTube continua — <strong>Paesaggi Digitali</strong> · "
-            "Telecamera puntata sul Vesuvio (NA)</p>",
-            unsafe_allow_html=True,
-        )
-        st.iframe(
-            "https://www.youtube.com/embed/RbI8JwrBZQA"
-            "?autoplay=0&rel=0&modestbranding=1",
-            height=380,
-        )
-        st.caption(
-            "📺 Per la visione ottimale aprire in un'altra scheda · "
-            "[→ Webcam Vesuvio su YouTube](https://www.youtube.com/watch?v=RbI8JwrBZQA)"
-        )
-
-    with st.expander("🎬 Ultimi video — @INGVvulcani", expanded=True):
-        videos = _fetch_yt_rss("UC3GnD1b5hO8a-ag0yKr_uqw")
-        _render_yt_cards(
-            videos,
-            fallback_url="https://www.youtube.com/@INGVvulcani",
-            caption_suffix="[→ Canale @INGVvulcani](https://www.youtube.com/@INGVvulcani)",
-        )
-
-
-def _show_ischia_news() -> None:
-    """
-    Sezione Ischia News: webcam live H24 + ultimi video INGV Terremoti.
-    Webcam: 'Ischia Live Webcam' by Panocam (Hllyp_GlG64).
-    Video RSS: canale INGVterremoti (UCWcylY2YDfioFmDAULj3vgA).
-    """
-    _section_divider("📡 Ischia News — Live & INGV")
-
-    with st.expander("📹 Webcam LIVE H24 — Ischia", expanded=True):
-        st.markdown(
-            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
-            "Diretta YouTube continua — <strong>Panocam</strong> · "
-            "Telecamera panoramica sull'isola di Ischia</p>",
-            unsafe_allow_html=True,
-        )
-        st.iframe(
-            "https://www.youtube.com/embed/Hllyp_GlG64"
-            "?autoplay=0&rel=0&modestbranding=1",
-            height=380,
-        )
-        st.caption(
-            "📺 Per la visione ottimale aprire in un'altra scheda · "
-            "[→ Webcam Ischia su YouTube](https://www.youtube.com/watch?v=Hllyp_GlG64)"
-        )
-
-    with st.expander("🎬 Ultimi video — @INGVterremoti", expanded=True):
-        videos = _fetch_yt_rss("UCWcylY2YDfioFmDAULj3vgA")
-        _render_yt_cards(
-            videos,
-            fallback_url="https://www.youtube.com/@INGVterremoti",
-            caption_suffix="[→ Canale @INGVterremoti](https://www.youtube.com/@INGVterremoti)",
-        )
-
-
-def _show_solfatara_news() -> None:
-    """
-    Sezione SolfataraNews nel tab Campi Flegrei:
-    - Webcam live H24 (YouTube embed)
-    - Video recenti (RSS YouTube, thumbnail + titolo)
-    - Link social (Instagram, TikTok)
-    """
-    _section_divider("📡 SolfataraNews — Citizen Journalism dai Campi Flegrei")
-
-    # ── Webcam live embed ─────────────────────────────────────────────────────
-    with st.expander("🔴 Webcam LIVE H24 — Solfatara & Campi Flegrei", expanded=True):
-        st.markdown(
-            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
-            "Diretta YouTube continua — <strong>@SolfataraNews</strong> · "
-            "Telecamera puntata su Solfatara e area flegrea</p>",
-            unsafe_allow_html=True,
-        )
-        st.iframe(
-            "https://www.youtube.com/embed/6Ie29xiu_SE"
-            "?autoplay=0&rel=0&modestbranding=1",
-            height=380,
-        )
-        st.caption(
-            "📺 Per la visione ottimale aprire in un'altra scheda · "
-            "[→ canale @SolfataraNews](https://www.youtube.com/@SolfataraNews)"
-        )
-
-    # ── Video recenti ─────────────────────────────────────────────────────────
-    with st.expander("🎬 Ultimi video — SolfataraNews", expanded=True):
-        videos = _fetch_solfatara_rss()
-        _render_yt_cards(videos,
-                         fallback_url="https://www.youtube.com/@SolfataraNews",
-                         caption_suffix="[→ Canale @SolfataraNews](https://www.youtube.com/@SolfataraNews)")
-
-
 def _link_row(icon_label, href, link_text):
     return (f"<tr><td style='padding:7px 12px;border-bottom:1px solid #e9ecef;white-space:nowrap'>"
             f"{icon_label}</td>"
@@ -3248,16 +2575,16 @@ def _show_ingv_official_links(area):
             _link_row("🚨 Protezione Civile — Vesuvio",
                       "https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/vesuvio/",
                       "rischi.protezionecivile.gov.it") +
-            _link_row("🛰️ GPS Nevada Geodetic Lab (portale)",
-                      "https://geodesy.unr.edu/PlugNPlayPortal.php",
+            _link_row("🛰️ GPS Nevada Geodetic Lab",
+                      "http://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/",
                       "geodesy.unr.edu")
         )
         st.markdown(_table_start + rows + _table_end, unsafe_allow_html=True)
     elif area == "flegrei":
         rows = (
-            _link_row("🛰️ GPS RITE — Portale NGL",
-                      "https://geodesy.unr.edu/PlugNPlayPortal.php",
-                      "geodesy.unr.edu") +
+            _link_row("🛰️ GPS Stazione RITE (live)",
+                      "http://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/RITE.tenv3",
+                      "geodesy.unr.edu RITE") +
             _link_row("🌍 Terremoti INGV live", "https://terremoti.ingv.it/", "terremoti.ingv.it") +
             _link_row("💨 Qualità aria (OpenAQ)", "https://openaq.org/#/countries/IT", "openaq.org") +
             _link_row("🚨 Protezione Civile — CF",
@@ -3277,9 +2604,9 @@ def _show_ingv_official_links(area):
             _link_row("🌊 ISPRA — Rischio frane Ischia",
                       "https://www.isprambiente.gov.it/it/attivita/suolo-e-territorio/pericolosita-e-rischio-idrogeologico",
                       "isprambiente.gov.it") +
-            _link_row("📡 GPS ISCH — Portale NGL",
-                      "https://geodesy.unr.edu/PlugNPlayPortal.php",
-                      "geodesy.unr.edu")
+            _link_row("📡 Rete INGV RING — Stazione ISCH",
+                      "http://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/ISCH.tenv3",
+                      "geodesy.unr.edu ISCH")
         )
         st.markdown(_table_start + rows + _table_end, unsafe_allow_html=True)
 
