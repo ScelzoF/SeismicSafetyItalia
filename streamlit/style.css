@@ -439,3 +439,10 @@ p, li, span, label, .stMarkdown p, .stMarkdown li,
 [data-testid="stMarkdownContainer"] h3[style*="color:white"],
 [data-testid="stMarkdownContainer"] h4[style*="color:white"] { color: white !important; }
 
+/* ── Box SOS e box colorati con classe esplicita ─── */
+.sos-header-box, .sos-header-box div, .sos-header-box span,
+.sos-header-box p, .sos-header-box h3 { color: #ffffff !important; }
+
+/* ── div con color:#ffffff inline — non sovrascrivere ─── */
+[data-testid="stMarkdownContainer"] div[style*="color:#ffffff"] { color: #ffffff !important; }
+
