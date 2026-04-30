@@ -3048,7 +3048,11 @@ def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str =
                 thumb = v.get("thumb", "")
                 if thumb:
                     try:
-                        st.image(thumb, use_container_width=True)
+                        thumb_data = _fetch_thumb_bytes(thumb)
+                        if thumb_data:
+                            st.image(thumb_data, use_container_width=True)
+                        else:
+                            st.markdown("🎬", unsafe_allow_html=False)
                     except Exception:
                         st.markdown("🎬", unsafe_allow_html=False)
                 title_short = v["title"][:68] + ("…" if len(v["title"]) > 68 else "")
@@ -3065,6 +3069,18 @@ def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str =
         cap += " · " + caption_suffix
     st.caption(cap)
     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_thumb_bytes(url: str) -> bytes | None:
+    """Scarica thumbnail lato server e restituisce i bytes. Evita il blocco CSP del browser."""
+    try:
+        r = requests.get(url, timeout=6, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200 and r.content:
+            return r.content
+        return None
+    except Exception:
+        return None
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
