@@ -61,7 +61,7 @@ def fetch_latest_bulletin_url(area: str) -> str:
 
 def _fetch_ngl_tail(station: str, timeout: int = 3, tail_kb: int = 80) -> list:
     """Scarica solo gli ultimi tail_kb KB del file tenv3 NGL via HTTPS Range."""
-    url = f"https://geodesy.unr.edu/gps_timeseries/tenv3/IGS14/{station}.tenv3"
+    url = f"https://geodesy.unr.edu/gps_timeseries/IGS14/tenv3/IGS14/{station}.tenv3"
     try:
         resp = requests.get(
             url, timeout=timeout,
