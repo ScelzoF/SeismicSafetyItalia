@@ -1597,3 +1597,86 @@ def fetch_storico_confronto(area: str) -> dict:
         except Exception:
             results[y] = {"count": 0, "max_mag": 0.0, "mags": [], "period": f"—"}
     return results
+
+
+# ─────────────────────────────────────────────────────────────
+# SHAKEMAP AUTOMATICA — INGV ShakeMap Portal
+# URL immagini: https://shakemap.ingv.it/data/{id}/current/products/intensity.jpg
+# ─────────────────────────────────────────────────────────────
+
+_SHAKEMAP_BBOX = {
+    "campi_flegrei": {"min_lat": 40.70, "max_lat": 40.90, "min_lon": 13.85, "max_lon": 14.35},
+    "vesuvio":       {"min_lat": 40.70, "max_lat": 41.00, "min_lon": 14.25, "max_lon": 14.62},
+    "ischia":        {"min_lat": 40.68, "max_lat": 40.80, "min_lon": 13.80, "max_lon": 14.00},
+    "campania":      {"min_lat": 39.90, "max_lat": 41.20, "min_lon": 13.50, "max_lon": 15.60},
+    "italia":        {"min_lat": 36.00, "max_lat": 47.50, "min_lon":  6.50, "max_lon": 18.50},
+}
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def fetch_shakemap_events(area: str = "campania", min_mag: float = 2.5, n_events: int = 6):
+    """
+    Recupera gli eventi ShakeMap recenti dall'INGV ShakeMap Portal
+    filtrati per area geografica e magnitudo minima.
+
+    Restituisce lista di dict con: id, description, lat, lon, mag, depth,
+    datetime_str, img_url, event_url.
+    """
+    bbox = _SHAKEMAP_BBOX.get(area, _SHAKEMAP_BBOX["campania"])
+    min_lat = bbox["min_lat"]
+    max_lat = bbox["max_lat"]
+    min_lon = bbox["min_lon"]
+    max_lon = bbox["max_lon"]
+
+    try:
+        r = requests.get(
+            "https://shakemap.ingv.it/events.json",
+            timeout=12,
+            headers={"User-Agent": "SeismicSafetyItalia/2.0"},
+        )
+        if r.status_code != 200:
+            return []
+        data = r.json()
+
+        events = []
+        for yr_key in data:
+            for mo_key in data[yr_key]:
+                for ev in data[yr_key][mo_key]:
+                    try:
+                        lat = float(ev.get("lat", 0))
+                        lon = float(ev.get("lon", 0))
+                        mag = float(ev.get("mag", 0))
+                        if (min_lat <= lat <= max_lat
+                                and min_lon <= lon <= max_lon
+                                and mag >= min_mag):
+                            yr = int(ev["year"])
+                            mo = int(ev["month"])
+                            dy = int(ev["day"])
+                            hh = int(ev.get("h", 0))
+                            mm = int(ev.get("m", 0))
+                            ss = int(ev.get("s", 0))
+                            eid = str(ev["id"])
+                            events.append({
+                                "id":           eid,
+                                "description":  ev.get("description", "—"),
+                                "lat":          round(lat, 4),
+                                "lon":          round(lon, 4),
+                                "mag":          round(mag, 1),
+                                "depth":        round(float(ev.get("depth", 0)), 1),
+                                "year": yr, "month": mo, "day": dy,
+                                "h": hh, "m": mm, "s": ss,
+                                "datetime_str": f"{dy:02d}/{mo:02d}/{yr} {hh:02d}:{mm:02d} UTC",
+                                "img_url":      f"https://shakemap.ingv.it/data/{eid}/current/products/intensity.jpg",
+                                "event_url":    f"https://shakemap.ingv.it/#event/{eid}",
+                            })
+                    except (ValueError, KeyError, TypeError):
+                        continue
+
+        events.sort(
+            key=lambda e: (e["year"], e["month"], e["day"], e["h"], e["m"]),
+            reverse=True,
+        )
+        return events[:n_events]
+
+    except Exception:
+        return []

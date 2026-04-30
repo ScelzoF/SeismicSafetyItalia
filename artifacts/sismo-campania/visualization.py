@@ -82,6 +82,7 @@ from ingv_monitor import (
     RSAM_URLS,
     GEOCHEM_URLS,
     ZONE_RISCHIO,
+    fetch_shakemap_events,
 )
 
 
@@ -804,6 +805,97 @@ def _render_pdf_download_button(area: str) -> None:
         )
 
 
+def _show_shakemap_widget(area: str, min_mag: float = 2.5) -> None:
+    """
+    Mostra la ShakeMap automatica INGV per l'area specificata.
+    Immagine intensità più recente + lista eventi recenti con link.
+    """
+    events = fetch_shakemap_events(area=area, min_mag=min_mag, n_events=6)
+
+    _AREA_LABELS = {
+        "campi_flegrei": "Campi Flegrei",
+        "vesuvio": "Vesuvio",
+        "ischia": "Ischia",
+        "campania": "Campania",
+        "italia": "Italia",
+    }
+    area_label = _AREA_LABELS.get(area, area.replace("_", " ").title())
+
+    with st.expander(f"🗺️ ShakeMap Automatica INGV — {area_label}", expanded=False):
+        st.caption(
+            "Mappe di scuotimento automatiche INGV ShakeMap v4 · "
+            "Aggiornamento ogni 30 min · "
+            "[shakemap.ingv.it](https://shakemap.ingv.it)"
+        )
+
+        if not events:
+            st.info(
+                f"Nessuna ShakeMap disponibile per {area_label} "
+                f"(M≥{min_mag:.1f}) negli ultimi anni. "
+                "Le ShakeMap vengono generate automaticamente per eventi M≥2.5."
+            )
+            return
+
+        # ── Evento più recente — immagine prominente ──────────────────────────
+        latest = events[0]
+        col_img, col_info = st.columns([2, 1])
+
+        with col_img:
+            st.markdown(
+                f"**Evento più recente con ShakeMap disponibile**  \n"
+                f"M **{latest['mag']:.1f}** · {latest['description']} · "
+                f"{latest['datetime_str']}"
+            )
+            st.image(
+                latest["img_url"],
+                caption=(
+                    f"Intensità sismica M{latest['mag']:.1f} — {latest['description']} "
+                    f"({latest['datetime_str']}) · Profondità {latest['depth']:.1f} km"
+                ),
+                use_container_width=True,
+            )
+
+        with col_info:
+            st.markdown("**Dettagli evento**")
+            st.markdown(
+                f"- 📍 **Luogo:** {latest['description']}\n"
+                f"- 📏 **Magnitudo:** M {latest['mag']:.1f}\n"
+                f"- ⏰ **Data/ora:** {latest['datetime_str']}\n"
+                f"- 🌊 **Profondità:** {latest['depth']:.1f} km\n"
+                f"- 🌍 **Coord.:** {latest['lat']:.3f}°N, {latest['lon']:.3f}°E"
+            )
+            st.link_button(
+                "🔗 Apri su INGV ShakeMap",
+                latest["event_url"],
+                use_container_width=True,
+            )
+
+        # ── Tabella eventi recenti ─────────────────────────────────────────────
+        if len(events) > 1:
+            st.markdown("**Ultimi eventi con ShakeMap:**")
+            for ev in events:
+                _mag_color = (
+                    "#DC2626" if ev["mag"] >= 4.0
+                    else "#D97706" if ev["mag"] >= 3.0
+                    else "#059669"
+                )
+                st.markdown(
+                    f"<div style='display:flex;align-items:center;gap:10px;"
+                    f"padding:5px 0;border-bottom:1px solid #e5e7eb;'>"
+                    f"<span style='background:{_mag_color};color:white;border-radius:4px;"
+                    f"padding:2px 6px;font-weight:700;font-size:0.85em;min-width:42px;text-align:center;'>"
+                    f"M {ev['mag']:.1f}</span>"
+                    f"<span style='flex:1;font-size:0.85em;'>{ev['description']}</span>"
+                    f"<span style='font-size:0.78em;color:#6B7280;white-space:nowrap;'>"
+                    f"{ev['datetime_str']}</span>"
+                    f"<a href='{ev['event_url']}' target='_blank' "
+                    f"style='font-size:0.78em;color:#2563EB;text-decoration:none;'>"
+                    f"↗ mappa</a>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+
 def _show_italia_tab(df, get_text):
     _it_img = _ZONA_IMG["italia"]
     _it_title = _gt("monitoring_italy")
@@ -840,6 +932,7 @@ def _show_italia_tab(df, get_text):
 
     _plot_daily_activity(df)
     _show_risk_calendar(df, area_name="Italia", plot_key="italia")
+    _show_shakemap_widget("italia", min_mag=3.0)
     _show_ingv_news(area="all")
 
 
@@ -1165,6 +1258,7 @@ def _show_vesuvio_tab(df, get_text):
     _section_divider(_gt("official_monitoring"))
     _show_ingv_official_links("vesuvio")
     _render_pdf_download_button("vesuvio")
+    _show_shakemap_widget("vesuvio", min_mag=2.5)
     _show_ingv_news(area="vesuvio")
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
@@ -1463,6 +1557,7 @@ Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi er
     _section_divider(_gt("official_monitoring"))
     _show_ingv_official_links("flegrei")
     _render_pdf_download_button("campi_flegrei")
+    _show_shakemap_widget("campi_flegrei", min_mag=2.5)
     _show_ingv_news(area="cf")
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
@@ -1697,6 +1792,7 @@ def _show_ischia_tab(df, get_text):
     _section_divider("🔗 Monitoraggio Ufficiale")
     _show_ingv_official_links("ischia")
     _render_pdf_download_button("ischia")
+    _show_shakemap_widget("ischia", min_mag=2.5)
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     if not ischia_data.empty:

@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timedelta
 import math
 from translations_lib import get_text as _gt
+from ingv_monitor import fetch_ingv_alert_level
 
 CACHE_TTL_SECONDS = 1800  # 30 minuti
 
@@ -571,7 +572,8 @@ def show():
     st.markdown("---")
 
     # ══ TABS PRINCIPALI ════════════════════════════════════════════════════════
-    tab_vesuvio, tab_flegrei, tab_ischia, tab_regioni, tab_evento, tab_kit = st.tabs([
+    tab_sai, tab_vesuvio, tab_flegrei, tab_ischia, tab_regioni, tab_evento, tab_kit = st.tabs([
+        "🆘 Sai cosa fare?",
         _gt("tab_vesuvio_zones"),
         _gt("tab_flegrei_zones"),
         "🏝️ Ischia",
@@ -579,6 +581,237 @@ def show():
         _gt("tab_procedures"),
         _gt("tab_kit"),
     ])
+
+    # ════════════════════════════════════════════════════════════════════════════
+    # TAB SAI COSA FARE?  — Guida personalizzata basata su allerta INGV live
+    # ════════════════════════════════════════════════════════════════════════════
+    with tab_sai:
+        st.markdown("""
+        <div style='background:#1e3a5f;color:white;padding:14px 18px;border-radius:8px;margin-bottom:16px;'>
+        <h3 style='margin:0;color:white;'>🆘 Sai cosa fare in caso di emergenza?</h3>
+        <p style='margin:6px 0 0 0;font-size:0.9em;opacity:0.9;'>
+        Guida personalizzata basata sui livelli di allerta INGV aggiornati in tempo reale.
+        Scopri cosa fare ADESSO in base alla situazione vulcanica attuale.
+        </p></div>
+        """, unsafe_allow_html=True)
+
+        # ── Fetch livelli allerta INGV ─────────────────────────────────────────
+        try:
+            _alert = fetch_ingv_alert_level()
+        except Exception:
+            _alert = {}
+
+        _CF_LEVEL  = _alert.get("campi_flegrei", "GIALLO")
+        _VES_LEVEL = _alert.get("vesuvio", "VERDE")
+        _ISC_LEVEL = _alert.get("ischia", "VERDE")
+        _ALERT_SRC = _alert.get("source", "INGV OV")
+
+        _LEVEL_COLOR = {
+            "VERDE": "#27ae60", "GIALLO": "#f39c12",
+            "ARANCIONE": "#e67e22", "ROSSO": "#e74c3c",
+        }
+        _LEVEL_ICON = {
+            "VERDE": "🟢", "GIALLO": "🟡",
+            "ARANCIONE": "🟠", "ROSSO": "🔴",
+        }
+
+        # ── Badge allerta attuale ──────────────────────────────────────────────
+        st.markdown("### 📡 Situazione attuale INGV")
+        badge_cols = st.columns(3)
+        for _col, _area_name, _level in [
+            (badge_cols[0], "Campi Flegrei", _CF_LEVEL),
+            (badge_cols[1], "Vesuvio", _VES_LEVEL),
+            (badge_cols[2], "Ischia", _ISC_LEVEL),
+        ]:
+            _c = _LEVEL_COLOR.get(_level, "#6c757d")
+            _ic = _LEVEL_ICON.get(_level, "⚪")
+            with _col:
+                st.markdown(
+                    f"<div style='background:{_c}22;border:2px solid {_c};"
+                    f"border-radius:8px;padding:12px;text-align:center;'>"
+                    f"<div style='font-size:1.8em;'>{_ic}</div>"
+                    f"<div style='font-weight:700;font-size:0.95em;'>{_area_name}</div>"
+                    f"<div style='color:{_c};font-weight:800;font-size:1.1em;'>{_level}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+        st.caption(f"Fonte: {_ALERT_SRC}")
+        st.markdown("---")
+
+        # ── Selezione area utente ──────────────────────────────────────────────
+        st.markdown("### 🏠 La tua zona di rischio")
+        _user_area = st.selectbox(
+            "Seleziona la tua area:",
+            ["📍 Scegli la tua area...", "🌋 Vesuvio (25 comuni zona rossa)",
+             "🔥 Campi Flegrei (zona rossa)", "🏝️ Ischia"],
+            key="sai_cosa_area_sel",
+        )
+
+        if _user_area == "📍 Scegli la tua area...":
+            st.info("👆 Seleziona la tua area sopra per vedere le istruzioni personalizzate.")
+        else:
+            if "Vesuvio" in _user_area:
+                _selected_level = _VES_LEVEL
+                _zona_data = VESUVIO_ZONA_ROSSA
+                _area_key = "vesuvio"
+                _piano_url = "https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/vesuvio/"
+                _area_label = "Vesuvio"
+            elif "Campi Flegrei" in _user_area:
+                _selected_level = _CF_LEVEL
+                _zona_data = CF_ZONA_ROSSA
+                _area_key = "campi_flegrei"
+                _piano_url = "https://rischi.protezionecivile.gov.it/it/vulcanico/vulcani-italia/campi-flegrei/"
+                _area_label = "Campi Flegrei"
+            else:
+                _selected_level = _ISC_LEVEL
+                _zona_data = []
+                _area_key = "ischia"
+                _piano_url = "https://rischi.protezionecivile.gov.it/"
+                _area_label = "Ischia"
+
+            _lc = _LEVEL_COLOR.get(_selected_level, "#6c757d")
+            _li = _LEVEL_ICON.get(_selected_level, "⚪")
+
+            # ── Banner livello attuale + cosa fare ────────────────────────────
+            _ISTRUZIONI = {
+                "VERDE": {
+                    "titolo": "Situazione nella norma — Prepararsi è il momento giusto",
+                    "desc": "Nessuna anomalia significativa. Questo è il momento ideale per prepararsi.",
+                    "steps": [
+                        "✅ **Aggiorna il kit di emergenza** — verifica scadenze, integra scorte d'acqua e medicinali",
+                        "✅ **Individua il punto di raccolta** del tuo Comune (vedi tab Vesuvio/CF/Ischia)",
+                        "✅ **Salva i numeri di emergenza** nel telefono: 112, 115, 800 840 840 (PC)",
+                        "✅ **Pianifica l'evacuazione familiare** — un percorso principale e uno alternativo",
+                        "✅ **Scarica l'app IT-Alert** e attiva le notifiche",
+                        "✅ **Tieni una radio a batterie** — in caso di emergenza è l'unica fonte affidabile",
+                        "✅ **Tieniti aggiornato** su INGV e Protezione Civile",
+                    ],
+                },
+                "GIALLO": {
+                    "titolo": "Attenzione — Monitora la situazione con frequenza",
+                    "desc": "Anomalie in corso. Non è ancora emergenza, ma devi essere pronto ad agire rapidamente.",
+                    "steps": [
+                        "⚠️ **Verifica che il kit di emergenza sia completo** e pronto vicino all'uscita",
+                        "⚠️ **Controlla questa app ogni 2-4 ore** e i canali INGV OV",
+                        "⚠️ **Avvisa la famiglia** del livello di attenzione e rivedi il piano di evacuazione",
+                        "⚠️ **Identifica il tuo punto di raccolta** — sai esattamente dove andare?",
+                        "⚠️ **Tieni il serbatoio dell'auto pieno** (o almeno a metà)",
+                        "⚠️ **Segui solo fonti ufficiali** — Protezione Civile, INGV, RAI Radio 1",
+                        "⚠️ **Non allarmarti**, ma sii pronto a partire in 15 minuti se arriva l'ordine",
+                    ],
+                },
+                "ARANCIONE": {
+                    "titolo": "ALLERTA — Preparati a evacuare immediatamente",
+                    "desc": "Anomalie significative in corso. Le autorità potrebbero ordinare l'evacuazione a breve.",
+                    "steps": [
+                        "🟠 **PRENDI SUBITO il kit di emergenza** — acqua, cibo, medicinali, documenti, power bank",
+                        "🟠 **Contatta i familiari** — pianificate insieme il percorso di evacuazione",
+                        "🟠 **Tieniti pronto a partire in 10 minuti** dall'ordine delle autorità",
+                        "🟠 **Ascolta RAI Radio 1** e gli aggiornamenti ufficiali della PC continuamente",
+                        "🟠 **Spostati al punto di raccolta** solo se le autorità lo ordinano",
+                        "🟠 **Non usare il telefono** per chiamate non urgenti — libera le linee ai soccorsi",
+                        "🟠 **Non credere a voci non ufficiali** — fonti: protezionecivile.gov.it, INGV",
+                    ],
+                },
+                "ROSSO": {
+                    "titolo": "EMERGENZA — EVACUA ORA",
+                    "desc": "Situazione critica. Segui immediatamente le istruzioni della Protezione Civile.",
+                    "steps": [
+                        "🔴 **EVACUA SUBITO** — non aspettare, segui le vie di fuga indicate dalla segnaletica DPC",
+                        "🔴 **Prendi SOLO l'essenziale** — documenti, medicinali, 1 borsa",
+                        "🔴 **Raggiungi il punto di raccolta** del tuo Comune IN AUTO (non a piedi)",
+                        "🔴 **Segui la segnaletica gialla DPC** sulle vie di fuga — non improvvisare",
+                        "🔴 **Ascolta solo RAI Radio 1** e i megafoni della Protezione Civile",
+                        "🔴 **Non tornare a casa** per nessun motivo fino all'ok delle autorità",
+                        "🔴 **Chiama il 112 solo per emergenze reali** — non intasare le linee",
+                    ],
+                },
+            }
+
+            _instr = _ISTRUZIONI.get(_selected_level, _ISTRUZIONI["VERDE"])
+
+            st.markdown(
+                f"<div style='background:{_lc}22;border-left:5px solid {_lc};"
+                f"padding:14px 18px;border-radius:8px;margin:12px 0;'>"
+                f"<h4 style='margin:0;color:{_lc};'>{_li} {_selected_level} — {_instr['titolo']}</h4>"
+                f"<p style='margin:6px 0 0 0;'>{_instr['desc']}</p>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("#### 📋 Cosa fare ADESSO:")
+            for step in _instr["steps"]:
+                st.markdown(f"- {step}")
+
+            st.markdown("---")
+
+            # ── Trova il tuo punto di raccolta ────────────────────────────────
+            if _zona_data:
+                st.markdown("#### 📍 Trova il tuo punto di raccolta")
+                _comune_list = [p["comune"] for p in _zona_data]
+                _sel_com = st.selectbox(
+                    "Seleziona il tuo Comune:",
+                    ["— Scegli il tuo Comune —"] + _comune_list,
+                    key=f"sai_cosa_comune_{_area_key}",
+                )
+                if _sel_com != "— Scegli il tuo Comune —":
+                    _punto = next((p for p in _zona_data if p["comune"] == _sel_com), None)
+                    if _punto:
+                        st.markdown(
+                            f"<div style='background:#1a8a1a22;border-left:4px solid #1a8a1a;"
+                            f"padding:12px;border-radius:6px;'>"
+                            f"<b>📍 {_punto['comune']}</b> — Zona {_punto['zona']}<br>"
+                            f"<b>Punto di raccolta:</b> {_punto['punto']}<br>"
+                            f"<b>Capacità:</b> ~{_punto['pax']:,} persone<br>"
+                            f"{_nav_buttons_html(_punto['plat'], _punto['plon'], _punto['punto'])}"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+
+            # ── Link rapidi ────────────────────────────────────────────────────
+            st.markdown("---")
+            _lnk1, _lnk2, _lnk3 = st.columns(3)
+            with _lnk1:
+                st.link_button(
+                    "📋 Piano Evacuazione DPC",
+                    _piano_url,
+                    use_container_width=True,
+                )
+            with _lnk2:
+                st.link_button(
+                    "📡 IT-Alert — Allerta Nazionale",
+                    "https://www.it-alert.it",
+                    use_container_width=True,
+                )
+            with _lnk3:
+                st.link_button(
+                    "🌋 INGV — Monitoraggio Live",
+                    "https://www.ingv.it",
+                    use_container_width=True,
+                )
+
+        # ── Regole universali post-terremoto ──────────────────────────────────
+        st.markdown("---")
+        with st.expander("🌍 Cosa fare in caso di TERREMOTO (regole universali)", expanded=False):
+            st.markdown("""
+            **Durante la scossa:**
+            - 🛡️ Riparati **SOTTO un tavolo robusto** o nel vano di una porta portante
+            - 🚫 NON precipitarti verso le uscite durante la scossa
+            - 🚫 NON usare ascensori
+
+            **Subito dopo:**
+            - 🚶 Esci con prudenza usano le scale (non l'ascensore)
+            - 📍 Raggiungi l'**area di raccolta** indicata dal tuo Comune
+            - 📻 Sintonizzati su **RAI Radio 1** per informazioni ufficiali
+            - 🚗 Non usare l'auto nelle prime ore (strade riservate ai soccorsi)
+
+            **Non fare:**
+            - ❌ Non rientrare nell'edificio senza il via libera delle autorità
+            - ❌ Non diffondere notizie non verificate
+            - ❌ Non intasare le linee telefoniche (usa solo il 112 per emergenze reali)
+
+            📎 [Protezione Civile — rischio sismico](https://www.protezionecivile.gov.it/it/rischio/rischio-sismico/cosa-fare)
+            """)
 
     # ════════════════════════════════════════════════════════════════════════════
     # TAB VESUVIO
