@@ -2986,23 +2986,26 @@ def _fetch_solfatara_rss() -> list:
     """Scarica i video recenti di SolfataraNews dal feed RSS YouTube."""
     import xml.etree.ElementTree as ET
     url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCC1XzjkXRz0DLJfH-69t1vQ"
+    ns = {
+        "atom": "http://www.w3.org/2005/Atom",
+        "yt":   "http://www.youtube.com/xml/schemas/2015",
+        "media":"http://search.yahoo.com/mrss/",
+    }
     try:
         r = requests.get(url, timeout=8, headers={"User-Agent": "SeismicSafetyItalia/2.0"})
         if r.status_code != 200:
             return []
-        ns = {
-            "atom": "http://www.w3.org/2005/Atom",
-            "yt":   "http://www.youtube.com/xml/schemas/2015",
-            "media":"http://search.yahoo.com/mrss/",
-        }
         root = ET.fromstring(r.text)
         videos = []
         for entry in root.findall("atom:entry", ns)[:6]:
-            vid_id = (entry.find("yt:videoId", ns) or entry).text
-            if not vid_id:
-                continue
+            vid_el   = entry.find("yt:videoId", ns)
             title_el = entry.find("atom:title", ns)
             pub_el   = entry.find("atom:published", ns)
+            if vid_el is None:
+                continue
+            vid_id = vid_el.text
+            if not vid_id:
+                continue
             title = title_el.text if title_el is not None else ""
             pub   = pub_el.text[:10] if pub_el is not None else ""
             videos.append({
@@ -3029,16 +3032,6 @@ def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str =
         st.info(msg)
         return
 
-    # CSS card container
-    st.markdown("""
-<style>
-.yt-card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:8px}
-.yt-card{background:#1a2130;border:1px solid #2d3a4a;border-radius:8px;overflow:hidden;padding:0}
-.yt-card-body{padding:8px 10px 10px}
-.yt-card-title{color:#e2e8f0;font-size:0.80rem;font-weight:600;line-height:1.4;margin-bottom:4px}
-.yt-card-date{color:#64748b;font-size:0.69rem}
-</style>""", unsafe_allow_html=True)
-
     # Griglia 3 colonne
     for row_start in range(0, len(videos), 3):
         row_videos = videos[row_start:row_start + 3]
@@ -3052,17 +3045,12 @@ def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str =
                         if thumb_data:
                             st.image(thumb_data, use_container_width=True)
                         else:
-                            st.markdown("🎬", unsafe_allow_html=False)
+                            st.markdown("🎬")
                     except Exception:
-                        st.markdown("🎬", unsafe_allow_html=False)
+                        st.markdown("🎬")
                 title_short = v["title"][:68] + ("…" if len(v["title"]) > 68 else "")
-                st.markdown(
-                    f"<div class='yt-card-body'>"
-                    f"<div class='yt-card-title'><a href='{v['url']}' target='_blank' "
-                    f"style='color:#e2e8f0;text-decoration:none'>{title_short}</a></div>"
-                    f"<div class='yt-card-date'>📅 {v['pub']}</div></div>",
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f"**[{title_short}]({v['url']})**")
+                st.caption(f"📅 {v['pub']}")
 
     cap = "🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico"
     if caption_suffix:
