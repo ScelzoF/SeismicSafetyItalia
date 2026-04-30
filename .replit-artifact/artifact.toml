@@ -1,0 +1,12 @@
+kind = "web"
+previewPath = "/"
+title = "SismoCampania"
+version = "1.0.0"
+
+[[services]]
+localPort = 5000
+name = "web"
+paths = ["/"]
+
+[services.development]
+run = "cd /home/runner/workspace/artifacts/sismo-campania && streamlit run app.py --server.port ${PORT:-5000} --server.address 0.0.0.0 --server.headless true"
