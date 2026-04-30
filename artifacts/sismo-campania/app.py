@@ -24,6 +24,7 @@ import forum
 import utils
 import ai_analysis
 import ai_chat
+import ingv_monitor
 
 # Impostiamo la localizzazione italiana per i nomi dei giorni
 try:
@@ -236,22 +237,34 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
 
     st.markdown("---")
 
-    # ── Alert livelli allerta ───────────────────────────────────────────────
+    # ── Alert livelli allerta — LIVE da INGV ───────────────────────────────
+    _sb_alert_styles = {
+        "VERDE":     ("rgba(39,174,96,0.25)",  "#27ae60", "#d4f7e0", "🟢"),
+        "GIALLO":    ("rgba(243,156,18,0.25)", "#f39c12", "#fff3cd", "🟡"),
+        "ARANCIONE": ("rgba(230,126,34,0.25)", "#e67e22", "#fde8d8", "🟠"),
+        "ROSSO":     ("rgba(231,76,60,0.25)",  "#e74c3c", "#f8d7da", "🔴"),
+    }
+    def _sb_badge_html(area_name, level):
+        lvl = level.upper() if level else "VERDE"
+        bg, border, txt, icon = _sb_alert_styles.get(lvl, _sb_alert_styles["VERDE"])
+        return (
+            f"<div style='background:{bg};border:1px solid {border};"
+            f"border-radius:7px;padding:6px 10px;'>"
+            f"<span style='font-size:12px;font-weight:700;color:{txt};'>{icon} {area_name}</span>"
+            f"<span style='font-size:11px;color:{txt};float:right;'>{lvl}</span>"
+            f"</div>"
+        )
+    _sb_alert_data = st.session_state.alert_level_cache or ingv_monitor.fetch_ingv_alert_level() or {}
+    _sb_ves = _sb_alert_data.get("vesuvio", "VERDE")
+    _sb_cf  = _sb_alert_data.get("campi_flegrei", "GIALLO")
+    _sb_isc = _sb_alert_data.get("ischia", "VERDE")
     st.markdown(f"**🚨 {get_text('alert_levels')}**")
     st.markdown(
         f"""<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:4px;">
-<div style="background:rgba(39,174,96,0.25);border:1px solid #27ae60;border-radius:7px;padding:6px 10px;">
-  <span style="font-size:12px;font-weight:700;color:#d4f7e0;">🟢 Vesuvio</span>
-  <span style="font-size:11px;color:#d4f7e0;float:right;">{get_text('alert_verde')}</span>
+{_sb_badge_html("Vesuvio", _sb_ves)}
+{_sb_badge_html("Campi Flegrei", _sb_cf)}
+{_sb_badge_html("Ischia", _sb_isc)}
 </div>
-<div style="background:rgba(243,156,18,0.25);border:1px solid #f39c12;border-radius:7px;padding:6px 10px;">
-  <span style="font-size:12px;font-weight:700;color:#fff3cd;">🟡 Campi Flegrei</span>
-  <span style="font-size:11px;color:#fff3cd;float:right;">{get_text('alert_giallo')}</span>
-</div>
-<div style="background:rgba(39,174,96,0.25);border:1px solid #27ae60;border-radius:7px;padding:6px 10px;">
-  <span style="font-size:12px;font-weight:700;color:#d4f7e0;">🟢 Ischia</span>
-  <span style="font-size:11px;color:#d4f7e0;float:right;">{get_text('alert_verde')}</span>
-</div></div>
 <p style="font-size:10px;color:rgba(255,255,255,0.6);margin:0;">{get_text('fonte_ingv_ov')}</p>""",
         unsafe_allow_html=True,
     )

@@ -747,26 +747,12 @@ def show():
 
             # ── Trova il tuo punto di raccolta ────────────────────────────────
             if _zona_data:
-                st.markdown("#### 📍 Trova il tuo punto di raccolta")
-                _comune_list = [p["comune"] for p in _zona_data]
-                _sel_com = st.selectbox(
-                    "Seleziona il tuo Comune:",
-                    ["— Scegli il tuo Comune —"] + _comune_list,
-                    key=f"sai_cosa_comune_{_area_key}",
+                _tab_label = "🌋 Vesuvio" if _area_key == "vesuvio" else "🔥 Campi Flegrei"
+                st.info(
+                    f"📍 **Trova il tuo punto di raccolta e le vie di fuga** nel tab "
+                    f"**{_tab_label}** qui accanto — seleziona il tuo Comune per ottenere "
+                    f"indirizzo, capienza e navigazione diretta."
                 )
-                if _sel_com != "— Scegli il tuo Comune —":
-                    _punto = next((p for p in _zona_data if p["comune"] == _sel_com), None)
-                    if _punto:
-                        st.markdown(
-                            f"<div style='background:#1a8a1a22;border-left:4px solid #1a8a1a;"
-                            f"padding:12px;border-radius:6px;'>"
-                            f"<b>📍 {_punto['comune']}</b> — Zona {_punto['zona']}<br>"
-                            f"<b>Punto di raccolta:</b> {_punto['punto']}<br>"
-                            f"<b>Capacità:</b> ~{_punto['pax']:,} persone<br>"
-                            f"{_nav_buttons_html(_punto['plat'], _punto['plon'], _punto['punto'])}"
-                            f"</div>",
-                            unsafe_allow_html=True,
-                        )
 
             # ── Link rapidi ────────────────────────────────────────────────────
             st.markdown("---")
