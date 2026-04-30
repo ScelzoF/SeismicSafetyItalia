@@ -3021,8 +3021,8 @@ def _fetch_solfatara_rss() -> list:
 
 def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str = "") -> None:
     """
-    Renderizza una griglia di card video YouTube.
-    Usa URL diretti dei thumbnail (nessun base64, nessuna sanitizzazione).
+    Renderizza una griglia 3-colonne di card video YouTube.
+    Usa st.image() per i thumbnail — caricamento server-side, nessun problema CSP.
     """
     if not videos:
         msg = "Feed RSS temporaneamente non disponibile."
@@ -3031,47 +3031,37 @@ def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str =
         st.info(msg)
         return
 
-    inner = ""
-    for v in videos:
-        thumb_url = v.get("thumb", "")
-        img_tag = (
-            f"<img src='{thumb_url}' style='width:100%;aspect-ratio:16/9;"
-            f"object-fit:cover;display:block;border-radius:7px 7px 0 0' "
-            f"onerror=\"this.style.display='none';this.nextSibling.style.display='flex'\">"
-            f"<div style='width:100%;aspect-ratio:16/9;background:#1e293b;"
-            f"border-radius:7px 7px 0 0;display:none;align-items:center;"
-            f"justify-content:center;font-size:2rem'>🎬</div>"
-        ) if thumb_url else (
-            "<div style='width:100%;aspect-ratio:16/9;background:#1e293b;"
-            "border-radius:7px 7px 0 0;display:flex;align-items:center;"
-            "justify-content:center;font-size:2rem'>🎬</div>"
-        )
-        title_esc = v["title"][:72].replace("<","&lt;").replace(">","&gt;")
-        if len(v["title"]) > 72:
-            title_esc += "…"
-        inner += (
-            f"<a href='{v['url']}' target='_blank' rel='noopener' "
-            f"style='text-decoration:none;display:block'>"
-            f"<div class='card'>{img_tag}"
-            f"<div style='padding:9px 11px 11px'>"
-            f"<div style='color:#e2e8f0;font-size:0.79rem;font-weight:600;"
-            f"line-height:1.45;margin-bottom:5px'>{title_esc}</div>"
-            f"<div style='color:#64748b;font-size:0.69rem'>📅 {v['pub']}</div>"
-            f"</div></div></a>"
-        )
+    # CSS card container
+    st.markdown("""
+<style>
+.yt-card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:8px}
+.yt-card{background:#1a2130;border:1px solid #2d3a4a;border-radius:8px;overflow:hidden;padding:0}
+.yt-card-body{padding:8px 10px 10px}
+.yt-card-title{color:#e2e8f0;font-size:0.80rem;font-weight:600;line-height:1.4;margin-bottom:4px}
+.yt-card-date{color:#64748b;font-size:0.69rem}
+</style>""", unsafe_allow_html=True)
 
-    rows = (len(videos) + 2) // 3
-    full_html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:transparent;font-family:sans-serif;padding:2px}}
-.grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}
-.card{{background:#1a2130;border-radius:8px;overflow:hidden;border:1px solid #2d3a4a}}
-.card:hover{{border-color:#4a5568}}
-</style></head><body>
-<div class="grid">{inner}</div>
-</body></html>"""
-    height = max(220, rows * 200 + 30)
-    st.components.v1.html(full_html, height=height, scrolling=False)
+    # Griglia 3 colonne
+    for row_start in range(0, len(videos), 3):
+        row_videos = videos[row_start:row_start + 3]
+        cols = st.columns(3)
+        for col, v in zip(cols, row_videos):
+            with col:
+                thumb = v.get("thumb", "")
+                if thumb:
+                    try:
+                        st.image(thumb, use_container_width=True)
+                    except Exception:
+                        st.markdown("🎬", unsafe_allow_html=False)
+                title_short = v["title"][:68] + ("…" if len(v["title"]) > 68 else "")
+                st.markdown(
+                    f"<div class='yt-card-body'>"
+                    f"<div class='yt-card-title'><a href='{v['url']}' target='_blank' "
+                    f"style='color:#e2e8f0;text-decoration:none'>{title_short}</a></div>"
+                    f"<div class='yt-card-date'>📅 {v['pub']}</div></div>",
+                    unsafe_allow_html=True,
+                )
+
     cap = "🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico"
     if caption_suffix:
         cap += " · " + caption_suffix
