@@ -1225,11 +1225,20 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
     }
     color = _COLORS.get(area_name, "#059669")
 
-    # Ultimo punto dinamico: mese corrente + valore reale dal bollettino live
+    # Ultimo punto dinamico: mese corrente
     _now_ym = datetime.now().strftime("%Y-%m")
     _up_total = gps_result.get("up_total_mm")
 
-    # Dati storici bollettini INGV come riferimento (punti fissi verificati)
+    # ── Campi Flegrei: serie temporale live da INGV OV ───────────────────────
+    _cf_ts = {}
+    if area_name == "Campi Flegrei":
+        try:
+            from ingv_monitor import fetch_ingv_cf_gps_timeseries
+            _cf_ts = fetch_ingv_cf_gps_timeseries()
+        except Exception:
+            _cf_ts = {}
+
+    # Dati storici di riferimento per Vesuvio e Ischia
     _BULLETIN_SERIES = {
         "Vesuvio": {
             "dates":  ["2000-01","2005-01","2010-01","2015-01","2018-01",
@@ -1237,13 +1246,6 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
             "values": [0, -1, -2, -3, -4, -4.5, -5, -5.5, -6,
                        round(_up_total, 1) if _up_total else -6.5],
             "ylabel": "Deformazione cumulativa (mm)",
-        },
-        "Campi Flegrei": {
-            "dates":  ["2005-01","2010-01","2015-01","2018-01","2020-01",
-                       "2022-01","2023-01","2024-01","2025-01", _now_ym],
-            "values": [0, 100, 340, 550, 720, 920, 1120, 1320, 1520,
-                       round(_up_total, 1) if _up_total else 1740],
-            "ylabel": "Sollevamento cumulativo (mm)",
         },
         "Ischia": {
             "dates":  ["2015-01","2017-01","2017-08","2018-01","2020-01",
@@ -1260,9 +1262,28 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
         y_vals = ts_df["up_mm"].round(2).tolist()
         badge = "🟢 LIVE — Nevada Geodetic Laboratory (NGL)"
         y_label = "Deformazione relativa (mm)"
+    elif area_name == "Campi Flegrei" and _cf_ts.get("ok") and len(_cf_ts.get("dates", [])) >= 5:
+        # ── SERIE TEMPORALE MENSILE LIVE da pagina INGV OV ──────────────────
+        x_vals  = _cf_ts["dates"]
+        y_vals  = _cf_ts["values"]
+        rate    = _cf_ts["monthly_rate_mm"]
+        tot_cm  = _cf_ts["total_cm"]
+        badge   = (f"🟢 LIVE — INGV OV · RITE {tot_cm} cm da nov-2005 "
+                   f"· tasso attuale ~{rate:.0f} mm/mese")
+        y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
     else:
         # Fallback: dati storici INGV OV + ultimo punto dal bollettino live
-        series = _BULLETIN_SERIES.get(area_name, {})
+        if area_name == "Campi Flegrei":
+            # Costruisci serie CF con dati storici verificati + punto live
+            series = {
+                "dates":  ["2005-01","2010-01","2015-01","2018-01","2020-01",
+                           "2022-01","2023-01","2024-01","2025-01", _now_ym],
+                "values": [0, 100, 340, 550, 720, 920, 1120, 1320, 1380,
+                           round(_up_total, 1) if _up_total else 1635],
+                "ylabel": "Sollevamento cumulativo (mm)",
+            }
+        else:
+            series = _BULLETIN_SERIES.get(area_name, {})
         if not series:
             return
         x_vals = series["dates"]

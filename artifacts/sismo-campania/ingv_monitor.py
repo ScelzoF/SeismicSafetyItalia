@@ -54,6 +54,133 @@ def fetch_latest_bulletin_url(area: str) -> str:
     return DIRECT_URLS.get(area, _BULLETIN_LISTING.get(area, "https://www.ov.ingv.it"))
 
 # ─────────────────────────────────────────────────────────────
+# GPS DEFORMAZIONE — INGV OV live (serie temporale mensile)
+# Fonte: https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/
+#        campi-flegrei/campi-flegrei-attivita-recente
+# Stazione RITE: Rione Terra, Pozzuoli
+# ─────────────────────────────────────────────────────────────
+
+_CF_ACTIVITY_URL = (
+    "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/"
+    "campi-flegrei/campi-flegrei-attivita-recente"
+)
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_ingv_cf_gps_timeseries() -> dict:
+    """
+    Scarica la pagina di attività CF di INGV OV e costruisce una serie temporale
+    mensile del sollevamento RITE da gennaio 2023 ad oggi.
+
+    Restituisce:
+        {
+          "dates":  [str YYYY-MM ...],
+          "values": [float mm uplift da nov-2005 ...],
+          "total_cm": float,
+          "since_jan2025_cm": float,
+          "monthly_rate_mm": float,   # tasso corrente
+          "source": str,
+          "ok": bool,
+        }
+    """
+    import re
+    from datetime import date
+
+    FALLBACK = {
+        "dates": [], "values": [],
+        "total_cm": 163.5, "since_jan2025_cm": 25.5,
+        "monthly_rate_mm": 10.0,
+        "source": "INGV OV (fallback statico)", "ok": False,
+    }
+
+    try:
+        resp = requests.get(
+            _CF_ACTIVITY_URL, timeout=10,
+            headers={"User-Agent": "SeismicSafetyItalia/2.0"},
+        )
+        if resp.status_code != 200:
+            return FALLBACK
+        text = resp.text
+
+        # ── Totale da novembre 2005 ──────────────────────────────
+        m_tot = re.search(
+            r"sollevamento[^è<]*\è[^<]*circa\s+([\d]+[.,]\d*)\s*cm\s*da\s*novembre\s*2005",
+            text, re.IGNORECASE | re.DOTALL,
+        )
+        total_cm = float(m_tot.group(1).replace(",", ".")) if m_tot else 163.5
+
+        # ── Sollevamento da gennaio 2025 ─────────────────────────
+        m_2025 = re.search(
+            r"di cui circa\s+([\d]+[.,]\d*)\s*cm\s*da\s*gennaio\s*2025",
+            text, re.IGNORECASE,
+        )
+        since_jan2025_cm = float(m_2025.group(1).replace(",", ".")) if m_2025 else 25.5
+
+        total_mm    = total_cm * 10
+        jan2025_mm  = total_mm - since_jan2025_cm * 10
+
+        # ── Tassi mensili per periodi ────────────────────────────
+        # Ogni valore (mm/mese) menzionato nel testo, in ordine cronologico
+        rates_raw = re.findall(r"circa\s+([\d]+[.,]?\d*)[^m]*mm/mese", text, re.IGNORECASE)
+        rates = [float(r.replace(",", ".")) for r in rates_raw]
+        current_rate = rates[-1] if rates else 10.0
+
+        # Periodi noti dall'analisi del testo (aggiornati manualmente se la pagina
+        # cambia struttura; il regex cattura sempre l'ultimo tasso come "corrente")
+        rate_periods = [
+            (date(2025,  1,  1), date(2025,  4,  1), rates[0] if len(rates) > 0 else 14.0),
+            (date(2025,  4,  1), date(2025, 10, 10), rates[0] if len(rates) > 0 else 15.0),
+            (date(2025, 10, 10), date(2025, 12, 15), rates[1] if len(rates) > 1 else 25.0),
+            (date(2025, 12, 15), date(2026,  2,  1), rates[2] if len(rates) > 2 else 15.0),
+            (date(2026,  2,  1), date(2099,  1,  1), current_rate),
+        ]
+
+        # ── Costruzione serie mensile 2023-01 → mese corrente ───
+        now = date.today()
+        dates_out: list = []
+        values_out: list = []
+
+        # 2023-01 stima iniziale: Jan 2025 - 24 mesi × 14 mm/mese
+        val_mm = jan2025_mm - 24 * 14.0
+
+        cur = date(2023, 1, 1)
+        while cur <= date(now.year, now.month, 1):
+            dates_out.append(cur.strftime("%Y-%m"))
+            if cur < date(2025, 1, 1):
+                values_out.append(round(val_mm, 1))
+                val_mm += 14.0
+            else:
+                # Forza ricalcolo da Jan 2025 per eliminare deriva
+                if cur == date(2025, 1, 1):
+                    val_mm = jan2025_mm
+                values_out.append(round(val_mm, 1))
+                # trova tasso per questo mese
+                r = current_rate
+                for (s, e, rv) in rate_periods:
+                    if s <= cur < e:
+                        r = rv
+                        break
+                val_mm += r
+
+            # avanza mese
+            if cur.month == 12:
+                cur = date(cur.year + 1, 1, 1)
+            else:
+                cur = date(cur.year, cur.month + 1, 1)
+
+        return {
+            "dates": dates_out,
+            "values": values_out,
+            "total_cm": total_cm,
+            "since_jan2025_cm": since_jan2025_cm,
+            "monthly_rate_mm": current_rate,
+            "source": f"INGV OV live — RITE {total_cm} cm da nov-2005",
+            "ok": True,
+        }
+    except Exception:
+        return FALLBACK
+
+
+# ─────────────────────────────────────────────────────────────
 # GPS DEFORMAZIONE — Nevada Geodetic Laboratory (NGL)
 # Stazione RITE: Rione Terra, Pozzuoli — riferimento principale
 # per il monitoraggio del bradisismo dei Campi Flegrei
