@@ -6,6 +6,7 @@ qualità aria reale da OpenAQ/ARPA Campania.
 """
 
 import warnings
+import requests
 warnings.filterwarnings("ignore", message=".*components.v1.html.*")
 warnings.filterwarnings("ignore", message=".*st.iframe.*")
 warnings.filterwarnings("ignore", message=".*use_container_width.*")
@@ -1229,67 +1230,77 @@ def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> 
     _now_ym = datetime.now().strftime("%Y-%m")
     _up_total = gps_result.get("up_total_mm")
 
-    # ── Campi Flegrei: serie temporale live da INGV OV ───────────────────────
-    _cf_ts = {}
-    if area_name == "Campi Flegrei":
-        try:
+    # ── Serie temporali live INGV OV per tutte e tre le aree ────────────────
+    _area_ts = {}
+    try:
+        if area_name == "Campi Flegrei":
             from ingv_monitor import fetch_ingv_cf_gps_timeseries
-            _cf_ts = fetch_ingv_cf_gps_timeseries()
-        except Exception:
-            _cf_ts = {}
-
-    # Dati storici di riferimento per Vesuvio e Ischia
-    _BULLETIN_SERIES = {
-        "Vesuvio": {
-            "dates":  ["2000-01","2005-01","2010-01","2015-01","2018-01",
-                       "2020-01","2022-01","2024-01","2025-01", _now_ym],
-            "values": [0, -1, -2, -3, -4, -4.5, -5, -5.5, -6,
-                       round(_up_total, 1) if _up_total else -6.5],
-            "ylabel": "Deformazione cumulativa (mm)",
-        },
-        "Ischia": {
-            "dates":  ["2015-01","2017-01","2017-08","2018-01","2020-01",
-                       "2022-01","2022-11","2023-01","2024-01", _now_ym],
-            "values": [0, 10, -30, -20, 0, 10, -40, -20, -10,
-                       round(_up_total, 1) if _up_total else 0],
-            "ylabel": "Deformazione relativa (mm)",
-        },
-    }
+            _area_ts = fetch_ingv_cf_gps_timeseries()
+        elif area_name == "Vesuvio":
+            from ingv_monitor import fetch_ingv_ves_gps_timeseries
+            _area_ts = fetch_ingv_ves_gps_timeseries()
+        elif area_name == "Ischia":
+            from ingv_monitor import fetch_ingv_isc_gps_timeseries
+            _area_ts = fetch_ingv_isc_gps_timeseries()
+    except Exception:
+        _area_ts = {}
 
     if ts_df is not None and len(ts_df) >= 5:
-        # Dati NGL live — ultimi 6 mesi
+        # Dati NGL live — ultimi 6 mesi (mai raggiunto, ma priorità massima)
         x_vals = ts_df["date"].tolist()
         y_vals = ts_df["up_mm"].round(2).tolist()
         badge = "🟢 LIVE — Nevada Geodetic Laboratory (NGL)"
         y_label = "Deformazione relativa (mm)"
-    elif area_name == "Campi Flegrei" and _cf_ts.get("ok") and len(_cf_ts.get("dates", [])) >= 5:
-        # ── SERIE TEMPORALE MENSILE LIVE da pagina INGV OV ──────────────────
-        x_vals  = _cf_ts["dates"]
-        y_vals  = _cf_ts["values"]
-        rate    = _cf_ts["monthly_rate_mm"]
-        tot_cm  = _cf_ts["total_cm"]
-        badge   = (f"🟢 LIVE — INGV OV · RITE {tot_cm} cm da nov-2005 "
-                   f"· tasso attuale ~{rate:.0f} mm/mese")
-        y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
-    else:
-        # Fallback: dati storici INGV OV + ultimo punto dal bollettino live
+    elif _area_ts.get("ok") and len(_area_ts.get("dates", [])) >= 5:
+        # ── SERIE TEMPORALE MENSILE LIVE da bollettino INGV OV ──────────────
+        x_vals = _area_ts["dates"]
+        y_vals = _area_ts["values"]
+        rate   = _area_ts["monthly_rate_mm"]
+        src    = _area_ts.get("source", "INGV OV live")
+
         if area_name == "Campi Flegrei":
-            # Costruisci serie CF con dati storici verificati + punto live
-            series = {
+            tot_cm = _area_ts.get("total_cm", "")
+            badge  = (f"🟢 LIVE — INGV OV · RITE {tot_cm} cm da nov-2005 "
+                      f"· tasso attuale ~{rate:.0f} mm/mese")
+            y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
+        elif area_name == "Vesuvio":
+            badge  = f"🟢 LIVE — INGV OV · BKNO/ERAS tasso {rate:+.2f} mm/mese"
+            y_label = "Deformazione relativa (mm, ref. gen-2019)"
+        else:
+            badge  = f"🟢 LIVE — INGV OV · IOCA/ISAS tasso {rate:+.2f} mm/mese"
+            y_label = "Deformazione relativa (mm, ref. gen-2020)"
+    else:
+        # Fallback statico
+        _STATIC = {
+            "Campi Flegrei": {
                 "dates":  ["2005-01","2010-01","2015-01","2018-01","2020-01",
                            "2022-01","2023-01","2024-01","2025-01", _now_ym],
                 "values": [0, 100, 340, 550, 720, 920, 1120, 1320, 1380,
                            round(_up_total, 1) if _up_total else 1635],
                 "ylabel": "Sollevamento cumulativo (mm)",
-            }
-        else:
-            series = _BULLETIN_SERIES.get(area_name, {})
+            },
+            "Vesuvio": {
+                "dates":  ["2019-01","2020-01","2021-01","2022-01","2023-01",
+                           "2024-01","2025-01", _now_ym],
+                "values": [0, -1.2, -2.4, -3.6, -4.8, -6.0, -7.2,
+                           round(_up_total, 1) if _up_total else -8.4],
+                "ylabel": "Deformazione relativa (mm)",
+            },
+            "Ischia": {
+                "dates":  ["2020-01","2021-01","2022-01","2022-11","2023-06",
+                           "2024-01","2025-01", _now_ym],
+                "values": [0, 0, 0, -25, -5, -5, -5,
+                           round(_up_total, 1) if _up_total else -5],
+                "ylabel": "Deformazione relativa (mm)",
+            },
+        }
+        series = _STATIC.get(area_name, {})
         if not series:
             return
         x_vals = series["dates"]
         y_vals = series["values"]
         last_src = gps_result.get("source", "INGV OV")
-        badge = f"📡 Storico INGV OV + bollettino live ({_now_ym}) — {last_src}"
+        badge = f"📡 Storico INGV OV + bollettino ({_now_ym}) — {last_src}"
         y_label = series["ylabel"]
 
     try:
@@ -1854,6 +1865,7 @@ Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi er
     _render_pdf_download_button("campi_flegrei")
     _show_shakemap_widget("campi_flegrei", min_mag=2.5)
     _show_ingv_news(area="cf")
+    _show_solfatara_news()
     with st.expander("📉 Bradisismo Storico — Sollevamento Cumulativo (1950→oggi)", expanded=False):
         _render_bradisismo_storico_cf(gps_data)
 
@@ -2946,6 +2958,119 @@ def _show_ingv_news(area: str = "all"):
             "[→ Tutte le notizie INGV OV](https://www.ov.ingv.it/index.php/it/news-ov)",
             unsafe_allow_html=False,
         )
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _fetch_solfatara_rss() -> list:
+    """Scarica i video recenti di SolfataraNews dal feed RSS YouTube."""
+    import xml.etree.ElementTree as ET
+    url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCC1XzjkXRz0DLJfH-69t1vQ"
+    try:
+        r = requests.get(url, timeout=8, headers={"User-Agent": "SeismicSafetyItalia/2.0"})
+        if r.status_code != 200:
+            return []
+        ns = {
+            "atom": "http://www.w3.org/2005/Atom",
+            "yt":   "http://www.youtube.com/xml/schemas/2015",
+            "media":"http://search.yahoo.com/mrss/",
+        }
+        root = ET.fromstring(r.text)
+        videos = []
+        for entry in root.findall("atom:entry", ns)[:6]:
+            vid_id = (entry.find("yt:videoId", ns) or entry).text
+            if not vid_id:
+                continue
+            title_el = entry.find("atom:title", ns)
+            pub_el   = entry.find("atom:published", ns)
+            title = title_el.text if title_el is not None else ""
+            pub   = pub_el.text[:10] if pub_el is not None else ""
+            videos.append({
+                "id":    vid_id,
+                "title": title,
+                "pub":   pub,
+                "thumb": f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg",
+                "url":   f"https://www.youtube.com/watch?v={vid_id}",
+            })
+        return videos
+    except Exception:
+        return []
+
+
+def _show_solfatara_news() -> None:
+    """
+    Sezione SolfataraNews nel tab Campi Flegrei:
+    - Webcam live H24 (YouTube embed)
+    - Video recenti (RSS YouTube, thumbnail + titolo)
+    - Link social (Instagram, TikTok)
+    """
+    _section_divider("📡 SolfataraNews — Citizen Journalism dai Campi Flegrei")
+
+    # ── Webcam live embed ─────────────────────────────────────────────────────
+    with st.expander("🔴 Webcam LIVE H24 — Solfatara & Campi Flegrei", expanded=True):
+        st.markdown(
+            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
+            "Diretta YouTube continua — <strong>@SolfataraNews</strong> · "
+            "Telecamera puntata su Solfatara e area flegrea</p>",
+            unsafe_allow_html=True,
+        )
+        st.components.v1.iframe(
+            "https://www.youtube.com/embed/6Ie29xiu_SE"
+            "?autoplay=0&rel=0&modestbranding=1",
+            height=380,
+            scrolling=False,
+        )
+        st.caption(
+            "📺 Per la visione ottimale aprire in un'altra scheda · "
+            "[→ canale @SolfataraNews](https://www.youtube.com/@SolfataraNews)"
+        )
+
+    # ── Video recenti ─────────────────────────────────────────────────────────
+    with st.expander("🎬 Ultimi video — SolfataraNews", expanded=True):
+        videos = _fetch_solfatara_rss()
+        if videos:
+            cols_per_row = 3
+            for i in range(0, len(videos), cols_per_row):
+                row_vids = videos[i:i + cols_per_row]
+                cols = st.columns(len(row_vids))
+                for col, v in zip(cols, row_vids):
+                    with col:
+                        st.markdown(
+                            f"<a href='{v['url']}' target='_blank' rel='noopener'>"
+                            f"<img src='{v['thumb']}' style='width:100%;border-radius:6px;"
+                            f"border:1px solid #e5e7eb'></a>",
+                            unsafe_allow_html=True,
+                        )
+                        st.markdown(
+                            f"<a href='{v['url']}' target='_blank' rel='noopener' "
+                            f"style='font-size:0.78rem;color:#374151;text-decoration:none;line-height:1.3'>"
+                            f"<strong>{v['title'][:70]}{'…' if len(v['title'])>70 else ''}</strong></a>"
+                            f"<br><span style='font-size:0.72rem;color:#9CA3AF'>{v['pub']}</span>",
+                            unsafe_allow_html=True,
+                        )
+        else:
+            st.info("Feed RSS temporaneamente non disponibile. "
+                    "[→ Apri canale YouTube](https://www.youtube.com/@SolfataraNews)")
+
+        st.caption("🔄 Aggiornato ogni 30 minuti · Fonte: YouTube RSS pubblico")
+
+    # ── Social links ──────────────────────────────────────────────────────────
+    st.markdown(
+        "<div style='display:flex;gap:10px;flex-wrap:wrap;margin-top:6px'>"
+        "<a href='https://www.youtube.com/@SolfataraNews' target='_blank' rel='noopener' "
+        "style='background:#FF0000;color:white;padding:6px 14px;border-radius:6px;"
+        "font-size:0.82rem;text-decoration:none'>▶ YouTube</a>"
+        "<a href='https://www.instagram.com/solfataranews' target='_blank' rel='noopener' "
+        "style='background:#E1306C;color:white;padding:6px 14px;border-radius:6px;"
+        "font-size:0.82rem;text-decoration:none'>📸 Instagram</a>"
+        "<a href='https://www.tiktok.com/@solfataranews' target='_blank' rel='noopener' "
+        "style='background:#010101;color:white;padding:6px 14px;border-radius:6px;"
+        "font-size:0.82rem;text-decoration:none'>🎵 TikTok</a>"
+        "<a href='https://www.youtube.com/@INGVvulcani' target='_blank' rel='noopener' "
+        "style='background:#1565C0;color:white;padding:6px 14px;border-radius:6px;"
+        "font-size:0.82rem;text-decoration:none'>🌋 INGV Vulcani</a>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _link_row(icon_label, href, link_text):
