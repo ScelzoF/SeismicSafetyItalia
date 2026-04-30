@@ -6,6 +6,7 @@ from collections import defaultdict
 import time
 import string
 from translations_lib import get_text as _gt
+from bacheca_giorno import render_bacheca
 
 # Importiamo la funzione di moderazione avanzata
 from chat_pubblica import filter_message
@@ -99,6 +100,8 @@ def main():
     tab1, tab2 = st.tabs([_gt("forum_tab_forum"), _gt("forum_tab_references")])
 
     with tab1:
+        render_bacheca()
+        st.divider()
         with st.form("nuovo_post"):
             username = st.text_input(_gt("forum_username_label"))
             contenuto = st.text_area(_gt("forum_message_label"))
