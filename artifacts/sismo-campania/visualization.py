@@ -1564,7 +1564,7 @@ def _show_vesuvio_tab(df, get_text):
     _render_pdf_download_button("vesuvio")
     _show_shakemap_widget("vesuvio", min_mag=2.5)
     _show_ingv_news(area="vesuvio")
-    _show_ingv_vulcani_news("Vesuvio News")
+    _show_vesuvio_news()
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     _show_risk_calendar(vesuvio_data if not vesuvio_data.empty else df,
@@ -2110,9 +2110,7 @@ def _show_ischia_tab(df, get_text):
     _render_pdf_download_button("ischia")
     _show_shakemap_widget("ischia", min_mag=2.5)
     _show_ingv_news(area="ischia")
-    _show_ingv_vulcani_news("Ischia News",
-                             channel_id="UCWcylY2YDfioFmDAULj3vgA",
-                             channel_handle="INGVterremoti")
+    _show_ischia_news()
 
     # ── CALENDARIO RISCHIO ────────────────────────────────────────────────
     if not ischia_data.empty:
@@ -3066,6 +3064,7 @@ def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str =
     if caption_suffix:
         cap += " · " + caption_suffix
     st.caption(cap)
+    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -3110,22 +3109,73 @@ def _fetch_yt_rss(channel_id: str, keyword_filter: str = "") -> list:
         return []
 
 
-def _show_ingv_vulcani_news(area_title: str, keyword_filter: str = "",
-                             channel_id: str = "UC3GnD1b5hO8a-ag0yKr_uqw",
-                             channel_handle: str = "INGVvulcani") -> None:
+def _show_vesuvio_news() -> None:
     """
-    Sezione video INGV per Vesuvio / Ischia / area generica.
-    Default: canale INGVvulcani (UC3GnD1b5hO8a-ag0yKr_uqw).
-    Per Ischia si può usare INGVterremoti (UCWcylY2YDfioFmDAULj3vgA).
+    Sezione Vesuvio News: webcam live H24 + ultimi video INGV Vulcani.
+    Webcam: 'Webcam Live Vulcano Vesuvio' by Paesaggi Digitali (RbI8JwrBZQA).
+    Video RSS: canale INGVvulcani (UC3GnD1b5hO8a-ag0yKr_uqw).
     """
-    yt_url = f"https://www.youtube.com/@{channel_handle}"
-    _section_divider(f"📡 {area_title} — INGV News")
-    with st.expander(f"🎬 Ultimi video — @{channel_handle}", expanded=True):
-        videos = _fetch_yt_rss(channel_id, keyword_filter=keyword_filter)
+    _section_divider("📡 Vesuvio News — Live & INGV")
+
+    with st.expander("📹 Webcam LIVE H24 — Vesuvio", expanded=True):
+        st.markdown(
+            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
+            "Diretta YouTube continua — <strong>Paesaggi Digitali</strong> · "
+            "Telecamera puntata sul Vesuvio (NA)</p>",
+            unsafe_allow_html=True,
+        )
+        st.components.v1.iframe(
+            "https://www.youtube.com/embed/RbI8JwrBZQA"
+            "?autoplay=0&rel=0&modestbranding=1",
+            height=380,
+            scrolling=False,
+        )
+        st.caption(
+            "📺 Per la visione ottimale aprire in un'altra scheda · "
+            "[→ Webcam Vesuvio su YouTube](https://www.youtube.com/watch?v=RbI8JwrBZQA)"
+        )
+
+    with st.expander("🎬 Ultimi video — @INGVvulcani", expanded=True):
+        videos = _fetch_yt_rss("UC3GnD1b5hO8a-ag0yKr_uqw")
         _render_yt_cards(
             videos,
-            fallback_url=yt_url,
-            caption_suffix=f"[→ Canale @{channel_handle}]({yt_url})",
+            fallback_url="https://www.youtube.com/@INGVvulcani",
+            caption_suffix="[→ Canale @INGVvulcani](https://www.youtube.com/@INGVvulcani)",
+        )
+
+
+def _show_ischia_news() -> None:
+    """
+    Sezione Ischia News: webcam live H24 + ultimi video INGV Terremoti.
+    Webcam: 'Ischia Live Webcam' by Panocam (Hllyp_GlG64).
+    Video RSS: canale INGVterremoti (UCWcylY2YDfioFmDAULj3vgA).
+    """
+    _section_divider("📡 Ischia News — Live & INGV")
+
+    with st.expander("📹 Webcam LIVE H24 — Ischia", expanded=True):
+        st.markdown(
+            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
+            "Diretta YouTube continua — <strong>Panocam</strong> · "
+            "Telecamera panoramica sull'isola di Ischia</p>",
+            unsafe_allow_html=True,
+        )
+        st.components.v1.iframe(
+            "https://www.youtube.com/embed/Hllyp_GlG64"
+            "?autoplay=0&rel=0&modestbranding=1",
+            height=380,
+            scrolling=False,
+        )
+        st.caption(
+            "📺 Per la visione ottimale aprire in un'altra scheda · "
+            "[→ Webcam Ischia su YouTube](https://www.youtube.com/watch?v=Hllyp_GlG64)"
+        )
+
+    with st.expander("🎬 Ultimi video — @INGVterremoti", expanded=True):
+        videos = _fetch_yt_rss("UCWcylY2YDfioFmDAULj3vgA")
+        _render_yt_cards(
+            videos,
+            fallback_url="https://www.youtube.com/@INGVterremoti",
+            caption_suffix="[→ Canale @INGVterremoti](https://www.youtube.com/@INGVterremoti)",
         )
 
 
