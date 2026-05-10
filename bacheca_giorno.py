@@ -152,8 +152,8 @@ _SANTI: dict[tuple[int, int], tuple[str, str | None]] = {
     (5,  7): ("San Giovanni Ante Portam Latinam",   None),
     (5,  8): ("San Vittore il Moro",                None),
     (5,  9): ("San Pacomio",                        "Fondatore del monachesimo cenobitico in Egitto"),
-    (5, 10): ("Sant'Antonino di Firenze",           "Arcivescovo di Firenze del XV secolo"),
-    (5, 11): ("Santa Gemma Galgani",                "Mistica italiana del XX secolo, stigmatizzata"),
+    (5, 10): ("San Cataldo",                         "🌋 Vescovo irlandese del VII secolo — patrono di Taranto e protettore dalle epidemie; venerato in tutto il Sud Italia"),
+    (5, 11): ("San Fabio martire",                  "Martire romano del IV secolo — decapitato sotto Diocleziano per aver rifiutato di adorare gli idoli"),
     (5, 12): ("Santi Nereo e Achilleo",             None),
     (5, 13): ("Beata Vergine di Fatima",            "Le apparizioni del 1917 ai tre pastorelli in Portogallo"),
     (5, 14): ("San Mattia Apostolo",                "Eletto al posto di Giuda Iscariota tra i Dodici"),
@@ -387,7 +387,7 @@ _SANTI: dict[tuple[int, int], tuple[str, str | None]] = {
     (12, 13): ("Santa Lucia",                       "'Santa Lucia, la notte più lunga che ci sia' — antica celebrazione del solstizio invernale"),
     (12, 14): ("San Giovanni della Croce",          "Carmelitano e Dottore della Chiesa — mistico spagnolo del XVI secolo"),
     (12, 15): ("Sant'Valeriano di Abbenza",         None),
-    (12, 16): ("San Eusebio di Vercelli",
+    (12, 16): ("San Gennaro (16 dicembre)",
                "🌋 Il 16/12/1631 il Vesuvio eruttò catastroficamente: 4.000 vittime, colate laviche fino al mare. "
                "Per questo San Gennaro fa il miracolo anche il 16 dicembre."),
     (12, 17): ("Sant'Olimpia",                      None),
@@ -642,6 +642,67 @@ def _get_curiosita_ai(date_key: str) -> tuple[str, str] | None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 4. AUGURI SPECIALI — 11 MAGGIO: SAN FABIO — per Fabio Scelzo, creatore
+# ─────────────────────────────────────────────────────────────────────────────
+
+@st.cache_data(ttl=86_400 * 30, show_spinner=False)
+def _auguri_fabio_scelzo(anno: int) -> str:
+    """
+    Genera un messaggio di auguri AI per Fabio Scelzo ogni 11 maggio.
+    Il seed=anno garantisce una frase diversa ogni anno, mai ripetuta.
+    Cita esplicitamente lui come creatore di SismoCampania e altri progetti.
+    """
+    try:
+        base_url = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL")
+        api_key  = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "replit-proxy")
+        if not base_url:
+            raise RuntimeError("no proxy")
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key, base_url=base_url)
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Sei l'anima vulcanica di SismoCampania, app italiana di monitoraggio sismico campana. "
+                        "Scrivi un messaggio di auguri per l'onomastico di Fabio Scelzo, il tuo creatore. "
+                        "Fabio non è solo il creatore di SismoCampania: ha sviluppato anche altri siti web e software. "
+                        "Il tono è caldo, spiritoso e personale, con metafore vulcaniche campane "
+                        "(Vesuvio, Campi Flegrei, Ischia, San Gennaro). "
+                        "Fai riferimento esplicito al fatto che Fabio Scelzo ha creato questa app "
+                        "e altri progetti digitali. "
+                        "Massimo 3 frasi. Originale e mai banale. Concludi con un emoji vulcanico."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Anno {anno} — auguri onomastico per Fabio Scelzo, "
+                        "creatore di SismoCampania e di altri siti e software"
+                    ),
+                },
+            ],
+            max_tokens=250,
+            temperature=0.92,
+            seed=anno,
+        )
+        testo = (resp.choices[0].message.content or "").strip()
+        if len(testo) > 30:
+            return testo
+    except Exception:
+        pass
+    # Fallback pool — varia per anno se l'AI non è disponibile
+    _fallback = [
+        f"Buon onomastico, Fabio Scelzo! Hai creato SismoCampania e tanti altri progetti digitali con la stessa passione con cui il Vesuvio forgia la pietra lavica — dura, preziosa e indistruttibile. Che questo {anno} sia esplosivo di soddisfazioni! 🌋",
+        f"Tanti auguri, Fabio Scelzo! SismoCampania monitora i vulcani grazie alla tua mente creativa, che non si è fermata qui: altri siti e software portano la tua firma. I Campi Flegrei tremano di ammirazione! 🌋",
+        f"Buon San Fabio, Fabio Scelzo! Come il bradisismo alza lentamente il suolo di Pozzuoli, la tua creatività continua ad alzare il livello — da SismoCampania agli altri tuoi progetti digitali. Auguri dal tuo vulcano preferito! 🌋",
+        f"Auguri, Fabio Scelzo! Hai dato vita a SismoCampania e a molti altri software con la stessa energia di un flusso piroclastico — rapido, potente, inarrestabile. Che il {anno} ti porti nuove eruzioni di genialità! 🌋",
+    ]
+    return _fallback[anno % len(_fallback)]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # RENDER PRINCIPALE — riquadri nativi Streamlit, layout verticale, no troncature
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -672,6 +733,14 @@ def render_bacheca(today: _date | None = None) -> None:
         "_Nessuna nota specifica per questo giorno liturgico._"
     )
     st.info(body_santo, icon=s_icon)
+
+    # ── 1b. Auguri speciali — 11 maggio: onomastico di Fabio Scelzo ─────────
+    if today.month == 5 and today.day == 11:
+        msg_fabio = _auguri_fabio_scelzo(today.year)
+        st.info(
+            f"**🎉 Auguri, Fabio Scelzo!**\n\n{msg_fabio}",
+            icon="🎂",
+        )
 
     # ── 2. Oggi nella storia ─────────────────────────────────────────────────
     eventi   = _STORIA.get((today.month, today.day), [])
