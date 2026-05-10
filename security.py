@@ -32,7 +32,7 @@ def _supabase_read():
         r = _requests.get(
             f"{_SUPABASE_URL}/rest/v1/{_TABLE}?id=eq.1&select=count",
             headers=_supabase_headers(),
-            timeout=3,
+            timeout=8,
         )
         if r.status_code == 200:
             data = r.json()
@@ -49,7 +49,7 @@ def _supabase_upsert(count):
             f"{_SUPABASE_URL}/rest/v1/{_TABLE}",
             headers={**_supabase_headers(), "Prefer": "resolution=merge-duplicates,return=representation"},
             json={"id": 1, "count": count},
-            timeout=3,
+            timeout=8,
         )
         return r.status_code in (200, 201)
     except Exception:
