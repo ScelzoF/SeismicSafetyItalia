@@ -1877,7 +1877,7 @@ Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi er
     _render_pdf_download_button("campi_flegrei")
     _show_shakemap_widget("campi_flegrei", min_mag=2.5)
     _show_ingv_news(area="cf")
-    _show_solfatara_news()
+    _show_skyline_webcam_cf()
     with st.expander("📉 Bradisismo Storico — Sollevamento Cumulativo (1950→oggi)", expanded=False):
         _render_bradisismo_storico_cf(gps_data)
 
@@ -1992,7 +1992,7 @@ def _show_ischia_tab(df, get_text):
         with mc2:
             _card(_gt("mag_max_live"), f"{stats_i['max_magnitude']:.1f}")
         with mc3:
-            _card("Mag. Media", f"{stats_i['mean_magnitude']:.1f}")
+            _card("Mag. Media", f"{stats_i['avg_magnitude']:.1f}")
         with mc4:
             _card(_gt("energy_live"), _format_energy(energy_total),
                   help_text="E = 10^(1.5·M+4.8) J — Gutenberg-Richter")
@@ -2989,45 +2989,6 @@ def _fetch_thumb_b64(url: str) -> str:
     return ""
 
 
-@st.cache_data(ttl=1800, show_spinner=False)
-def _fetch_solfatara_rss() -> list:
-    """Scarica i video recenti di SolfataraNews dal feed RSS YouTube."""
-    import xml.etree.ElementTree as ET
-    url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCC1XzjkXRz0DLJfH-69t1vQ"
-    ns = {
-        "atom": "http://www.w3.org/2005/Atom",
-        "yt":   "http://www.youtube.com/xml/schemas/2015",
-        "media":"http://search.yahoo.com/mrss/",
-    }
-    try:
-        r = requests.get(url, timeout=8, headers={"User-Agent": "SeismicSafetyItalia/2.0"})
-        if r.status_code != 200:
-            return []
-        root = ET.fromstring(r.text)
-        videos = []
-        for entry in root.findall("atom:entry", ns)[:6]:
-            vid_el   = entry.find("yt:videoId", ns)
-            title_el = entry.find("atom:title", ns)
-            pub_el   = entry.find("atom:published", ns)
-            if vid_el is None:
-                continue
-            vid_id = vid_el.text
-            if not vid_id:
-                continue
-            title = title_el.text if title_el is not None else ""
-            pub   = pub_el.text[:10] if pub_el is not None else ""
-            videos.append({
-                "id":    vid_id,
-                "title": title,
-                "pub":   pub,
-                "thumb": f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg",
-                "url":   f"https://www.youtube.com/watch?v={vid_id}",
-            })
-        return videos
-    except Exception:
-        return []
-
-
 def _render_yt_cards(videos: list, fallback_url: str = "", caption_suffix: str = "") -> None:
     """
     Renderizza una griglia 3-colonne di card video YouTube.
@@ -3121,6 +3082,44 @@ def _fetch_yt_rss(channel_id: str, keyword_filter: str = "") -> list:
         return []
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_webcam_pozzuoli_img() -> bytes | None:
+    """Scarica l'immagine live della webcam Pozzuoli-Macellum dal CDN SkylineWebcams."""
+    try:
+        r = requests.get(
+            "https://cdn.skylinewebcams.com/live5508.jpg",
+            timeout=10,
+            headers={"User-Agent": "SeismicSafetyItalia/2.0"},
+        )
+        if r.status_code == 200 and r.content:
+            return r.content
+    except Exception:
+        pass
+    return None
+
+
+def _show_skyline_webcam_cf() -> None:
+    """
+    Webcam Campi Flegrei — Pozzuoli Macellum via SkylineWebcams CDN.
+    Immagine scaricata server-side e mostrata con st.image() a piena larghezza.
+    Cache 5 minuti (ttl=300). cam ID 5508.
+    """
+    _section_divider("📡 Webcam — Campi Flegrei")
+    with st.expander("📷 Webcam LIVE — Pozzuoli, Macellum (Campi Flegrei)", expanded=True):
+        st.caption(
+            "🔴 Immagine in diretta · aggiornata ogni ~5 min · "
+            "Fonte: [SkylineWebcams](https://www.skylinewebcams.com/it/webcam/italia/campania/napoli/pozzuoli-macellum.html)"
+        )
+        img_bytes = _fetch_webcam_pozzuoli_img()
+        if img_bytes:
+            st.image(img_bytes, use_container_width=True,
+                     caption="Veduta dal Macellum di Pozzuoli — area dei Campi Flegrei")
+        else:
+            st.warning("📷 Webcam temporaneamente non disponibile — "
+                       "[→ Apri direttamente](https://www.skylinewebcams.com/it/webcam/italia/campania/napoli/pozzuoli-macellum.html)",
+                       icon="📡")
+
+
 def _show_vesuvio_news() -> None:
     """
     Sezione Vesuvio News: webcam live H24 + ultimi video INGV Vulcani.
@@ -3201,48 +3200,6 @@ def _show_ischia_news() -> None:
             fallback_url="https://www.youtube.com/@INGVterremoti",
             caption_suffix="[→ Canale @INGVterremoti](https://www.youtube.com/@INGVterremoti)",
         )
-
-
-def _show_solfatara_news() -> None:
-    """
-    Sezione SolfataraNews nel tab Campi Flegrei:
-    - Webcam live H24 (YouTube embed)
-    - Video recenti (RSS YouTube, thumbnail + titolo)
-    - Link social (Instagram, TikTok)
-    """
-    _section_divider("📡 SolfataraNews — Citizen Journalism dai Campi Flegrei")
-
-    # ── Webcam live embed ─────────────────────────────────────────────────────
-    with st.expander("🔴 Webcam LIVE H24 — Solfatara & Campi Flegrei", expanded=True):
-        st.markdown(
-            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
-            "Diretta YouTube continua — <strong>@SolfataraNews</strong> · "
-            "Telecamera puntata su Solfatara e area flegrea</p>",
-            unsafe_allow_html=True,
-        )
-        st.components.v1.html(
-            "<style>*{margin:0;padding:0;box-sizing:border-box}"
-            "html,body{width:100%;overflow:hidden;background:transparent}</style>"
-            "<div style='position:relative;width:100%;padding-bottom:56.25%;'>"
-            "<iframe src='https://www.youtube.com/embed/6Ie29xiu_SE"
-            "?autoplay=0&rel=0&modestbranding=1&vq=hd1080' "
-            "style='position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-            "border-radius:10px;' "
-            "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
-            "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
-            height=850,
-        )
-        st.caption(
-            "📺 Per la visione ottimale aprire in un'altra scheda · "
-            "[→ canale @SolfataraNews](https://www.youtube.com/@SolfataraNews)"
-        )
-
-    # ── Video recenti ─────────────────────────────────────────────────────────
-    with st.expander("🎬 Ultimi video — SolfataraNews", expanded=True):
-        videos = _fetch_solfatara_rss()
-        _render_yt_cards(videos,
-                         fallback_url="https://www.youtube.com/@SolfataraNews",
-                         caption_suffix="[→ Canale @SolfataraNews](https://www.youtube.com/@SolfataraNews)")
 
 
 def _link_row(icon_label, href, link_text):
