@@ -1877,7 +1877,7 @@ Sistemi come **MIROVA** e **NASA FIRMS** rilevano anomalie termiche di grandi er
     _render_pdf_download_button("campi_flegrei")
     _show_shakemap_widget("campi_flegrei", min_mag=2.5)
     _show_ingv_news(area="cf")
-    _show_skyline_webcam_cf()
+    _show_cf_news()
     with st.expander("📉 Bradisismo Storico — Sollevamento Cumulativo (1950→oggi)", expanded=False):
         _render_bradisismo_storico_cf(gps_data)
 
@@ -3082,42 +3082,45 @@ def _fetch_yt_rss(channel_id: str, keyword_filter: str = "") -> list:
         return []
 
 
-@st.cache_data(ttl=300, show_spinner=False)
-def _fetch_webcam_pozzuoli_img() -> bytes | None:
-    """Scarica l'immagine live della webcam Pozzuoli-Macellum dal CDN SkylineWebcams."""
-    try:
-        r = requests.get(
-            "https://cdn.skylinewebcams.com/live5508.jpg",
-            timeout=10,
-            headers={"User-Agent": "SeismicSafetyItalia/2.0"},
+def _show_cf_news() -> None:
+    """
+    Sezione Campi Flegrei News: monitor sismico live H24 + report terremoti CF.
+    Live: 'Campi Flegrei/Vesuvius Volcano monitoring 24/7' by FiBro (jb3BscOyaQU).
+    Video RSS: canale Meteo Ariccia (UCSi4cdeEEK2Rsw6AOD1cecg) — post CF-specifici.
+    """
+    _section_divider("📡 Campi Flegrei News — Live & Solfatara")
+
+    with st.expander("🌋 Monitor LIVE H24 — Campi Flegrei / Vesuvio", expanded=True):
+        st.markdown(
+            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
+            "Monitoraggio vulcanico in diretta — <strong>FiBro</strong> · "
+            "Campi Flegrei &amp; Vesuvio — spettrogrammi e dati sismici H24</p>",
+            unsafe_allow_html=True,
         )
-        if r.status_code == 200 and r.content:
-            return r.content
-    except Exception:
-        pass
-    return None
-
-
-def _show_skyline_webcam_cf() -> None:
-    """
-    Webcam Campi Flegrei — Pozzuoli Macellum via SkylineWebcams CDN.
-    Immagine scaricata server-side e mostrata con st.image() a piena larghezza.
-    Cache 5 minuti (ttl=300). cam ID 5508.
-    """
-    _section_divider("📡 Webcam — Campi Flegrei")
-    with st.expander("📷 Webcam LIVE — Pozzuoli, Macellum (Campi Flegrei)", expanded=True):
+        st.components.v1.html(
+            "<style>*{margin:0;padding:0;box-sizing:border-box}"
+            "html,body{width:100%;overflow:hidden;background:transparent}</style>"
+            "<div style='position:relative;width:100%;padding-bottom:56.25%;'>"
+            "<iframe src='https://www.youtube.com/embed/jb3BscOyaQU"
+            "?autoplay=0&rel=0&modestbranding=1&vq=hd1080' "
+            "style='position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
+            "border-radius:10px;' "
+            "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
+            "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
+            height=850,
+        )
         st.caption(
-            "🔴 Immagine in diretta · aggiornata ogni ~5 min · "
-            "Fonte: [SkylineWebcams](https://www.skylinewebcams.com/it/webcam/italia/campania/napoli/pozzuoli-macellum.html)"
+            "📺 Per la visione ottimale aprire in un'altra scheda · "
+            "[→ Monitor CF/Vesuvio su YouTube](https://www.youtube.com/watch?v=jb3BscOyaQU)"
         )
-        img_bytes = _fetch_webcam_pozzuoli_img()
-        if img_bytes:
-            st.image(img_bytes, use_container_width=True,
-                     caption="Veduta dal Macellum di Pozzuoli — area dei Campi Flegrei")
-        else:
-            st.warning("📷 Webcam temporaneamente non disponibile — "
-                       "[→ Apri direttamente](https://www.skylinewebcams.com/it/webcam/italia/campania/napoli/pozzuoli-macellum.html)",
-                       icon="📡")
+
+    with st.expander("🎬 Ultimi report — Campi Flegrei / Solfatara", expanded=True):
+        videos = _fetch_yt_rss("UCSi4cdeEEK2Rsw6AOD1cecg")
+        _render_yt_cards(
+            videos,
+            fallback_url="https://www.youtube.com/@MeteoAriccia",
+            caption_suffix="[→ Report terremoti CF](https://www.youtube.com/@MeteoAriccia)",
+        )
 
 
 def _show_vesuvio_news() -> None:
