@@ -157,7 +157,6 @@ _visit_count = read_visit_counter()
 # Carica stile CSS personalizzato (light sempre; dark sovrapposto se attivo)
 _base_dir = os.path.dirname(__file__)
 _css_dirs = [
-    os.path.join(_base_dir, 'SeismicSafetyItalia', 'streamlit'),
     os.path.join(_base_dir, 'streamlit'),
 ]
 for _css_dir in _css_dirs:
@@ -291,7 +290,7 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
     st.markdown(f"**📋 {get_text('menu')}**")
     page = st.radio(
         "Navigation",
-        ["monitoring", "predictions", "weather", "ai_assistant", "emergency", "community", "about"],
+        ["monitoring", "predictions", "weather", "ai_assistant", "emergency", "community", "about", "oldstyle"],
         format_func=lambda x: get_text(x),
         label_visibility="collapsed"
     )
@@ -1152,6 +1151,18 @@ per fare <b>previsioni probabilistiche del rischio</b> nei 7 giorni successivi, 
             lang=st.session_state.get("language", "it"),
         )
 
+elif page == "oldstyle":
+    import streamlit.components.v1 as _components
+    st.markdown(
+        "<h3 style='margin-bottom:4px;'>🗂️ Vista Old Style</h3>"
+        "<p style='color:#888;font-size:13px;margin-top:0;'>Versione storica del monitoraggio sismico Campania</p>",
+        unsafe_allow_html=True
+    )
+    _components.iframe(
+        "https://sismoold.streamlit.app/?embed=true",
+        height=900,
+        scrolling=True
+    )
 elif page == "emergency":
     emergenza.show()
 elif page == "community":
