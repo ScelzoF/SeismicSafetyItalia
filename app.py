@@ -1158,6 +1158,24 @@ elif page == "oldstyle":
         "<p style='color:#888;font-size:13px;margin-top:0;'>Versione storica del monitoraggio sismico Campania</p>",
         unsafe_allow_html=True
     )
+    st.markdown(
+        """
+        <div style='background:#1a1a2e;border-left:4px solid #f0a500;border-radius:6px;
+                    padding:10px 14px;margin-bottom:12px;font-size:12.5px;color:#ccc;'>
+          <strong style='color:#f0a500;'>⚠️ Limitazioni rispetto alla versione attuale</strong>
+          <ul style='margin:6px 0 0 0;padding-left:18px;line-height:1.7;'>
+            <li>Nessuna analisi <strong>Multi-AI</strong> (GPT-5 · Claude · Gemini in parallelo)</li>
+            <li>Nessun modello <strong>ML previsionale</strong> (SISMAI: RandomForest + GradientBoosting + Poisson-G-R + Omori-Utsu)</li>
+            <li>Nessun monitoraggio <strong>pressione atmosferica</strong> (base + vetta Vesuvio)</li>
+            <li>Nessun dato sensori real-time: <strong>CO₂, deformazione del suolo, inclinazione</strong></li>
+            <li>Fonte dati ridotta: solo <strong>INGV + USGS + EMSC + GOSSIP-OV</strong> (nessun sollevamento bradisismico integrato)</li>
+            <li>Nessuna integrazione <strong>meteo</strong> Open-Meteo né webcam vulcaniche</li>
+            <li>Nessun sistema di <strong>allerta/notifiche</strong> in tempo reale</li>
+          </ul>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     _components.iframe(
         "https://sismoold.streamlit.app/?embed=true",
         height=900,
