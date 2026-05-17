@@ -91,7 +91,10 @@ def _fetch_ingv_raw():
     resp = _retry_get(INGV_API_URL, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
     if resp.status_code != 200 or not resp.text:
         return pd.DataFrame()
-    data = resp.json()
+    try:
+        data = resp.json()
+    except Exception:
+        return pd.DataFrame()
     earthquakes = []
     for event in data.get("features", []):
         props = event.get("properties", {})
