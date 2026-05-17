@@ -3046,7 +3046,7 @@ def _fetch_yt_rss(channel_id: str, keyword_filter: str = "") -> list:
     Scarica ultimi video dal feed RSS YouTube di un canale.
     Filtra opzionalmente per keyword nel titolo.
     """
-    import xml.etree.ElementTree as ET
+    import defusedxml.ElementTree as ET
     ns = {
         "atom": "http://www.w3.org/2005/Atom",
         "yt":   "http://www.youtube.com/xml/schemas/2015",
