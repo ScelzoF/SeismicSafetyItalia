@@ -42,6 +42,23 @@ import ai_analysis
 import ai_chat
 import ingv_monitor
 
+# ── Keep-alive: pinga sismoold.streamlit.app ogni 5 ore per evitare lo sleep ──
+import threading as _threading
+
+def _keep_oldstyle_alive():
+    import time as _time
+    import requests as _req
+    _time.sleep(30)  # attendi avvio app
+    while True:
+        try:
+            _req.head("https://sismoold.streamlit.app/", timeout=15, allow_redirects=True)
+        except Exception:
+            pass
+        _time.sleep(5 * 3600)  # ogni 5 ore
+
+_ka_thread = _threading.Thread(target=_keep_oldstyle_alive, daemon=True, name="oldstyle-keepalive")
+_ka_thread.start()
+
 # Impostiamo la localizzazione italiana per i nomi dei giorni
 try:
     locale.setlocale(locale.LC_TIME, 'it_IT.UTF-8')  # Linux/macOS
