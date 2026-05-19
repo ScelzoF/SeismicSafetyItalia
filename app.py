@@ -1188,7 +1188,6 @@ elif page == "oldstyle":
     st.iframe(
         "https://sismoold.streamlit.app/?embed=true",
         height=900,
-        scrolling=True
     )
 elif page == "emergency":
     emergenza.show()
