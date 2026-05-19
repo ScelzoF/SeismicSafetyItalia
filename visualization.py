@@ -3307,6 +3307,14 @@ def show_map(df, area, get_text):
     else:
         m = folium.Map(location=center, zoom_start=zoom, tiles="CartoDB positron")
 
+    # Forza apertura in nuova tab per i link attribution Leaflet/CartoDB
+    m.get_root().html.add_child(folium.Element(
+        '<script>document.addEventListener("DOMContentLoaded",function(){'
+        'document.querySelectorAll(".leaflet-control-attribution a")'
+        '.forEach(function(a){a.setAttribute("target","_blank");});'
+        '});</script>'
+    ))
+
     if volcano_pos:
         folium.Circle(
             volcano_pos, radius=4000, color="#ff6b35", fill=True,
