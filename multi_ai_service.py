@@ -132,7 +132,10 @@ def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-4o") -> str:
     try:
         return _openai_compat_call(base, key, effective_model, prompt, system)
     except Exception as e:
-        return f"[GPT errore: {str(e)[:120]}]"
+        err = str(e)
+        if "402" in err or "Payment Required" in err:
+            return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
+        return f"[GPT errore: {err[:120]}]"
 
 
 _CLAUDE_FALLBACK_SYSTEM = """Sei un sismologo statistico specializzato nell'analisi probabilistica del rischio.
@@ -178,8 +181,9 @@ def _ask_claude(prompt: str, system: str = "", model: str = "claude-haiku-4-5") 
                 return r.content[0].text.strip()
             else:
                 return _openai_compat_call(cb, ck, cm, prompt, system)
-        except Exception:
-            pass
+        except Exception as e:
+            if "402" in str(e) or "Payment Required" in str(e):
+                return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
     # Fallback GPT-4o con prospettiva statistica
     base, key, mdl = _get_openai_creds()
     if not (base and key):
@@ -187,7 +191,10 @@ def _ask_claude(prompt: str, system: str = "", model: str = "claude-haiku-4-5") 
     try:
         return _openai_compat_call(base, key, mdl, prompt, system or _CLAUDE_FALLBACK_SYSTEM)
     except Exception as e:
-        return f"[Claude errore: {str(e)[:120]}]"
+        err = str(e)
+        if "402" in err or "Payment Required" in err:
+            return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
+        return f"[Claude errore: {err[:120]}]"
 
 
 def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") -> str:
@@ -211,8 +218,9 @@ def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") 
                 d = r.json()
                 parts = d.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
                 return (parts[0].get("text") or "").strip()
-        except Exception:
-            pass
+        except Exception as e:
+            if "402" in str(e) or "Payment Required" in str(e):
+                return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
     # Fallback GPT-4o con prospettiva protezione civile
     base, key, mdl = _get_openai_creds()
     if not (base and key):
@@ -220,7 +228,10 @@ def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") 
     try:
         return _openai_compat_call(base, key, mdl, prompt, system or _GEMINI_FALLBACK_SYSTEM)
     except Exception as e:
-        return f"[Gemini errore: {str(e)[:120]}]"
+        err = str(e)
+        if "402" in err or "Payment Required" in err:
+            return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
+        return f"[Gemini errore: {err[:120]}]"
 
 
 # ─────────────────────────────────────────────────────────────
