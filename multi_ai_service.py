@@ -121,19 +121,50 @@ _PROVIDERS_OK = _providers_status()
 
 
 # ─────────────────────────────────────────────────────────────
+# FREE FALLBACK — g4f (nessuna API key richiesta)
+# ─────────────────────────────────────────────────────────────
+
+def _ask_g4f_free(prompt: str, system: str = "") -> str:
+    """Fallback completamente gratuito via g4f (GPT4Free).
+    Usato solo quando tutti i provider a pagamento falliscono (es. 402)."""
+    try:
+        from g4f.client import Client as _G4FClient
+        client = _G4FClient()
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        r = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            timeout=30,
+        )
+        text = r.choices[0].message.content or ""
+        if text.strip():
+            return text.strip()
+    except Exception:
+        pass
+    return ""
+
+
+# ─────────────────────────────────────────────────────────────
 # SINGLE-PROVIDER CALLS
 # ─────────────────────────────────────────────────────────────
 
 def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-4o") -> str:
-    """Chiama OpenAI GPT via Replit proxy, API diretta o OpenRouter."""
+    """Chiama OpenAI GPT via Replit proxy, API diretta o OpenRouter.
+    Fallback finale: g4f (gratuito, nessuna API key)."""
     base, key, effective_model = _get_openai_creds()
     if not (base and key):
-        return "GPT non disponibile (env vars mancanti)."
+        return _ask_g4f_free(prompt, system) or "GPT non disponibile (env vars mancanti)."
     try:
         return _openai_compat_call(base, key, effective_model, prompt, system)
     except Exception as e:
         err = str(e)
         if "402" in err or "Payment Required" in err:
+            result = _ask_g4f_free(prompt, system)
+            if result:
+                return result
             return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
         return f"[GPT errore: {err[:120]}]"
 
@@ -183,16 +214,22 @@ def _ask_claude(prompt: str, system: str = "", model: str = "claude-haiku-4-5") 
                 return _openai_compat_call(cb, ck, cm, prompt, system)
         except Exception as e:
             if "402" in str(e) or "Payment Required" in str(e):
+                result = _ask_g4f_free(prompt, system or _CLAUDE_FALLBACK_SYSTEM)
+                if result:
+                    return result
                 return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
     # Fallback GPT-4o con prospettiva statistica
     base, key, mdl = _get_openai_creds()
     if not (base and key):
-        return "Claude non disponibile (nessuna API key configurata)."
+        return _ask_g4f_free(prompt, system or _CLAUDE_FALLBACK_SYSTEM) or "Claude non disponibile (nessuna API key configurata)."
     try:
         return _openai_compat_call(base, key, mdl, prompt, system or _CLAUDE_FALLBACK_SYSTEM)
     except Exception as e:
         err = str(e)
         if "402" in err or "Payment Required" in err:
+            result = _ask_g4f_free(prompt, system or _CLAUDE_FALLBACK_SYSTEM)
+            if result:
+                return result
             return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
         return f"[Claude errore: {err[:120]}]"
 
@@ -220,16 +257,22 @@ def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") 
                 return (parts[0].get("text") or "").strip()
         except Exception as e:
             if "402" in str(e) or "Payment Required" in str(e):
+                result = _ask_g4f_free(prompt, system or _GEMINI_FALLBACK_SYSTEM)
+                if result:
+                    return result
                 return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
     # Fallback GPT-4o con prospettiva protezione civile
     base, key, mdl = _get_openai_creds()
     if not (base and key):
-        return "Gemini non disponibile (nessuna API key configurata)."
+        return _ask_g4f_free(prompt, system or _GEMINI_FALLBACK_SYSTEM) or "Gemini non disponibile (nessuna API key configurata)."
     try:
         return _openai_compat_call(base, key, mdl, prompt, system or _GEMINI_FALLBACK_SYSTEM)
     except Exception as e:
         err = str(e)
         if "402" in err or "Payment Required" in err:
+            result = _ask_g4f_free(prompt, system or _GEMINI_FALLBACK_SYSTEM)
+            if result:
+                return result
             return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
         return f"[Gemini errore: {err[:120]}]"
 
