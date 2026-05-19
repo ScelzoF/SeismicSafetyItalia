@@ -20,7 +20,8 @@ for _noisy in (
 # di terze parti (es. streamlit-folium) — il codice dell'app usa già st.iframe.
 class _FilterComponentsV1(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
-        return "components.v1.html" not in record.getMessage()
+        msg = record.getMessage()
+        return "components.v1.html" not in msg and "components.v1.iframe" not in msg
 
 for _st_logger_name in (
     "streamlit", "streamlit.runtime", "streamlit.deprecation_util",
@@ -51,10 +52,10 @@ def _keep_oldstyle_alive():
     _time.sleep(30)  # attendi avvio app
     while True:
         try:
-            _req.head("https://sismoold.streamlit.app/", timeout=15, allow_redirects=True)
+            _req.get("https://sismoold.streamlit.app/", timeout=15, allow_redirects=True)
         except Exception:
             pass
-        _time.sleep(5 * 3600)  # ogni 5 ore
+        _time.sleep(30 * 60)  # ogni 30 minuti
 
 _ka_thread = _threading.Thread(target=_keep_oldstyle_alive, daemon=True, name="oldstyle-keepalive")
 _ka_thread.start()
@@ -1169,7 +1170,7 @@ per fare <b>previsioni probabilistiche del rischio</b> nei 7 giorni successivi, 
         )
 
 elif page == "oldstyle":
-    import streamlit.components.v1 as _components
+
     st.markdown(
         "<h3 style='margin-bottom:4px;'>🗂️ Vista Old Style</h3>"
         "<p style='color:#888;font-size:13px;margin-top:0;'>Versione storica del monitoraggio sismico Campania</p>",
@@ -1184,7 +1185,7 @@ elif page == "oldstyle":
             "• Nessuna integrazione meteo Open-Meteo né webcam vulcaniche\n"
             "• Nessun sistema di allerta/notifiche in tempo reale"
         )
-    _components.iframe(
+    st.iframe(
         "https://sismoold.streamlit.app/?embed=true",
         height=900,
         scrolling=True
