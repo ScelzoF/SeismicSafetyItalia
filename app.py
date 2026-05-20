@@ -1185,6 +1185,21 @@ elif page == "oldstyle":
             "• Nessuna integrazione meteo Open-Meteo né webcam vulcaniche\n"
             "• Nessun sistema di allerta/notifiche in tempo reale"
         )
+
+    col_wake, col_info = st.columns([1, 3])
+    with col_wake:
+        st.link_button(
+            "🔔 Sveglia OldStyle",
+            "https://sismoold.streamlit.app/",
+            help="Apre OldStyle in una nuova tab per riattivarlo se è in pausa",
+            use_container_width=True,
+        )
+    with col_info:
+        st.caption(
+            "Se l'app qui sotto mostra '😴 Zzzz', clicca **Sveglia OldStyle** → "
+            "attendi il riavvio nella nuova tab (15-30 s) → torna qui e ricarica la pagina."
+        )
+
     st.iframe(
         "https://sismoold.streamlit.app/?embed=true",
         height=900,
