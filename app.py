@@ -7,12 +7,15 @@ import pandas as pd
 import requests
 import locale
 
-# Sopprimi log DEBUG da watchdog, urllib3, PIL, matplotlib, pdfminer, charset_normalizer
+# Sopprimi log DEBUG da librerie rumorose (openai SDK, httpcore, httpx inclusi)
 for _noisy in (
     "watchdog", "urllib3", "PIL", "matplotlib", "asyncio",
     "pdfminer", "pdfminer.pdfpage", "pdfminer.pdfinterp",
     "pdfminer.pdfdocument", "pdfminer.psparser", "pdfminer.cmapdb",
     "pdfminer.converter", "charset_normalizer",
+    "openai", "openai._base_client",
+    "httpcore", "httpcore.connection", "httpcore.http11",
+    "httpx", "anthropic", "anthropic._base_client",
 ):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
 
