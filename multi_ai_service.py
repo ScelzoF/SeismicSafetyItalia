@@ -18,13 +18,28 @@ from datetime import datetime
 import requests
 
 # ─────────────────────────────────────────────────────────────
+# CIRCUIT BREAKER OpenRouter — evita chiamate inutili se 402
+# ─────────────────────────────────────────────────────────────
+_OR_UNAVAILABLE_UNTIL: float = 0.0   # timestamp unix
+_OR_LOCK = threading.Lock()
+_OR_SKIP_SECONDS = 1800              # 30 minuti
+
+def _openrouter_is_down() -> bool:
+    return time.time() < _OR_UNAVAILABLE_UNTIL
+
+def _mark_openrouter_down() -> None:
+    global _OR_UNAVAILABLE_UNTIL
+    with _OR_LOCK:
+        _OR_UNAVAILABLE_UNTIL = time.time() + _OR_SKIP_SECONDS
+
+# ─────────────────────────────────────────────────────────────
 # PROVIDER CREDENTIAL RESOLVER — riletto ad ogni chiamata
 # Priorità: Replit AI Integrations proxy → OPENAI_API_KEY diretto
 # ─────────────────────────────────────────────────────────────
 
 def _get_openai_creds():
     """Restituisce (base_url, api_key, model) leggendo le env vars live.
-    Priorità: Replit proxy → OPENAI_API_KEY → OpenRouter."""
+    Priorità: Replit proxy → OPENAI_API_KEY → OpenRouter (skip se circuit breaker aperto)."""
     base = os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY", "")
     if base and key:
@@ -39,10 +54,11 @@ def _get_openai_creds():
             return "https://api.openai.com/v1", direct, "gpt-4o"
     except Exception:
         pass
-    # Fallback OpenRouter (usa GPT-4o tramite OpenRouter)
-    or_key = _get_openrouter_key()
-    if or_key:
-        return "https://openrouter.ai/api/v1", or_key, "openai/gpt-4o"
+    # Fallback OpenRouter — saltato se circuit breaker aperto (402 recente)
+    if not _openrouter_is_down():
+        or_key = _get_openrouter_key()
+        if or_key:
+            return "https://openrouter.ai/api/v1", or_key, "openai/gpt-4o"
     return "", "", ""
 
 
@@ -59,7 +75,7 @@ def _get_openrouter_key() -> str:
 
 
 def _get_claude_creds():
-    """Replit proxy → ANTHROPIC_API_KEY → OpenRouter."""
+    """Replit proxy → ANTHROPIC_API_KEY → OpenRouter (skip se circuit breaker aperto)."""
     base = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY", "")
     if base and key:
@@ -74,14 +90,15 @@ def _get_claude_creds():
             return "https://api.anthropic.com", direct, "claude-3-5-haiku-20241022", "native"
     except Exception:
         pass
-    or_key = _get_openrouter_key()
-    if or_key:
-        return "https://openrouter.ai/api/v1", or_key, "anthropic/claude-3-haiku", "openrouter"
+    if not _openrouter_is_down():
+        or_key = _get_openrouter_key()
+        if or_key:
+            return "https://openrouter.ai/api/v1", or_key, "anthropic/claude-3-haiku", "openrouter"
     return "", "", "", ""
 
 
 def _get_gemini_creds():
-    """Replit proxy → GOOGLE_API_KEY → OpenRouter."""
+    """Replit proxy → GOOGLE_API_KEY → OpenRouter (skip se circuit breaker aperto)."""
     base = os.environ.get("AI_INTEGRATIONS_GEMINI_BASE_URL", "")
     key  = os.environ.get("AI_INTEGRATIONS_GEMINI_API_KEY", "")
     if base and key:
@@ -98,9 +115,10 @@ def _get_gemini_creds():
                 return "https://generativelanguage.googleapis.com/v1beta", direct, "gemini-2.0-flash", "native"
     except Exception:
         pass
-    or_key = _get_openrouter_key()
-    if or_key:
-        return "https://openrouter.ai/api/v1", or_key, "google/gemini-2.0-flash-001", "openrouter"
+    if not _openrouter_is_down():
+        or_key = _get_openrouter_key()
+        if or_key:
+            return "https://openrouter.ai/api/v1", or_key, "google/gemini-2.0-flash-001", "openrouter"
     return "", "", "", ""
 
 
@@ -162,6 +180,8 @@ def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-4o") -> str:
     except Exception as e:
         err = str(e)
         if "402" in err or "Payment Required" in err:
+            if "openrouter" in base:
+                _mark_openrouter_down()
             result = _ask_g4f_free(prompt, system)
             if result:
                 return result
