@@ -1189,9 +1189,15 @@ elif page == "oldstyle":
             "• Nessun sistema di allerta/notifiche in tempo reale"
         )
 
-    st.iframe(
-        "https://sismoold.streamlit.app/?embed=true",
-        height=900,
+    st.markdown(
+        '<iframe src="https://sismoold.streamlit.app/?embed=true"'
+        ' width="100%" height="900"'
+        ' style="border:none;"'
+        ' allow="forms;scripts;same-origin;popups"'
+        ' sandbox="allow-forms allow-scripts allow-same-origin'
+        ' allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation">'
+        '</iframe>',
+        unsafe_allow_html=True,
     )
 elif page == "emergency":
     emergenza.show()
