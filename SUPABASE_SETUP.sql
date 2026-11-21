@@ -21,12 +21,32 @@ CREATE TABLE IF NOT EXISTS segnalazioni_altro_progetto (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Abilita accesso pubblico (RLS)
+-- Accesso pubblico limitato a lettura e inserimento.
+-- Mai concedere modifica/cancellazione anonima dei messaggi.
 ALTER TABLE chat_altro_progetto          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE segnalazioni_altro_progetto  ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "allow_all" ON chat_altro_progetto;
-CREATE POLICY "allow_all" ON chat_altro_progetto         FOR ALL USING (true) WITH CHECK (true);
-
 DROP POLICY IF EXISTS "allow_all" ON segnalazioni_altro_progetto;
-CREATE POLICY "allow_all" ON segnalazioni_altro_progetto FOR ALL USING (true) WITH CHECK (true);
+REVOKE ALL ON public.chat_altro_progetto FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON public.segnalazioni_altro_progetto FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT ON public.chat_altro_progetto TO anon, authenticated;
+GRANT SELECT, INSERT ON public.segnalazioni_altro_progetto TO anon, authenticated;
+GRANT USAGE ON SEQUENCE public.chat_altro_progetto_id_seq TO anon, authenticated;
+GRANT USAGE ON SEQUENCE public.segnalazioni_altro_progetto_id_seq TO anon, authenticated;
+DROP POLICY IF EXISTS community_read ON public.chat_altro_progetto;
+DROP POLICY IF EXISTS community_insert ON public.chat_altro_progetto;
+DROP POLICY IF EXISTS community_read ON public.segnalazioni_altro_progetto;
+DROP POLICY IF EXISTS community_insert ON public.segnalazioni_altro_progetto;
+CREATE POLICY community_read ON public.chat_altro_progetto
+    FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY community_insert ON public.chat_altro_progetto
+    FOR INSERT TO anon, authenticated
+    WITH CHECK (length(contenuto) BETWEEN 1 AND 4000 AND length(coalesce(username, '')) <= 100);
+CREATE POLICY community_read ON public.segnalazioni_altro_progetto
+    FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY community_insert ON public.segnalazioni_altro_progetto
+    FOR INSERT TO anon, authenticated
+    WITH CHECK (length(contenuto) BETWEEN 1 AND 4000 AND length(coalesce(username, '')) <= 100);
+
+-- Contatore persistente: eseguire anche sql/visit_counter.sql.

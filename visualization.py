@@ -42,6 +42,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import folium
 from streamlit_folium import folium_static
+from map_tiles import street_map
 
 from data_service import (
     calculate_earthquake_statistics,
@@ -156,7 +157,12 @@ def _data_freshness_badge(label: str = "INGV/USGS", ttl_min: int = 15):
     fetch_time = st.session_state.get("last_data_fetch")
     if fetch_time:
         age_s = (_dt.now() - fetch_time).total_seconds()
-        if age_s < ttl_min * 60 * 0.5:
+        frame = st.session_state.get("earthquake_data")
+        if getattr(frame, "attrs", {}).get("data_status") == "stale":
+            icon, color, stato = "⚠️", "#e67e22", "copia locale — non live"
+        elif frame is None or frame.empty:
+            icon, color, stato = "⚪", "#6c757d", "dati non disponibili"
+        elif age_s < ttl_min * 60 * 0.5:
             icon, color, stato = "✅", "#27ae60", "live"
         elif age_s < ttl_min * 60:
             icon, color, stato = "⚠️", "#e67e22", "cache"
@@ -1369,7 +1375,7 @@ def _show_vesuvio_tab(df, get_text):
     bulletin = bvlive["vesuvio"]
 
     # ── Badge livello allerta ──────────────────────────────────────────────
-    alert_level = alert.get("vesuvio", "VERDE")
+    alert_level = alert.get("vesuvio", "NON DISPONIBILE")
     _render_alert_badge(alert_level, "Vesuvio",
                         bulletin["bulletin_date"], alert.get("source", "INGV OV"))
     _show_swarm_banner(df, "vesuvio")
@@ -1611,7 +1617,7 @@ def _show_flegrei_tab(df, get_text):
         st.caption(f"📋 Bollettino: valori statici (INGV OV non raggiungibile al momento) — {bulletin['bulletin_date']}")
 
     # ── Badge livello allerta ──────────────────────────────────────────────
-    alert_level = alert.get("campi_flegrei", "GIALLO")
+    alert_level = alert.get("campi_flegrei", "NON DISPONIBILE")
     _render_alert_badge(alert_level, "Campi Flegrei",
                         bulletin["bulletin_date"], alert.get("source", "INGV OV"))
     _show_swarm_banner(df, "campi_flegrei")
@@ -1925,7 +1931,7 @@ def _show_ischia_tab(df, get_text):
     bulletin_isc = bvlive.get("ischia", {})
 
     # ── Badge livello allerta ──────────────────────────────────────────────
-    alert_level = alert.get("ischia", "VERDE")
+    alert_level = alert.get("ischia", "NON DISPONIBILE")
     _bulletin_date = bulletin_isc.get("bulletin_date", datetime.now().strftime("%B %Y"))
     _render_alert_badge(alert_level, "Ischia", _bulletin_date, alert.get("source", "INGV"))
     _show_swarm_banner(df, "ischia")
@@ -3305,7 +3311,8 @@ def show_map(df, area, get_text):
             overlay=True, control=False, opacity=0.7,
         ).add_to(m)
     else:
-        m = folium.Map(location=center, zoom_start=zoom, tiles="CartoDB positron")
+        # Explicit keyless URL: catalog aliases may become authenticated services.
+        m = street_map(location=center, zoom_start=zoom)
 
     # Forza apertura in nuova tab per i link attribution Leaflet/CartoDB
     m.get_root().html.add_child(folium.Element(
@@ -3416,17 +3423,17 @@ def _show_risk_banner(risk_level, risk_metrics, stats, ctx_key="default"):
         "basso": {
             "icon": "✅", "bg": "#d4edda", "border": "#27ae60", "fg": "#155724",
             "titolo": "Attività nella norma",
-            "cosa_fare": "Nessuna azione necessaria. Continua la tua giornata normalmente.",
+            "cosa_fare": "Indice statistico, non un'allerta ufficiale. Consulta le indicazioni della Protezione Civile.",
         },
         "moderato": {
             "icon": "⚠️", "bg": "#fff3cd", "border": "#f39c12", "fg": "#856404",
             "titolo": "Attività moderata",
-            "cosa_fare": "Tieni d'occhio gli aggiornamenti. Non è richiesta alcuna azione immediata.",
+            "cosa_fare": "Consulta gli aggiornamenti e le indicazioni ufficiali della Protezione Civile.",
         },
         "elevato": {
             "icon": "🟠", "bg": "#fde8d8", "border": "#e67e22", "fg": "#7f3000",
             "titolo": "Attività elevata rispetto alla media",
-            "cosa_fare": "Resta informato. L'allerta ufficiale INGV è GIALLO — nessuna evacuazione in corso.",
+            "cosa_fare": "Resta informato tramite INGV e Protezione Civile: questo indice non determina l'allerta o le evacuazioni.",
         },
         "molto elevato": {
             "icon": "🔴", "bg": "#f8d7da", "border": "#e63946", "fg": "#721c24",

@@ -46,7 +46,7 @@ import ai_analysis
 import ai_chat
 import ingv_monitor
 
-# ── Keep-alive: pinga sismoold.streamlit.app ogni 5 ore per evitare lo sleep ──
+# ── Keep-alive: un solo worker per processo, non uno per ogni rerun ──
 import threading as _threading
 
 def _keep_oldstyle_alive():
@@ -60,8 +60,15 @@ def _keep_oldstyle_alive():
             pass
         _time.sleep(30 * 60)  # ogni 30 minuti
 
-_ka_thread = _threading.Thread(target=_keep_oldstyle_alive, daemon=True, name="oldstyle-keepalive")
-_ka_thread.start()
+@st.cache_resource(show_spinner=False)
+def _start_oldstyle_keepalive():
+    thread = _threading.Thread(
+        target=_keep_oldstyle_alive, daemon=True, name="oldstyle-keepalive"
+    )
+    thread.start()
+    return thread
+
+_start_oldstyle_keepalive()
 
 # Impostiamo la localizzazione italiana per i nomi dei giorni
 try:
@@ -168,12 +175,22 @@ if st.query_params.get("postepay") == "1":
 
 # === CONTATORE VISITE (una sola volta per sessione) ===
 from security import read_visit_counter, increment_visit_counter
+from uuid import uuid4
 if 'visit_counted' not in st.session_state:
     st.session_state.visit_counted = False
+if 'visit_id' not in st.session_state:
+    st.session_state.visit_id = str(uuid4())
+_visit_count = None
 if not st.session_state.visit_counted:
-    increment_visit_counter()
-    st.session_state.visit_counted = True
-_visit_count = read_visit_counter()
+    _visit_count = increment_visit_counter(st.session_state.visit_id)
+    if _visit_count is not None:
+        st.session_state.visit_counted = True
+if _visit_count is None:
+    _visit_count = read_visit_counter()
+_visit_label = (
+    f"{_visit_count:,}" if _visit_count is not None
+    else "temporaneamente non disponibili"
+)
 
 # Carica stile CSS personalizzato (light sempre; dark sovrapposto se attivo)
 _base_dir = os.path.dirname(__file__)
@@ -281,8 +298,10 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
         "ROSSO":     ("rgba(231,76,60,0.25)",  "#e74c3c", "#f8d7da", "🔴"),
     }
     def _sb_badge_html(area_name, level):
-        lvl = level.upper() if level else "VERDE"
-        bg, border, txt, icon = _sb_alert_styles.get(lvl, _sb_alert_styles["VERDE"])
+        lvl = level.upper() if level else "NON DISPONIBILE"
+        bg, border, txt, icon = _sb_alert_styles.get(
+            lvl, ("rgba(128,128,128,0.25)", "#999", "#eee", "⚪")
+        )
         return (
             f"<div style='background:{bg};border:1px solid {border};"
             f"border-radius:7px;padding:6px 10px;'>"
@@ -291,9 +310,9 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
             f"</div>"
         )
     _sb_alert_data = st.session_state.alert_level_cache or ingv_monitor.fetch_ingv_alert_level() or {}
-    _sb_ves = _sb_alert_data.get("vesuvio", "VERDE")
-    _sb_cf  = _sb_alert_data.get("campi_flegrei", "GIALLO")
-    _sb_isc = _sb_alert_data.get("ischia", "VERDE")
+    _sb_ves = _sb_alert_data.get("vesuvio", "NON DISPONIBILE")
+    _sb_cf  = _sb_alert_data.get("campi_flegrei", "NON DISPONIBILE")
+    _sb_isc = _sb_alert_data.get("ischia", "NON DISPONIBILE")
     st.markdown(f"**🚨 {get_text('alert_levels')}**")
     st.markdown(
         f"""<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:4px;">
@@ -301,7 +320,7 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
 {_sb_badge_html("Campi Flegrei", _sb_cf)}
 {_sb_badge_html("Ischia", _sb_isc)}
 </div>
-<p style="font-size:10px;color:rgba(255,255,255,0.6);margin:0;">{get_text('fonte_ingv_ov')}</p>""",
+<p style="font-size:10px;color:rgba(255,255,255,0.6);margin:0;">Fonte: Protezione Civile · N/D se non verificabile</p>""",
         unsafe_allow_html=True,
     )
 
@@ -333,12 +352,17 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
         on_change=utils.toggle_notifications
     )
 
-    st.caption(f"👥 Visite totali: **{_visit_count:,}**")
+    st.caption(f"👥 Visite totali: **{_visit_label}**")
 
     # Last update timestamp + data quality badge
     if st.session_state.last_data_fetch:
         age_s = (datetime.now() - st.session_state.last_data_fetch).total_seconds()
-        if age_s < 660:
+        _eq_status = getattr(st.session_state.earthquake_data, "attrs", {}).get("data_status")
+        if _eq_status == "stale":
+            _dq_icon, _dq_color, _dq_label = "⚠️", "#e67e22", "copia locale — fonte non raggiungibile"
+        elif st.session_state.earthquake_data is None or st.session_state.earthquake_data.empty:
+            _dq_icon, _dq_color, _dq_label = "❌", "#c0392b", "dati non disponibili"
+        elif age_s < 660:
             _dq_icon, _dq_color, _dq_label = "✅", "#27ae60", "live"
         elif age_s < 1800:
             _dq_icon, _dq_color, _dq_label = "⚠️", "#e67e22", "cache"
@@ -515,6 +539,12 @@ if st.session_state.earthquake_data is None or (
                 except Exception: pass
         st.session_state.last_data_fetch = datetime.now()
         st.rerun()
+
+if getattr(st.session_state.earthquake_data, "attrs", {}).get("data_status") == "stale":
+    st.warning(
+        "Le fonti sismiche non sono raggiungibili: stai visualizzando "
+        "l'ultima copia locale disponibile, non dati in tempo reale."
+    )
 
 def _ai_card(icon, title, headline, body, color, extra=""):
     """Card grande e leggibile per un risultato AI."""
@@ -850,7 +880,12 @@ elif page == "ai_assistant":
                 m5.metric("Fonte meteo", "Open-Meteo" if _meteo_live else "⚠️ fallback")
 
                 # ── PREVISIONE 7 GIORNI ────────────────────────────────────
-                st.markdown("#### 🔮 Previsione rischio sismico — prossimi 7 giorni")
+                st.markdown("#### 🔬 Scenario statistico sperimentale — prossimi 7 giorni")
+                st.warning(
+                    "Questi risultati non prevedono i terremoti e non sono allerte ufficiali. "
+                    "Le percentuali descrivono le classi del modello, non la probabilità "
+                    "validata di un terremoto. Per decisioni di sicurezza consulta INGV e Protezione Civile."
+                )
                 cols_fc = st.columns(7)
                 days = fc.get("days", [])
                 for i, day in enumerate(days[:7]):
@@ -1287,7 +1322,7 @@ elif page == "about":
     📧 Email: meteotorre@gmail.com
     
     ---
-    👥 **Visite totali:** {_visit_count:,} &nbsp;|&nbsp; © {datetime.now().year} Monitoraggio Sismico Campania
+    👥 **Visite totali:** {_visit_label} &nbsp;|&nbsp; © {datetime.now().year} Monitoraggio Sismico Campania
     """)
 
 # ── NOTIFICHE SMART — solo nuovi eventi, no spam ──────────────────────────

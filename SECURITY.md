@@ -1,21 +1,25 @@
-# Security Policy
+# Sicurezza
 
-## Supported Versions
+Il progetto è un servizio informativo indipendente: non è un sistema ufficiale
+di allerta o di protezione civile. Gli scenari statistici e le risposte AI non
+devono determinare decisioni di evacuazione o sostituire INGV, Protezione Civile
+e disposizioni comunali.
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+## Segnalazioni
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+Per difetti non sensibili aprire un'issue nel repository, indicando passaggi di
+riproduzione e comportamento atteso. Per vulnerabilità sfruttabili contattare
+privatamente il manutentore; usare la segnalazione privata GitHub se abilitata.
+Non pubblicare credenziali, token, dati personali, dump del database o dettagli
+che consentano di danneggiare il servizio.
 
-## Reporting a Vulnerability
+## Configurazione
 
-Use this section to tell people how to report a vulnerability.
+- Conservare le credenziali solo in Streamlit Secrets o variabili d'ambiente.
+- Non esporre chiavi con privilegi amministrativi nel browser.
+- Mantenere abilitate verifica TLS, protezione XSRF e CORS.
+- Applicare e verificare le migrazioni SQL prima del rilascio applicativo.
+- Non trasformare un errore di rete in un valore rassicurante o in un azzeramento.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+L'audit tecnico e i limiti della verifica sono descritti in `docs/AUDIT.md`.
+Non viene dichiarata una certificazione di sicurezza o validazione scientifica.

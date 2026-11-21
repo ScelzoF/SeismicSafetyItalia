@@ -35,14 +35,9 @@ def _retry_get(url, params=None, headers=None, timeout=REQUEST_TIMEOUT, max_retr
 
 
 def _ingv_ov_get(url, timeout=8, **kwargs):
-    """GET con SSL fallback per endpoint INGV OV (certificati talvolta problematici).
-    Tenta prima con verify=True; se SSLError ritenta con verify=False (solo rete INGV)."""
-    import warnings as _w
-    try:
-        return requests.get(url, timeout=timeout, **kwargs)
-    except requests.exceptions.SSLError:
-        _w.warn(f"SSLError su {url} — retry senza verifica cert (INGV OV)", stacklevel=2)
-        return requests.get(url, timeout=timeout, verify=False, **kwargs)  # nosec B501
+    """GET verificato; su errori TLS il chiamante usa il fallback dati esistente."""
+    kwargs["verify"] = True
+    return requests.get(url, timeout=timeout, **kwargs)
 
 INGV_OV_RSS = "https://www.ov.ingv.it/index.php/it/news-ov?format=feed&type=rss"
 INGV_NEWS_RSS = "https://www.ingv.it/feed/"
@@ -540,12 +535,14 @@ def fetch_earthquake_data():
                             .drop(columns=["_src_rank","_lat_r","_lon_r","_mag_r","_ts_r"])
                             .sort_values("datetime", ascending=False))
         combined["formatted_time"] = combined["datetime"].dt.strftime("%d/%m/%Y %H:%M:%S")
+        combined.attrs["data_status"] = "fresh"
         _save_fallback(combined)
         return combined
 
     # Tutte fallite — usa cache disco
     fallback_df, loaded = _load_fallback()
     if loaded and not fallback_df.empty:
+        fallback_df.attrs["data_status"] = "stale"
         if "formatted_time" not in fallback_df.columns:
             fallback_df["formatted_time"] = fallback_df["datetime"].dt.strftime("%d/%m/%Y %H:%M:%S")
         return fallback_df
