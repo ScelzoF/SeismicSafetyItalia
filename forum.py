@@ -5,6 +5,7 @@ from better_profanity import profanity
 from collections import defaultdict
 import time
 import string
+from html import escape
 from translations_lib import get_text as _gt
 from bacheca_giorno import render_bacheca
 
@@ -95,7 +96,9 @@ class ModeratorAI:
 
 def main():
     st.title(_gt("forum_title"))
-    moderator = ModeratorAI()
+    if "forum_moderator" not in st.session_state:
+        st.session_state.forum_moderator = ModeratorAI()
+    moderator = st.session_state.forum_moderator
 
     tab1, tab2 = st.tabs([_gt("forum_tab_forum"), _gt("forum_tab_references")])
 
@@ -136,11 +139,14 @@ def main():
                     data_fmt = _dt.fromisoformat(raw_data.replace('Z', '+00:00')).strftime("%d/%m/%Y %H:%M")
                 except Exception:
                     data_fmt = raw_data[:16].replace('T', ' ')
+                safe_username = escape(str(post.get("username") or "Anonimo"))
+                safe_content = escape(str(post.get("contenuto") or ""))
+                safe_date = escape(str(data_fmt))
                 with st.container():
                     st.markdown(f"""
                     <div style='padding: 10px; border: 1px solid #eee; border-radius: 5px; margin: 5px 0;'>
-                        <strong>{post['username']}</strong> <small>({data_fmt})</small><br>
-                        {post['contenuto']}
+                        <strong>{safe_username}</strong> <small>({safe_date})</small><br>
+                        {safe_content}
                     </div>
                     """, unsafe_allow_html=True)
         else:

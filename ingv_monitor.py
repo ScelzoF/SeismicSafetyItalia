@@ -24,17 +24,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def _ingv_get(url: str, timeout: int = 8, **kwargs) -> requests.Response:
-    """
-    GET sicuro per host INGV OV — tenta prima TLS verificato,
-    poi fallback con verify=False solo se SSLError (certificato INGV noto come problematico).
-    Sopprime il warning InsecureRequestWarning nel solo caso di fallback.
-    """
-    try:
-        return requests.get(url, timeout=timeout, **kwargs)
-    except requests.exceptions.SSLError:
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        return requests.get(url, timeout=timeout, verify=False, **kwargs)  # nosec B501
+    """GET con TLS verificato, senza disabilitare globalmente i warning."""
+    kwargs["verify"] = True
+    return requests.get(url, timeout=timeout, **kwargs)
 
 _BULLETIN_LISTING = {
     "campi_flegrei": "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
@@ -1638,88 +1630,11 @@ INGV_WEBCAM_URLS = {
 # ALERT LEVEL UFFICIALE — cerca su INGV OV
 # ─────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=900, show_spinner=False)
 def fetch_ingv_alert_level():
-    """
-    Livello di allerta ufficiale — catena di 5 fonti a cascata:
-    1. INGV OV /monitoraggio
-    2. INGV OV pagina CF bollettini
-    3. INGV OV RSS feed
-    4. DPC Protezione Civile rischi.it
-    5. Hardcoded (valore ufficiale noto)
-    """
-    from bs4 import BeautifulSoup
-
-    _KW = {
-        "ARANCIONE": ["arancione", "orange", "allerta arancione"],
-        "ROSSO":     ["rosso", "red", "allerta rossa"],
-        "GIALLO":    ["giallo", "yellow", "allerta gialla"],
-        "VERDE":     ["verde", "green", "allerta verde"],
-    }
-    _HDR = {"User-Agent": "SeismicSafetyItalia/2.0", "Accept": "text/html,application/xhtml+xml,*/*"}
-
-    def _parse_level(text):
-        t = text.lower()
-        for level, kws in _KW.items():
-            if any(kw in t for kw in kws):
-                return level
-        return None
-
-    def _try_url(url, label, timeout=2):
-        try:
-            r = _ingv_get(url, timeout=timeout, headers=_HDR,
-                          allow_redirects=True)
-            if r.status_code != 200 or len(r.text) < 500:
-                return None
-            text = BeautifulSoup(r.text, "html.parser").get_text(" ", strip=True)
-            lv = _parse_level(text)
-            if lv:
-                return lv, label
-        except Exception:
-            pass
-        return None
-
-    # 1. INGV OV pagina monitoraggio principale
-    res = _try_url("https://www.ov.ingv.it/index.php/it/monitoraggio", "INGV OV /monitoraggio")
-    if res:
-        return {"campi_flegrei": res[0], "vesuvio": "VERDE", "source": f"INGV OV live ({res[1]})"}
-
-    # 2. INGV OV pagina bollettini Campi Flegrei
-    res = _try_url(
-        "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/campi-flegrei",
-        "INGV OV bollettini CF"
-    )
-    if res:
-        return {"campi_flegrei": res[0], "vesuvio": "VERDE", "source": f"INGV OV live ({res[1]})"}
-
-    # 3. INGV OV RSS feed nazionale
-    try:
-        r = requests.get("https://www.ingv.it/feed/", timeout=2,
-                         headers={"User-Agent": "SeismicSafetyItalia/2.0"})
-        if r.status_code == 200:
-            text = r.text.lower()
-            lv = _parse_level(text)
-            if lv:
-                return {"campi_flegrei": lv, "vesuvio": "VERDE",
-                        "source": "INGV RSS feed (live)"}
-    except Exception:
-        pass
-
-    # 4. DPC — Protezione Civile (rischio vulcanico)
-    res = _try_url(
-        "https://rischi.protezionecivile.gov.it/it/vulcanico/",
-        "DPC Protezione Civile", timeout=2
-    )
-    if res:
-        return {"campi_flegrei": res[0], "vesuvio": "VERDE",
-                "source": f"DPC Protezione Civile ({res[1]})"}
-
-    # 5. Hardcoded — valori ufficiali noti
-    return {
-        "campi_flegrei": "GIALLO",
-        "vesuvio": "VERDE",
-        "source": "INGV OV (bollettino — valore ufficiale)"
-    }
+    """Compatibilità API: livelli verificati separatamente per ogni vulcano."""
+    from alert_levels import fetch_official_alert_levels
+    return fetch_official_alert_levels()
 
 
 @st.cache_data(ttl=1800)

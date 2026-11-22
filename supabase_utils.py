@@ -11,20 +11,26 @@ import time
 import streamlit as st
 from datetime import datetime
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://usobrbklqjwjvxesfbxk.supabase.co")
+def _get_setting(name, default=""):
+    value = os.environ.get(name)
+    if value:
+        return value
+    try:
+        return st.secrets.get(name, default)
+    except Exception:
+        return default
+
+
+SUPABASE_URL = _get_setting(
+    "SUPABASE_URL", "https://usobrbklqjwjvxesfbxk.supabase.co"
+).rstrip("/")
 REQUEST_TIMEOUT = 2   # 2s: DNS morto fallisce subito → fallback locale
 MAX_RETRIES = 0
 
 
 def _get_supabase_key():
     """Legge la chiave Supabase da st.secrets o variabile d'ambiente."""
-    key = os.environ.get("SUPABASE_KEY", "")
-    if not key:
-        try:
-            key = st.secrets.get("SUPABASE_KEY", "")
-        except Exception:
-            pass
-    return key
+    return _get_setting("SUPABASE_KEY")
 
 
 def _get_headers():

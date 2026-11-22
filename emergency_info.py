@@ -1,5 +1,6 @@
 import streamlit as st
 import folium
+from map_tiles import street_map
 from streamlit_folium import folium_static
 import pandas as pd
 
@@ -129,7 +130,7 @@ def show_evacuation_routes():
         """)
         
         # Show Vesuvio evacuation map
-        vesuvio_map = folium.Map(location=[40.82, 14.42], zoom_start=11, tiles="CartoDB positron")
+        vesuvio_map = street_map(location=[40.82, 14.42], zoom_start=11)
         
         # Add zone colored overlays
         folium.Circle(
@@ -213,7 +214,7 @@ def show_evacuation_routes():
         """)
         
         # Show Campi Flegrei evacuation map
-        flegrei_map = folium.Map(location=[40.85, 14.14], zoom_start=11, tiles="CartoDB positron")
+        flegrei_map = street_map(location=[40.85, 14.14], zoom_start=11)
         
         # Add zone colored overlays
         folium.Circle(
@@ -295,7 +296,7 @@ def show_emergency_centers():
     
     with area_tab1:
         # Show Vesuvio emergency centers map
-        vesuvio_em_map = folium.Map(location=[40.82, 14.42], zoom_start=11, tiles="CartoDB positron")
+        vesuvio_em_map = street_map(location=[40.82, 14.42], zoom_start=11)
         
         # Add emergency centers
         emergency_centers = [
@@ -336,7 +337,7 @@ def show_emergency_centers():
     
     with area_tab2:
         # Show Campi Flegrei emergency centers map
-        flegrei_em_map = folium.Map(location=[40.85, 14.14], zoom_start=11, tiles="CartoDB positron")
+        flegrei_em_map = street_map(location=[40.85, 14.14], zoom_start=11)
         
         # Add emergency centers
         emergency_centers = [

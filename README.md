@@ -18,7 +18,7 @@ streamlit run app.py
 
 ## 🌐 Deploy online
 
-- App: https://scelzof-seismicsafetyitalia.streamlit.app
+- App: https://sismocampania.streamlit.app
 - Landing page: https://scelzof.github.io/SeismicSafetyItalia/
 
 ## 🙌 Supporto

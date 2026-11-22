@@ -304,7 +304,10 @@ def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") 
 _SYSTEM_PROMPT = """Sei un esperto di sismologia vulcanica con specializzazione nell'area campana
 (Campi Flegrei, Vesuvio, Ischia). Rispondi in italiano, in modo chiaro e accessibile.
 Fornisci un'analisi concisa (3-5 frasi) basata solo sui dati forniti.
-Non inventare dati. Indica il livello di preoccupazione e le azioni consigliate."""
+Non inventare dati. I dati assenti sono sconosciuti, non indicano assenza di rischio.
+Non prevedere terremoti e non dichiarare allerte, evacuazioni o assenza di pericolo.
+La risposta è sperimentale e non è un comunicato ufficiale.
+Per comportamenti di sicurezza rimanda a INGV e Protezione Civile."""
 
 
 def _build_seismic_prompt(area: str, data_ctx: dict) -> str:
@@ -312,12 +315,12 @@ def _build_seismic_prompt(area: str, data_ctx: dict) -> str:
     n_events   = data_ctx.get("n_events", 0)
     max_mag    = data_ctx.get("max_mag", 0.0)
     avg_mag    = data_ctx.get("avg_mag", 0.0)
-    alert      = data_ctx.get("alert_level", "VERDE")
+    alert      = data_ctx.get("alert_level") or "NON DISPONIBILE"
     gps        = data_ctx.get("gps_uplift_mm_month", 0.0)
     pressure   = data_ctx.get("pressure_base", 1013.0)
     temp_base  = data_ctx.get("temp_base", 15.0)
     temp_vetta = data_ctx.get("temp_vetta", None)
-    sismai_risk= data_ctx.get("sismai_forecast_label", "BASSO")
+    sismai_risk= data_ctx.get("sismai_forecast_label") or "NON DISPONIBILE"
     emsc_n     = data_ctx.get("emsc_n_events", 0)
     isc_n      = data_ctx.get("isc_n_events", 0)
     period     = data_ctx.get("period_days", 90)
@@ -353,15 +356,16 @@ def multi_ai_consensus(area: str, data_ctx: dict) -> dict:
     results   = {"gpt": None, "claude": None, "gemini": None, "consensus": None,
                  "elapsed_s": 0.0, "prompt": prompt, "area": area,
                  "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M")}
+    provider_results = {}
 
     def _run_gpt():
-        results["gpt"] = _ask_gpt(prompt, system=system)
+        provider_results["gpt"] = _ask_gpt(prompt, system=system)
 
     def _run_claude():
-        results["claude"] = _ask_claude(prompt, system=system)
+        provider_results["claude"] = _ask_claude(prompt, system=system)
 
     def _run_gemini():
-        results["gemini"] = _ask_gemini(prompt, system=system)
+        provider_results["gemini"] = _ask_gemini(prompt, system=system)
 
     threads = [
         threading.Thread(target=_run_gpt),
@@ -371,8 +375,10 @@ def multi_ai_consensus(area: str, data_ctx: dict) -> dict:
     for t in threads:
         t.daemon = True
         t.start()
+    deadline = time.monotonic() + 30
     for t in threads:
-        t.join(timeout=30)
+        t.join(timeout=max(0, deadline - time.monotonic()))
+    results.update(provider_results.copy())
 
     results["elapsed_s"] = round(time.time() - t0, 1)
 
@@ -404,9 +410,10 @@ def multi_ai_consensus(area: str, data_ctx: dict) -> dict:
             + "\n\n---\n\n".join(
                 [f"Parere {i+1}: {r}" for i, r in enumerate(responses_available)]
             )
-            + "\n\nSintetizza in 3-4 frasi un consenso scientifico autorevole, "
-            "indicando punti di accordo e eventuali divergenze tra i pareri. "
-            "Scrivi in italiano, stile comunicato ufficiale. "
+            + "\n\nSintetizza in 3-4 frasi le risposte dei modelli, "
+            "indicando accordi, divergenze e limiti dei dati. "
+            "L'accordo fra modelli non è validazione scientifica. "
+            "Scrivi in italiano e dichiara che non è un comunicato ufficiale. "
             "NON usare titoli, elenchi puntati o formattazione markdown."
         )
         results["consensus"] = _ask_gpt(consensus_prompt, system=_SYSTEM_PROMPT)
@@ -429,17 +436,18 @@ def ask_all_providers(question: str, system: str = "") -> dict:
     """
     t0 = time.time()
     results = {"gpt": None, "claude": None, "gemini": None}
+    provider_results = {}
 
     sys_ctx = system or _SYSTEM_PROMPT
 
     def _run_gpt():
-        results["gpt"] = _ask_gpt(question, system=sys_ctx)
+        provider_results["gpt"] = _ask_gpt(question, system=sys_ctx)
 
     def _run_claude():
-        results["claude"] = _ask_claude(question, system=sys_ctx)
+        provider_results["claude"] = _ask_claude(question, system=sys_ctx)
 
     def _run_gemini():
-        results["gemini"] = _ask_gemini(question, system=sys_ctx)
+        provider_results["gemini"] = _ask_gemini(question, system=sys_ctx)
 
     threads = [
         threading.Thread(target=_run_gpt),
@@ -449,8 +457,10 @@ def ask_all_providers(question: str, system: str = "") -> dict:
     for t in threads:
         t.daemon = True
         t.start()
+    deadline = time.monotonic() + 25
     for t in threads:
-        t.join(timeout=25)
+        t.join(timeout=max(0, deadline - time.monotonic()))
+    results.update(provider_results.copy())
 
     results["elapsed_s"] = round(time.time() - t0, 1)
     results["providers_ok"] = _PROVIDERS_OK.copy()

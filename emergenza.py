@@ -6,6 +6,7 @@ Auto-aggiornamento 30 minuti. Google Maps routing. DPC open data.
 
 import streamlit as st
 import folium
+from map_tiles import street_map
 from streamlit_folium import folium_static
 import requests
 import time
@@ -440,8 +441,7 @@ def _fetch_dpc_allerta():
 
 
 def _render_zona_map(punti, title, center_lat, center_lon, zoom=11, key="zona_map"):
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom,
-                   tiles="CartoDB positron")
+    m = street_map(location=[center_lat, center_lon], zoom_start=zoom)
 
     zona_colors = {"A": "red", "B": "orange", "C": "blue"}
 
@@ -452,7 +452,7 @@ def _render_zona_map(punti, title, center_lat, center_lon, zoom=11, key="zona_ma
         <b>{p['comune']}</b><br>
         <span style='color:{zona_col};font-weight:bold'>Zona {p['zona']}</span><br>
         <b>{_gt('popup_raccolta')}:</b> {p['punto']}<br>
-        <b>{_gt('popup_capacity')}:</b> ~{p['pax']:,}<br>
+        <small>Localizzazione indicativa, da verificare con il Comune.</small><br>
         <small style='color:#777'>{p['plat']:.5f}, {p['plon']:.5f}</small><br>
         <hr>
         <a href='{_gmaps_route_url(p["plat"],p["plon"],p["punto"])}' target='_blank'
@@ -535,6 +535,12 @@ def show():
         st.session_state.emergenza_last_update = now.strftime("%d/%m/%Y %H:%M")
 
     st.markdown(_gt("emergency_intro"))
+    st.warning(
+        "Le localizzazioni riportate nelle mappe sono riferimenti statici: "
+        "non ne è verificata qui l'attuale validità come punti di raccolta. "
+        "Non sono itinerari di evacuazione autorizzati. Verifica il piano "
+        "comunale e segui esclusivamente le disposizioni delle autorità."
+    )
 
     # ══ NUMERI DI EMERGENZA ════════════════════════════════════════════════════
     with st.expander(_gt("emergency_numbers_section"), expanded=True):
@@ -601,9 +607,9 @@ def show():
         except Exception:
             _alert = {}
 
-        _CF_LEVEL  = _alert.get("campi_flegrei", "GIALLO")
-        _VES_LEVEL = _alert.get("vesuvio", "VERDE")
-        _ISC_LEVEL = _alert.get("ischia", "VERDE")
+        _CF_LEVEL  = _alert.get("campi_flegrei", "NON DISPONIBILE")
+        _VES_LEVEL = _alert.get("vesuvio", "NON DISPONIBILE")
+        _ISC_LEVEL = _alert.get("ischia", "NON DISPONIBILE")
         _ALERT_SRC = _alert.get("source", "INGV OV")
 
         _LEVEL_COLOR = {
@@ -616,7 +622,7 @@ def show():
         }
 
         # ── Badge allerta attuale ──────────────────────────────────────────────
-        st.markdown("### 📡 Situazione attuale INGV")
+        st.markdown("### 📡 Livelli di allerta — Protezione Civile")
         badge_cols = st.columns(3)
         for _col, _area_name, _level in [
             (badge_cols[0], "Campi Flegrei", _CF_LEVEL),
@@ -677,62 +683,23 @@ def show():
             _li = _LEVEL_ICON.get(_selected_level, "⚪")
 
             # ── Banner livello attuale + cosa fare ────────────────────────────
-            _ISTRUZIONI = {
-                "VERDE": {
-                    "titolo": "Situazione nella norma — Prepararsi è il momento giusto",
-                    "desc": "Nessuna anomalia significativa. Questo è il momento ideale per prepararsi.",
-                    "steps": [
-                        "✅ **Aggiorna il kit di emergenza** — verifica scadenze, integra scorte d'acqua e medicinali",
-                        "✅ **Individua il punto di raccolta** del tuo Comune (vedi tab Vesuvio/CF/Ischia)",
-                        "✅ **Salva i numeri di emergenza** nel telefono: 112, 115, 800 840 840 (PC)",
-                        "✅ **Pianifica l'evacuazione familiare** — un percorso principale e uno alternativo",
-                        "✅ **Scarica l'app IT-Alert** e attiva le notifiche",
-                        "✅ **Tieni una radio a batterie** — in caso di emergenza è l'unica fonte affidabile",
-                        "✅ **Tieniti aggiornato** su INGV e Protezione Civile",
-                    ],
-                },
-                "GIALLO": {
-                    "titolo": "Attenzione — Monitora la situazione con frequenza",
-                    "desc": "Anomalie in corso. Non è ancora emergenza, ma devi essere pronto ad agire rapidamente.",
-                    "steps": [
-                        "⚠️ **Verifica che il kit di emergenza sia completo** e pronto vicino all'uscita",
-                        "⚠️ **Controlla questa app ogni 2-4 ore** e i canali INGV OV",
-                        "⚠️ **Avvisa la famiglia** del livello di attenzione e rivedi il piano di evacuazione",
-                        "⚠️ **Identifica il tuo punto di raccolta** — sai esattamente dove andare?",
-                        "⚠️ **Tieni il serbatoio dell'auto pieno** (o almeno a metà)",
-                        "⚠️ **Segui solo fonti ufficiali** — Protezione Civile, INGV, RAI Radio 1",
-                        "⚠️ **Non allarmarti**, ma sii pronto a partire in 15 minuti se arriva l'ordine",
-                    ],
-                },
-                "ARANCIONE": {
-                    "titolo": "ALLERTA — Preparati a evacuare immediatamente",
-                    "desc": "Anomalie significative in corso. Le autorità potrebbero ordinare l'evacuazione a breve.",
-                    "steps": [
-                        "🟠 **PRENDI SUBITO il kit di emergenza** — acqua, cibo, medicinali, documenti, power bank",
-                        "🟠 **Contatta i familiari** — pianificate insieme il percorso di evacuazione",
-                        "🟠 **Tieniti pronto a partire in 10 minuti** dall'ordine delle autorità",
-                        "🟠 **Ascolta RAI Radio 1** e gli aggiornamenti ufficiali della PC continuamente",
-                        "🟠 **Spostati al punto di raccolta** solo se le autorità lo ordinano",
-                        "🟠 **Non usare il telefono** per chiamate non urgenti — libera le linee ai soccorsi",
-                        "🟠 **Non credere a voci non ufficiali** — fonti: protezionecivile.gov.it, INGV",
-                    ],
-                },
-                "ROSSO": {
-                    "titolo": "EMERGENZA — EVACUA ORA",
-                    "desc": "Situazione critica. Segui immediatamente le istruzioni della Protezione Civile.",
-                    "steps": [
-                        "🔴 **EVACUA SUBITO** — non aspettare, segui le vie di fuga indicate dalla segnaletica DPC",
-                        "🔴 **Prendi SOLO l'essenziale** — documenti, medicinali, 1 borsa",
-                        "🔴 **Raggiungi il punto di raccolta** del tuo Comune IN AUTO (non a piedi)",
-                        "🔴 **Segui la segnaletica gialla DPC** sulle vie di fuga — non improvvisare",
-                        "🔴 **Ascolta solo RAI Radio 1** e i megafoni della Protezione Civile",
-                        "🔴 **Non tornare a casa** per nessun motivo fino all'ok delle autorità",
-                        "🔴 **Chiama il 112 solo per emergenze reali** — non intasare le linee",
-                    ],
-                },
+            # An alert color is not an evacuation order. The app must never
+            # invent operational instructions, transport modes or deadlines.
+            _instr = {
+                "titolo": "Consulta le disposizioni ufficiali per la tua area",
+                "desc": (
+                    "Il livello riportato non costituisce un ordine di evacuazione "
+                    "né una dichiarazione di assenza di pericolo. Se non verificabile, "
+                    "il livello è indicato come NON DISPONIBILE."
+                ),
+                "steps": [
+                    f"Consulta il [piano e gli aggiornamenti della Protezione Civile]({_piano_url}).",
+                    "Segui le disposizioni del Comune e delle autorità competenti, "
+                    "comprese eventuali indicazioni su spostamenti e assistenza.",
+                    "Non usare questa app per decidere autonomamente quando o come evacuare.",
+                    "In caso di emergenza immediata chiama il **112**.",
+                ],
             }
-
-            _instr = _ISTRUZIONI.get(_selected_level, _ISTRUZIONI["VERDE"])
 
             st.markdown(
                 f"<div style='background:{_lc}22;border-left:5px solid {_lc};"
@@ -852,7 +819,7 @@ def show():
                     f"<div style='background:#1a8a1a22;border-left:4px solid #1a8a1a;padding:12px;border-radius:6px;'>"
                     f"<b>📍 {punto['comune']}</b> — Zona {punto['zona']}<br>"
                     f"<b>{_gt('collection_point_label')}:</b> {punto['punto']}<br>"
-                    f"<b>{_gt('capacity_label')}:</b> ~{punto['pax']:,} persone<br>"
+                    "<small>Riferimento statico da verificare con il Comune.</small><br>"
                     f"{_nav_buttons_html(punto['plat'], punto['plon'], punto['punto'])}"
                     f"</div>",
                     unsafe_allow_html=True
@@ -860,13 +827,13 @@ def show():
 
         m_v = _render_zona_map(VESUVIO_ZONA_ROSSA, "Vesuvio — Zone Evacuazione",
                                 40.820, 14.430, zoom=10, key="vesuvio_zona_map")
-        folium_static(m_v, width=800, height=500)
+        folium_static(m_v, width=None, height=500)
 
         # Tabella completa
         with st.expander(_gt("all_collection_points")):
             for p in VESUVIO_ZONA_ROSSA:
                 st.markdown(
-                    f"🔴 **{p['comune']}** (Zona {p['zona']}) — {p['punto']} (~{p['pax']:,} pax)"
+                    f"🔴 **{p['comune']}** (Zona {p['zona']}) — {p['punto']} (da verificare)"
                     + _nav_buttons_html(p["plat"], p["plon"], p["punto"]),
                     unsafe_allow_html=True
                 )
@@ -933,7 +900,7 @@ def show():
                     f"<div style='background:#ff990022;border-left:4px solid #ff9900;padding:12px;border-radius:6px;'>"
                     f"<b>📍 {punto_f['comune']}</b> — Zona {punto_f['zona']}<br>"
                     f"<b>{_gt('collection_point_label')}:</b> {punto_f['punto']}<br>"
-                    f"<b>{_gt('capacity_label')}:</b> ~{punto_f['pax']:,} persone<br>"
+                    "<small>Riferimento statico da verificare con il Comune.</small><br>"
                     f"{_nav_buttons_html(punto_f['plat'], punto_f['plon'], punto_f['punto'], bg='#ff9900')}"
                     f"</div>",
                     unsafe_allow_html=True
@@ -941,13 +908,13 @@ def show():
 
         m_f = _render_zona_map(CF_ZONA_ROSSA, "Campi Flegrei — Zone Evacuazione",
                                 40.840, 14.130, zoom=11, key="flegrei_zona_map")
-        folium_static(m_f, width=800, height=500)
+        folium_static(m_f, width=None, height=500)
 
         with st.expander("📋 Tutti i punti di raccolta — Zona Rossa Campi Flegrei"):
             for p in CF_ZONA_ROSSA:
                 col_zona = "🔴" if p["zona"] == "A" else "🟠"
                 st.markdown(
-                    f"{col_zona} **{p['comune']}** (Zona {p['zona']}) — {p['punto']} (~{p['pax']:,} pax)"
+                    f"{col_zona} **{p['comune']}** (Zona {p['zona']}) — {p['punto']} (da verificare)"
                     + _nav_buttons_html(p["plat"], p["plon"], p["punto"]),
                     unsafe_allow_html=True
                 )

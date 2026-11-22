@@ -349,9 +349,20 @@ def check_with_openai(text, user_id=None):
         return False, None
     
     try:
-        logger.info(f"Invio richiesta a OpenAI Moderation API per: '{text[:50]}...'")
-        response = openai.Moderation.create(input=text)
-        results = response["results"][0]
+        key = os.getenv("OPENAI_API_KEY")
+        if not key:
+            try:
+                key = st.secrets.get("OPENAI_API_KEY", "")
+            except Exception:
+                key = ""
+        if not key:
+            return False, None
+        logger.info("Verifica del contenuto tramite Moderation API")
+        client = openai.OpenAI(api_key=key, timeout=10, max_retries=0)
+        response = client.moderations.create(
+            model="omni-moderation-latest", input=text
+        )
+        results = response.results[0].model_dump()
         
         # Se il contenuto è flaggato come inappropriato
         if results["flagged"]:
@@ -373,8 +384,8 @@ def check_with_openai(text, user_id=None):
             return True, f"Contenuto bloccato: OpenAI ha rilevato {highest_category} (confidence: {highest_score:.2f})"
         
         return False, None
-    except Exception as e:
-        logger.error(f"Errore durante la verifica con OpenAI: {e}")
+    except Exception:
+        logger.warning("Moderazione remota non disponibile; applicati i filtri locali")
         # Fallback ai metodi locali in caso di errore
         return False, None
 
