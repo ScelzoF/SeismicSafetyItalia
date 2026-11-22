@@ -1,15 +1,16 @@
 # Audit tecnico di Sismocampania
 
-Data: 21 novembre 2026.
+Data: 22 novembre 2026.
 Repository: `ScelzoF/SeismicSafetyItalia`.
-Base esaminata: `8654a9ea59d592c23b635a866baf768d97b328d4`.
+Ambito: correzioni già integrate nel ramo principale e verifiche aggiuntive in preparazione.
 
 ## Esito
 
-Preparata una correzione dei difetti tecnici riproducibili senza modificare
-il sito pubblicato o il database reale. Il rilascio richiede prima le migrazioni
-Supabase e poi l'integrazione del codice e il riavvio manuale.
-Vedere `RIAVVIO_STREAMLIT.md`.
+La prima correzione del contatore e dei permessi è stata integrata. Le correzioni
+descritte nell'aggiornamento del 22 novembre sono ancora da integrare e richiedono
+il riavvio manuale del proprietario. L'utente ha confermato l'esito “Success” dei
+due script SQL; l'accesso al progetto Supabase non è disponibile per una verifica
+indipendente. Vedere `RIAVVIO_STREAMLIT.md`.
 
 Questo è un audit tecnico del codice e dei percorsi provati: non è un penetration
 test completo del servizio online, una certificazione o una validazione scientifica.
@@ -27,6 +28,9 @@ Non è corretto considerare tutte le funzioni e tutti i dati “certificati”.
   conservazione del totale, concorrenza, retry e permessi dei ruoli pubblici.
 - Letture HTTPS effettive: una tile OpenStreetMap, catalogo INGV, sito OV e pagine
   ufficiali DPC. Sono verifiche puntuali, non garanzie di disponibilità futura.
+- Download e parsing reali dei tre bollettini INGV OV (22 novembre 2026), dopo
+  aver individuato dinamicamente le categorie e le cartelle annuali dal sito ufficiale.
+- Lettura delle pagine ufficiali Streamlit sulle regole di sospensione Community Cloud.
 - L'alias `CartoDB positron` è stato riprodotto con Folium 1.0.0 e
   xyzservices 2026.9.1: genera un avviso di chiave obbligatoria e un URL con
   parametro di chiave. La versione installata sul sito reale non è stata letta.
@@ -46,7 +50,7 @@ Non è corretto considerare tutte le funzioni e tutti i dati “certificati”.
 | Media | Verifica TLS disabilitata su errori di certificato; warning soppressi globalmente | Rimossi i due fallback non verificati; nessuna soppressione globale |
 | Media | XSRF e CORS disattivati nella configurazione Streamlit | Riattivate entrambe le protezioni |
 | Media | Dati sismici caricati dal disco possono essere etichettati “live” | Metadato stale e avvisi sia nella pagina sia nei badge |
-| Media | Ogni rerun crea un nuovo thread keep-alive infinito | Risorsa Streamlit condivisa per avviare un solo worker per processo |
+| Media | Il thread “keep-alive” puntava al vecchio sito e non impediva l'ibernazione | Rimosso il ping errato; chiarito che il refresh browser vale solo con visitatori attivi |
 | Media | Il moderatore del forum perde la cronologia a ogni rerun | Istanza mantenuta nella sessione; non equivale a rate limiting globale |
 | Media | Moderazione OpenAI usa un'interfaccia SDK rimossa | API `client.moderations.create`; niente testo utente nei log della funzione |
 | Media | I timeout multi-AI si sommano e i thread possono modificare un risultato già restituito | Budget condiviso di attesa e snapshot separato dei risultati |
@@ -81,9 +85,10 @@ non documentate dal rendering principale e aggiunge un avviso esplicito.
 La verifica dei piani comunali rimane necessaria: navigazione cartografica e
 itinerario di evacuazione autorizzato non sono la stessa cosa.
 
-Altri valori di fallback GPS/bollettini sono statici: mantenere sempre fonte,
-data, stato di validazione e distinzione fra misura, stima e riferimento storico.
-L'audit non ha certificato l'accuratezza scientifica di questi numeri.
+I valori statici conservati per compatibilità non vengono presentati come misure:
+la UI mostra una metrica vulcanologica solo se il campo è stato estratto dal PDF
+corrente o da una serie GNSS recente. L'audit non certifica l'accuratezza
+scientifica dei riferimenti storici.
 
 ### 2. Protezione community — alta priorità
 
@@ -139,8 +144,9 @@ del lock npm ausiliario.
 Ridurre i fetch e i rendering eseguiti in tab non aperti; caching per area con
 chiavi e TTL espliciti; moduli più piccoli per `visualization.py` e `app.py`;
 log strutturati senza contenuti utente; contatori di fallimento delle fonti.
-I warning di deprecazione su `folium_static` e `datetime.utcnow` restano un debito
-di compatibilità: non sono stati trattati come crash attuali.
+È stato sostituito `datetime.utcnow` con UTC timezone-aware nei moduli principali.
+Il warning di deprecazione su `folium_static` resta un debito di compatibilità,
+ma non è stato riprodotto come crash attuale.
 
 Per scalare il conteggio, definire una retention del registro delle sessioni e
 un concetto di visita esplicito. L'attuale soluzione conta sessioni Streamlit,
@@ -158,14 +164,91 @@ grafici e popup. I test AppTest eseguono l'app ma non verificano pixel, Leaflet
 nel browser, lettori di schermo o un dispositivo reale. Il precedente controllo
 browser del sito non è stato completato e non viene spacciato per un test riuscito.
 
+## Aggiornamento del 22 novembre 2026
+
+### Percorsi e aggiornamento dei dati
+
+Il percorso Ischia era obsoleto: la categoria ufficiale è cambiata e il suffisso
+della cartella annuale non è stabile. Ora il codice parte dalla navigazione INGV,
+scopre la categoria corretta per ciascuna area e segue il link dell'anno corrente;
+la stessa risoluzione è usata sia per estrarre i dati sia per scaricare il PDF.
+Anche il link al PDF viene selezionato dal testo/contesto della pagina, non da uno
+slug annuale immutabile; se non è possibile identificarlo, il downloader si ferma
+invece di prendere un PDF casuale.
+I percorsi di Campi Flegrei e Vesuvio non dipendono più da suffissi annuali
+fissati nel codice. La cache di sei ore limita il carico sul sito INGV.
+
+Verifica effettiva: il 22 novembre sono stati trovati e scaricati i PDF ufficiali
+per tutte e tre le aree; l'estrazione ha identificato Campi Flegrei 17 novembre
+2026 e i bollettini mensili di Vesuvio e Ischia di ottobre 2026. I badge sono ora
+indipendenti per area: il successo di una fonte non può più far apparire
+“aggiornate” le altre. Se una pagina o un PDF non è verificabile, il dato viene
+segnalato come non disponibile/non verificato.
+
+Le API sismiche (INGV, USGS, EMSC e GOSSIP-OV) hanno endpoint distinti, retry e
+fallback su dati precedenti; Open-Meteo, NOAA, UNR e le altre API hanno formati
+propri. Non esiste una riparazione universale in grado di dedurre in sicurezza
+una nuova API o interpretare un formato cambiato. L'auto-risoluzione copre le
+directory INGV che pubblicano i propri link; per API con schema cambiato o fonte
+offline, la regola resta mostrare un fallback datato o “non disponibile”, non
+inventare dati. L'app non riscrive né pubblica codice da sola.
+
+### Provenienza delle metriche GPS e dei bollettini
+
+Il percorso NGL della stazione RITE restituiva 404; Campi Flegrei usa ora il tasso
+mensile estratto dal bollettino settimanale corrente. La stazione Ischia NAPL
+restituiva dati fermi al 2024: il parser li rifiuta se superano 90 giorni. Le
+metriche GPS Vesuvio/Ischia non dichiarano più “live” tassi predefiniti che il PDF
+non contiene; restano non disponibili finché non arriva una misura attuale.
+Le serie mensili sintetiche GNSS sono state rimosse. Il grafico storico dei
+Campi Flegrei è esplicitamente di contesto e termina con il riferimento 2024.
+
+Verifica diretta dei PDF ufficiali il 22 novembre: Vesuvio ottobre 2026 (92 eventi,
+Mdmax estratto); Ischia ottobre 2026 (0 eventi nel mese, 2 negli ultimi 12 mesi);
+Campi Flegrei 17 novembre 2026 (10 mm/mese dal bollettino). Questi numeri descrivono
+i PDF scaricati durante la verifica, non un impegno di aggiornamento istantaneo.
+
+### Altri problemi riprodotti dagli screenshot
+
+- **Ibernazione Streamlit:** il worker locale pingava `sismoold.streamlit.app`,
+  cioè un sito diverso; l'auto-refresh del browser funziona solo mentre una scheda
+  è attiva. Non c'è un cron esterno nel repository. Streamlit Community Cloud
+  sospende le app senza traffico per 12 ore; nessun ping nel codice garantisce
+  disponibilità continua. Per “sempre online” serve un piano/hosting senza
+  ibernazione; non viene aggiunto un ping per aggirare questa regola.
+- **Multi-AI fuori tema:** fallback non dichiarati potevano riutilizzare risposte
+  GPT/g4f al posto dei provider indicati e non c'era controllo di pertinenza.
+  Il confronto ora accetta solo risposte pertinenti dei provider configurati,
+  rifiuta testo generico come l'avviso Copilot nello screenshot, escapa il
+  contenuto HTML e non chiama “consenso scientifico” l'accordo fra modelli.
+  Questo non certifica le conclusioni AI; l'assistente generale mantiene ancora
+  alcuni fallback esterni ed è un punto residuo di privacy/affidabilità.
+- **Video non disponibile:** rimossi gli embed fissi CF e Ischia che non erano
+  più accessibili; al loro posto ci sono le pagine ufficiali INGV. Il feed di
+  notizie resta un percorso separato.
+- **Supporto/donazioni:** rimossi dal codice corrente i metodi non più validi.
+  La UI resta temporaneamente disattivata finché non viene indicato un nuovo
+  collegamento pubblico; non inserire numeri di carta o coordinate bancarie nel
+  repository. Dati finanziari erano presenti in un commit precedente: eliminarli
+  dal file attuale non li rimuove dalla cronologia Git. La carta va sostituita/
+  bloccata e la riscrittura della cronologia richiede un'autorizzazione separata.
+
+Queste correzioni aggiuntive non sono ancora nel sito pubblicato. Un test locale
+non prova che Streamlit abbia scaricato la nuova versione: il proprietario deve
+integrare la proposta, riavviare e controllare i log.
+
 ## Test e limiti di rilascio
 
-Esito finale locale: **46 test superati**, inclusi 60 incrementi concorrenti
+Ultima esecuzione locale: **55 test superati, 5 saltati**, inclusi i controlli su
+incrementi concorrenti
 con token distinti, 40 retry concorrenti dello stesso token, conservazione del
 totale esistente, blocco dei reset anonimi, navigazione offline nelle otto pagine,
-catalogo sintetico, assenza di accumulo dei worker e gestione dell'allerta ignota.
-Gli 88 warning rilevati sono principalmente deprecazioni e messaggi del runtime
-di test: non vengono nascosti come se fossero stati corretti tutti.
+catalogo sintetico, risoluzione dei percorsi INGV, filtri Multi-AI e gestione
+dell'allerta ignota, provenienza delle metriche GPS e conteggio Ischia a zero.
+I cinque test database sono saltati perché in questa esecuzione non era configurato
+un database locale eliminabile; non è stato usato Supabase. Gli 11 warning sono
+principalmente deprecazioni di `folium_static` e del runtime di test: non vengono
+nascosti come se fossero stati corretti tutti.
 
 Eseguire dalla radice:
 

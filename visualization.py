@@ -294,8 +294,8 @@ def _show_3d_depth_map(df: pd.DataFrame, area_name: str, plot_key: str) -> None:
 
 def _render_bradisismo_storico_cf(gps_data: dict | None = None) -> None:
     """
-    Grafico interattivo del sollevamento cumulativo ai Campi Flegrei (1950→oggi).
-    Due tracce: crisi storiche (1950-2005) + ciclo attuale GPS RITE (2005→oggi).
+    Grafico di contesto del sollevamento cumulativo ai Campi Flegrei.
+    I punti storici non sono un feed live; il tasso corrente è separato.
     Se gps_data è fornito aggiunge il tasso attuale come annotazione.
     """
     df_brd = get_bradisismo_storico_cf()
@@ -326,12 +326,12 @@ def _render_bradisismo_storico_cf(gps_data: dict | None = None) -> None:
         ax=60, ay=-40,
     )
 
-    # Traccia ciclo attuale (asse Y secondario, riferimento 2005=0)
+    # Riferimenti storici (asse Y secondario, riferimento 2005=0)
     fig.add_trace(go.Scatter(
         x=_recente["year"].tolist(),
         y=_recente["uplift_mm"].tolist(),
         mode="lines+markers",
-        name="Ciclo attuale GPS RITE (2005=0)",
+        name="Riferimenti storici GPS RITE (2005=0)",
         line=dict(color="#f39c12", width=2.5, dash="solid"),
         marker=dict(size=7, symbol="diamond"),
         text=_recente["note"].tolist(),
@@ -340,19 +340,25 @@ def _render_bradisismo_storico_cf(gps_data: dict | None = None) -> None:
     ))
 
     # Tasso attuale live da GPS
-    if gps_data and gps_data.get("monthly_rate_mm") is not None:
+    if (
+        gps_data
+        and gps_data.get("source_type") in ("live", "bulletin_live")
+        and gps_data.get("monthly_rate_mm") is not None
+    ):
         _rate = gps_data["monthly_rate_mm"]
         _station = gps_data.get("station", "RITE")
-        _src_icon = "🟢 LIVE" if gps_data.get("source_type") == "live" else "📡"
+        _src_icon = (
+            "🟢 LIVE" if gps_data.get("source_type") == "live"
+            else "📋 BOLLETTINO"
+        )
         fig.add_annotation(
-            x=2026.1, y=_recente["uplift_mm"].iloc[-1],
+            x=0.99, y=0.98, xref="paper", yref="paper",
             text=f"{_src_icon} {_station}<br>{_rate:+.1f} mm/mese",
-            showarrow=True, arrowhead=2, arrowcolor="#f39c12",
+            showarrow=False,
             font=dict(size=10, color="#f39c12"),
             bgcolor="rgba(255,255,255,0.85)",
             bordercolor="#f39c12", borderwidth=1,
-            ax=-70, ay=-30,
-            yref="y2",
+            xanchor="right", yanchor="top",
         )
 
     # Zona "allerta livello storico"
@@ -392,9 +398,8 @@ def _render_bradisismo_storico_cf(gps_data: dict | None = None) -> None:
     )
     st.plotly_chart(fig, width="stretch", key="bradisismo_storico_cf")
     st.caption(
-        "📚 Fonti: INGV OV Bollettini storici · Barberi et al. (1984) · Chiodini et al. (2017) · "
-        "GPS RITE da bollettini INGV OV (rete RING — non su NGL). I valori 1950–2005 sono espressi "
-        "rispetto al benchmark Rione Terra; il ciclo attuale (arancio) è relativo al riferimento GPS RITE 2005=0."
+        "Serie di contesto con riferimenti storici curati manualmente, ultimo punto 2024 (non live). "
+        "Il tasso corrente appare solo se verificato da GPS o dal bollettino ufficiale."
     )
 
 
@@ -1063,9 +1068,18 @@ def _render_pdf_download_button(area: str) -> None:
         )
     else:
         _listing_urls = {
-            "vesuvio":       f"https://www.ov.ingv.it/ov/it/bollett-mensili-ves/anno-{datetime.now().year}-1.html",
-            "campi_flegrei": f"https://www.ov.ingv.it/ov/it/boll-sett-flegre/anno-{datetime.now().year}.html",
-            "ischia":        f"https://www.ov.ingv.it/ov/it/bollett-mensili-isch/anno-{datetime.now().year}-3.html",
+            "vesuvio": (
+                "https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
+                "bollettini-tutti/bollett-mensili-ves"
+            ),
+            "campi_flegrei": (
+                "https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
+                "bollettini-tutti/settimanali-dei-campi-flegrei"
+            ),
+            "ischia": (
+                "https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
+                "bollettini-tutti/bollett-mensili-ischia"
+            ),
         }
         url = _listing_urls.get(area, "https://www.ov.ingv.it")
         st.markdown(
@@ -1209,147 +1223,97 @@ def _show_italia_tab(df, get_text):
 # HELPER — Grafico deformazione GPS (ts_df da NGL o bollettino)
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _format_gps_rate(gps_result: dict) -> str:
+    rate = gps_result.get("monthly_rate_mm")
+    if rate is None or gps_result.get("source_type") not in ("live", "bulletin_live"):
+        return "NON DISPONIBILE"
+    try:
+        return f"{float(rate):+.1f} mm/mese"
+    except (TypeError, ValueError):
+        return "NON DISPONIBILE"
+
+
+def _verified_bulletin_value(bulletin: dict, field: str, unit: str = "", decimals: int = 0) -> str:
+    """Format only values actually parsed from that area's current official source."""
+    if not bulletin.get("_live") or field not in set(bulletin.get("_parsed_fields") or []):
+        return "NON DISPONIBILE"
+    value = bulletin.get(field)
+    if value is None:
+        return "NON DISPONIBILE"
+    try:
+        number = float(value)
+        rendered = f"{number:.{decimals}f}" if decimals else f"{number:g}"
+        return f"{rendered}{unit}"
+    except (TypeError, ValueError):
+        return "NON DISPONIBILE"
+
+
 def _render_gps_chart(gps_result: dict, area_name: str, chart_key: str = "") -> None:
-    """
-    Mostra la curva di deformazione del suolo.
-    Se ts_df è disponibile (dati NGL live) usa quelli, altrimenti usa i dati
-    storici dai bollettini INGV OV come fallback.
-    """
-    import plotly.graph_objects as go
-
-    ts_df = gps_result.get("ts_df")
-    source_type = gps_result.get("source_type", "bulletin")
+    """Mostra solo misure GNSS attuali o una serie storica effettivamente scaricata."""
+    source_type = gps_result.get("source_type", "unavailable")
     station = gps_result.get("station", "")
-    source = gps_result.get("source", "INGV OV")
-
-    _COLORS = {
-        "Vesuvio": "#7C3AED",
-        "Campi Flegrei": "#DC2626",
-        "Ischia": "#2563EB",
+    source = gps_result.get("source", "Fonte GNSS non verificata")
+    rate = gps_result.get("monthly_rate_mm")
+    ts_df = gps_result.get("ts_df")
+    gps_pages = {
+        "Campi Flegrei": "https://www.ov.ingv.it/index.php/flegrei-stato-attuale",
+        "Vesuvio": "https://www.ov.ingv.it/index.php/stato-attuale",
+        "Ischia": "https://www.ov.ingv.it/index.php/ischia-stato-attuale",
     }
-    color = _COLORS.get(area_name, "#059669")
 
-    # Ultimo punto dinamico: mese corrente
-    _now_ym = datetime.now().strftime("%Y-%m")
-    _up_total = gps_result.get("up_total_mm")
+    if source_type == "bulletin_live" and rate is not None:
+        with st.expander("📈 Dato GPS da bollettino INGV", expanded=False):
+            st.caption(f"{source} · {gps_result.get('last_date') or 'data del bollettino non disponibile'}")
+            st.info(
+                f"Ultimo tasso pubblicato: {_format_gps_rate(gps_result)}. "
+                "Il bollettino non fornisce una serie temporale numerica completa; "
+                "non mostro una curva ricostruita o stimata."
+            )
+            if area_name in gps_pages:
+                st.link_button("Apri la fonte ufficiale INGV →", gps_pages[area_name], width="stretch")
+        return
 
-    # ── Campi Flegrei: serie temporale live da pagina INGV OV ───────────────
-    _cf_ts = {}
-    if area_name == "Campi Flegrei":
-        try:
-            from ingv_monitor import fetch_ingv_cf_gps_timeseries
-            _cf_ts = fetch_ingv_cf_gps_timeseries()
-        except Exception:
-            _cf_ts = {}
-
-    # ── Selezione dati per il grafico ────────────────────────────────────────
-    # Campi Flegrei: usa serie storica lunga dedicata (2005→oggi)
-    if area_name == "Campi Flegrei":
-        if _cf_ts.get("ok") and len(_cf_ts.get("dates", [])) >= 6:
-            x_vals  = _cf_ts["dates"]
-            y_vals  = _cf_ts["values"]
-            rate    = _cf_ts["monthly_rate_mm"]
-            tot_cm  = _cf_ts.get("total_cm", "")
-            badge   = (f"🟢 LIVE INGV OV — RITE {tot_cm} cm da nov-2005 "
-                       f"· tasso attuale ~{rate:.0f} mm/mese")
-            y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
-        else:
-            x_vals  = ["2005-11","2010-01","2015-01","2018-01","2020-01",
-                       "2022-01","2023-01","2024-01","2025-01", _now_ym]
-            y_vals  = [0, 100, 340, 550, 720, 920, 1050, 1210, 1380,
-                       round(_up_total, 1) if _up_total else 1635]
-            badge   = f"📋 Storico INGV OV + bollettino live ({_now_ym})"
-            y_label = "Sollevamento cumulativo RITE da nov-2005 (mm)"
-
-    elif area_name == "Vesuvio":
-        # Serie storica lunga (2014→oggi) + tasso live NGL se disponibile
-        rate_ves = gps_result.get("monthly_rate_mm", -0.1)
-        bd       = gps_result.get("last_date", "")
-        src_type = gps_result.get("source_type", "bulletin")
-        # Ancora storici verificati bollettini INGV OV (subsidenza lenta ~1-2 mm/anno)
-        # + ultimo punto aggiornato col tasso NGL live se disponibile
-        _last_y  = round(-13.2 + rate_ves * 16, 1)
-        x_vals   = ["2014-01","2016-01","2018-01","2020-01","2021-01",
-                    "2022-01","2023-01","2024-01","2025-01", _now_ym]
-        y_vals   = [0, -2.4, -4.8, -7.2, -8.4, -9.6, -10.8, -12.0, -13.2,
-                    _last_y]
-        _src_lbl = f"🟢 LIVE NGL · {station} · {bd}" if src_type == "live" else f"📡 INGV OV · {bd}"
-        badge    = f"{_src_lbl} · tasso {rate_ves:+.2f} mm/mese"
-        y_label  = "Deformazione cumulativa (mm, rif. gen-2014)"
-
-    elif area_name == "Ischia":
-        # Serie storica + effetto sisma Casamicciola nov-2022 + recupero
-        # Tasso corrente aggiornato da NGL live se disponibile
-        rate_isc = gps_result.get("monthly_rate_mm", 0.0)
-        bd       = gps_result.get("last_date", "")
-        src_type = gps_result.get("source_type", "bulletin")
-        _last_y  = round(-3.0 + rate_isc * 16, 1)
-        x_vals   = ["2014-01","2016-01","2017-08","2018-01","2020-01",
-                    "2022-01","2022-11","2023-06","2024-01","2025-01", _now_ym]
-        # Dati verificati: sisma M4.0 ago-2017 → subsidenza ~5mm,
-        # sisma M5.9 nov-2022 Casamicciola → subsidenza ~24mm, recupero progressivo
-        y_vals   = [0, 1.5, -4.5, -2.0, 0.5,
-                    1.0, -24.0, -10.0, -5.0, -3.0, _last_y]
-        _src_lbl = f"🟢 LIVE NGL · {station} · {bd}" if src_type == "live" else f"📡 INGV OV · {bd}"
-        badge    = (f"{_src_lbl} · tasso {rate_isc:+.2f} mm/mese · "
-                    f"sisma Casamicciola nov-2022 incluso")
-        y_label  = "Deformazione relativa IOCA (mm, rif. gen-2014)"
-
-    elif ts_df is not None and len(ts_df) >= 5:
-        # Generico: usa ts_df NGL live se disponibile
-        x_vals  = ts_df["date"].tolist()
-        y_vals  = ts_df["up_mm"].round(2).tolist()
-        badge   = f"🟢 LIVE — Nevada Geodetic Laboratory (NGL) · {station}"
-        y_label = "Deformazione relativa (mm)"
-
-    else:
-        # Fallback generico
-        x_vals  = [_now_ym]
-        y_vals  = [round(_up_total, 1) if _up_total else 0]
-        badge   = f"📋 Bollettino INGV OV ({gps_result.get('last_date', '')})"
-        y_label = "Deformazione (mm)"
+    if source_type != "live" or ts_df is None or len(ts_df) < 5:
+        with st.expander("📈 Serie GPS", expanded=False):
+            st.info("Misure GNSS recenti non disponibili: non viene mostrata una curva sintetica.")
+            st.caption(source)
+            if area_name in gps_pages:
+                st.link_button("Apri la fonte ufficiale INGV →", gps_pages[area_name], width="stretch")
+        return
 
     try:
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=x_vals, y=y_vals,
-            mode="lines+markers",
-            line=dict(color=color, width=2),
-            marker=dict(size=4),
-            name=station,
-            hovertemplate="<b>%{x}</b><br>%{y:+.1f} mm<extra></extra>"
+        import plotly.graph_objects as go
+        required = {"date", "up_mm"}
+        if not required.issubset(ts_df.columns):
+            st.info("La fonte GNSS non ha restituito una serie leggibile.")
+            return
+        x_vals = ts_df["date"].astype(str).tolist()
+        y_vals = pd.to_numeric(ts_df["up_mm"], errors="coerce").tolist()
+        valid = [(x, y) for x, y in zip(x_vals, y_vals) if pd.notna(y)]
+        if len(valid) < 5:
+            st.info("La serie GNSS contiene pochi punti validi per un grafico.")
+            return
+        x_vals, y_vals = zip(*valid)
+        colors = {"Vesuvio": "#7C3AED", "Campi Flegrei": "#DC2626", "Ischia": "#2563EB"}
+        color = colors.get(area_name, "#059669")
+        fig = go.Figure(go.Scatter(
+            x=list(x_vals), y=list(y_vals), mode="lines+markers",
+            line=dict(color=color, width=2), marker=dict(size=4), name=station,
+            hovertemplate="<b>%{x}</b><br>%{y:+.1f} mm<extra></extra>",
         ))
         fig.add_hline(y=0, line_dash="dash", line_color="#9CA3AF", line_width=1)
-        if y_vals:
-            fig.add_annotation(
-                x=x_vals[-1], y=y_vals[-1],
-                text=f"{y_vals[-1]:+.1f} mm",
-                showarrow=True, arrowhead=2,
-                font=dict(color=color, size=11), xshift=12
-            )
         fig.update_layout(
-            title=f"Deformazione del suolo — {area_name} ({station})",
-            xaxis_title="Data", yaxis_title=y_label,
+            title=f"Serie GNSS misurata — {area_name} ({station})",
+            xaxis_title="Data", yaxis_title="Variazione relativa (mm)",
             height=320, plot_bgcolor="#f9fafb", paper_bgcolor="white",
-            hovermode="x unified", margin=dict(l=40, r=20, t=50, b=40)
+            hovermode="x unified", margin=dict(l=40, r=20, t=50, b=40),
         )
-        _key = chart_key or f"gps_deform_{area_name.lower().replace(' ', '_')}"
-        with st.expander("📈 Curva deformazione del suolo GPS", expanded=False):
-            st.caption(badge)
-            st.plotly_chart(fig, width='stretch', key=_key)
-            if gps_result.get("source_type") != "live":
-                _gps_page = {
-                    "Campi Flegrei": "https://www.ov.ingv.it/index.php/flegrei-stato-attuale",
-                    "Vesuvio":       "https://www.ov.ingv.it/index.php/stato-attuale",
-                    "Ischia":        "https://www.ov.ingv.it/index.php/ischia-stato-attuale",
-                }.get(area_name, "https://www.ov.ingv.it")
-                st.link_button(
-                    "📡 Dati GPS live su INGV OV →",
-                    _gps_page,
-                    width='stretch',
-                )
-    except Exception as _e:
-        st.warning(f"Grafico GPS non disponibile: {_e}")
+        key = chart_key or f"gps_deform_{area_name.lower().replace(' ', '_')}"
+        with st.expander("📈 Serie GNSS misurata", expanded=False):
+            st.caption(f"{source} · ultimo dato {gps_result.get('last_date') or 'data non disponibile'}")
+            st.plotly_chart(fig, width="stretch", key=key)
+    except Exception:
+        st.info("Grafico GPS non disponibile in questo momento.")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1384,26 +1348,26 @@ def _show_vesuvio_tab(df, get_text):
     _show_gossip_widget("vesuvio")
 
     # ── Bollettino mensile INGV OV — Vesuvio ──────────────────────────────
-    _bv_date = bulletin.get("bulletin_date", "—")
-    _bv_ev   = bulletin.get("seismic_events_month")
-    _bv_md   = bulletin.get("seismic_md_max_month")
+    _bv_date = bulletin.get("bulletin_date", "Data non verificata")
+    _bv_ev   = _verified_bulletin_value(bulletin, "seismic_events_month")
+    _bv_md   = _verified_bulletin_value(bulletin, "seismic_md_max_month", decimals=1)
     _bv_col1, _bv_col2, _bv_col3 = st.columns(3)
     with _bv_col1:
         _card(
             "📋 Bollettino mensile",
             _bv_date,
-            help_text=f"Fonte: {bulletin.get('source','INGV OV')}",
+            help_text=f"Fonte: {bulletin.get('_source','INGV OV non verificato')}",
         )
     with _bv_col2:
         _card(
             "🌋 Terremoti (mese)",
-            str(_bv_ev) if _bv_ev is not None else "—",
+            _bv_ev,
             help_text="Numero totale eventi registrati nel mese — Bollettino INGV OV",
         )
     with _bv_col3:
         _card(
             "📏 Mdmax (mese)",
-            f"M {_bv_md:.1f}" if _bv_md is not None else "—",
+            f"M {_bv_md}" if _bv_md != "NON DISPONIBILE" else _bv_md,
             help_text="Magnitudo massima registrata nel mese — Bollettino INGV OV",
         )
 
@@ -1434,12 +1398,16 @@ def _show_vesuvio_tab(df, get_text):
                   help_text="E = 10^(1.5·M+4.8) J — Gutenberg-Richter")
 
     # ── GPS uplift Vesuvio ─────────────────────────────────────────────────
-    _gps_ves_icon = "🟢 LIVE" if gps_ves.get("source_type") == "live" else "📡 INGV OV"
+    _gps_ves_icon = (
+        "🟢 LIVE" if gps_ves.get("source_type") == "live"
+        else "📋 Bollettino" if gps_ves.get("source_type") == "bulletin_live"
+        else "⚪ Non verificato"
+    )
     st.metric(
         _gt("sensor_gps_deform"),
-        f"{gps_ves['monthly_rate_mm']:+.1f} mm/mese",
-        f"{_gps_ves_icon} · {gps_ves['station']} · {gps_ves['last_date']}",
-        help=gps_ves["source"]
+        _format_gps_rate(gps_ves),
+        f"{_gps_ves_icon} · {gps_ves.get('station', 'stazione non disponibile')} · {gps_ves.get('last_date') or 'data non disponibile'}",
+        help=gps_ves.get("source", "Fonte GNSS non verificata")
     )
     _render_gps_chart(gps_ves, "Vesuvio")
 
@@ -1454,12 +1422,16 @@ def _show_vesuvio_tab(df, get_text):
     _section_divider(_gt("sensors_vesuvio"))
 
     # Mostra sorgenti dati attive
-    _gps_icon = "🟢 LIVE NGL" if gps_ves.get("source_type") == "live" else f"📡 INGV OV Bollettino"
+    _gps_icon = (
+        "🟢 LIVE NGL" if gps_ves.get("source_type") == "live"
+        else "📋 Bollettino INGV" if gps_ves.get("source_type") == "bulletin_live"
+        else "⚪ GPS non verificato"
+    )
     sources_live = [
-        f"{_gps_icon} ({gps_ves['station']}, {gps_ves['last_date']})",
-        "🟢 CAMS Copernicus (aria, ora)",
-        f"📡 INGV OV ({bulletin['bulletin_date']})",
-        "🟢 NOAA Mauna Loa (CO₂, giornaliero)",
+        f"{_gps_icon} ({gps_ves.get('station', 'stazione non disponibile')}, {gps_ves.get('last_date') or 'data non disponibile'})",
+        "CAMS Copernicus (fonte qualità aria)" if aq_ves else "Qualità aria non disponibile",
+        f"{'📡 INGV OV' if bulletin.get('_live') else '⚪ Bollettino non verificato'} ({bulletin.get('bulletin_date', 'data non disponibile')})",
+        "NOAA Mauna Loa (CO₂ atmosferico globale)",
     ]
     st.caption(_gt("data_sources_label") + ": " + " · ".join(sources_live))
 
@@ -1473,23 +1445,27 @@ def _show_vesuvio_tab(df, get_text):
         temp_summit = _f_temp.result()
         noaa_co2    = _f_noaa.result()
 
-    _gps_col_icon = "🟢 LIVE" if gps_ves.get("source_type") == "live" else "📡 INGV OV"
+    _gps_col_icon = (
+        "🟢 LIVE" if gps_ves.get("source_type") == "live"
+        else "📋 Bollettino" if gps_ves.get("source_type") == "bulletin_live"
+        else "⚪ Non verificato"
+    )
 
     with sensor_cols[0]:
-        # CO2 atmosferico: NOAA live > bulletin static
+        # CO2 atmosferico globale: non è una misura delle emissioni vulcaniche locali.
         if noaa_co2 and noaa_co2.get("co2_ppm"):
             st.metric(
                 _gt("sensor_co2_vesuvio"),
                 f"{noaa_co2['co2_ppm']:.1f} ppm",
                 f"🟢 LIVE · NOAA Mauna Loa · {noaa_co2['date']}",
-                help=f"CO₂ atmosferico globale — {noaa_co2['source']}. "
-                     f"Valori >415 ppm indicano impatto vulcanico locale."
+                help=f"Concentrazione atmosferica globale — {noaa_co2['source']}; "
+                     "non misura le emissioni vulcaniche locali."
             )
         else:
             st.metric(
                 _gt("sensor_co2_vesuvio"),
-                f"{bulletin['co2_background_ppm']} ppm",
-                "📡 INGV OV — valore di riferimento",
+                "NON DISPONIBILE",
+                "NOAA non raggiungibile",
                 help=_gt("co2_ves_help")
             )
         # Temperatura summit
@@ -1503,21 +1479,21 @@ def _show_vesuvio_tab(df, get_text):
         else:
             st.metric(
                 _gt("sensor_temp_summit"),
-                f"{bulletin['ground_temp_summit']}°C",
-                "📡 INGV OV — area cratere",
+                _verified_bulletin_value(bulletin, "ground_temp_summit", "°C", 1),
+                "Misura INGV non disponibile",
                 help=_gt("temp_summit_help")
             )
 
     with sensor_cols[1]:
         st.metric(
             _gt("sensor_gps_deform"),
-            f"{gps_ves['monthly_rate_mm']:+.1f} mm/mese",
-            f"{_gps_col_icon} · {gps_ves['station']} · {gps_ves['last_date']}",
-            help=gps_ves["source"]
+            _format_gps_rate(gps_ves),
+            f"{_gps_col_icon} · {gps_ves.get('station', 'stazione non disponibile')} · {gps_ves.get('last_date') or 'data non disponibile'}",
+            help=gps_ves.get("source", "Fonte GNSS non verificata")
         )
         st.metric(
             _gt("sensor_radon"),
-            f"{bulletin['radon_bq_m3']} Bq/m³",
+            _verified_bulletin_value(bulletin, "radon_bq_m3", " Bq/m³"),
             "📡 INGV OV — rete sensori geochimici",
             help=_gt("radon_help")
         )
@@ -1525,7 +1501,7 @@ def _show_vesuvio_tab(df, get_text):
     with sensor_cols[2]:
         st.metric(
             _gt("sensor_tilt"),
-            f"{bulletin['ground_tilt_urad']:.1f} µrad",
+            _verified_bulletin_value(bulletin, "ground_tilt_urad", " µrad", 1),
             "📡 INGV OV — tiltmetri rete vulcanologica",
             help=_gt("tilt_ov_help")
         )
@@ -1608,13 +1584,17 @@ def _show_flegrei_tab(df, get_text):
         alert    = _f_alert.result()
         _gps_pre = _f_gps.result()  # prefetch in cache
     bulletin = bvlive["campi_flegrei"]
-    # Mostra fonte bollettino (live se scraping ok, altrimenti fallback)
-    _bv_source = bvlive.get("_source", "")
-    _bv_scraped_at = bvlive.get("_scraped_at")
-    if bvlive.get("_scraped"):
-        st.caption(f"📡 Bollettino aggiornato via scraping INGV OV — {_bv_scraped_at} · {_bv_source}")
+    # Stato per-area: un PDF valido di un altro vulcano non valida questo.
+    if bulletin.get("_live"):
+        st.caption(
+            f"📡 Bollettino INGV verificato · {bulletin.get('_fetched_at') or 'ora non disponibile'} · "
+            f"{bulletin.get('_source') or 'fonte ufficiale'}"
+        )
     else:
-        st.caption(f"📋 Bollettino: valori statici (INGV OV non raggiungibile al momento) — {bulletin['bulletin_date']}")
+        st.caption(
+            f"⚪ Bollettino non verificato — {bulletin.get('bulletin_date', 'data non disponibile')}. "
+            "I valori senza fonte corrente non vengono presentati come misure."
+        )
 
     # ── Badge livello allerta ──────────────────────────────────────────────
     alert_level = alert.get("campi_flegrei", "NON DISPONIBILE")
@@ -1658,12 +1638,16 @@ def _show_flegrei_tab(df, get_text):
                   help_text="E = 10^(1.5·M+4.8) J — Gutenberg-Richter")
 
     # ── GPS uplift compatto sotto le metriche ──────────────────────────────
-    _gps_cf_icon = "🟢 LIVE" if gps_data.get("source_type") == "live" else "📡 INGV OV"
+    _gps_cf_icon = (
+        "🟢 LIVE" if gps_data.get("source_type") == "live"
+        else "📋 Bollettino INGV" if gps_data.get("source_type") == "bulletin_live"
+        else "⚪ Non verificato"
+    )
     st.metric(
         _gt("gps_uplift_live"),
-        f"{gps_data['monthly_rate_mm']:+.1f} mm/mese",
-        f"{_gps_cf_icon} · {gps_data['station']} · {gps_data.get('last_date','')}",
-        help=gps_data["source"]
+        _format_gps_rate(gps_data),
+        f"{_gps_cf_icon} · {gps_data.get('station', 'stazione non disponibile')} · {gps_data.get('last_date') or 'data non disponibile'}",
+        help=gps_data.get("source", "Fonte GNSS non verificata")
     )
     _render_gps_chart(gps_data, "Campi Flegrei", chart_key="gps_cf_main")
 
@@ -1687,18 +1671,18 @@ def _show_flegrei_tab(df, get_text):
         st.markdown(f"### {_gt('thermal_params')}")
         st.metric(
             _gt("sensor_soil_temp_30"),
-            f"{bulletin['ground_temp_30cm']}°C",
+            _verified_bulletin_value(bulletin, "ground_temp_30cm", "°C", 1),
             "📡 INGV OV — termometri Solfatara",
             help=_gt("temp_30cm_help")
         )
         st.metric(
             _gt("sensor_fumarole_temp"),
-            f"{bulletin['fumarole_temp_bocca_grande']}°C",
+            _verified_bulletin_value(bulletin, "fumarole_temp_bocca_grande", "°C"),
             "📡 INGV OV — sensori Bocca Grande",
             help=_gt("fumarole_temp_help")
         )
         pisc_t = bulletin.get("fumarole_temp_pisciarelli")
-        if pisc_t:
+        if bulletin.get("_live") and "fumarole_temp_pisciarelli" in set(bulletin.get("_parsed_fields") or []):
             st.metric(
                 "🌡️ Fumarola Pisciarelli",
                 f"{pisc_t}°C",
@@ -1731,29 +1715,33 @@ def _show_flegrei_tab(df, get_text):
         else:
             st.metric(
                 _gt("sensor_co2_flux"),
-                f"{bulletin['co2_flux_td']} t/g",
+                _verified_bulletin_value(bulletin, "co2_flux_td", " t/g"),
                 "📡 INGV OV — rete gechimica",
                 help=_gt("co2_flux_help")
             )
         st.metric(
             _gt("sensor_h2s_flux"),
-            f"{bulletin['h2s_flux_td']} t/g",
+            _verified_bulletin_value(bulletin, "h2s_flux_td", " t/g"),
             "📡 INGV OV — rete geochimica",
             help=_gt("h2s_flux_help")
         )
 
     with sensor_cols[2]:
         st.markdown(f"### {_gt('deformation_section')}")
-        _gps_cf_col_icon = "🟢 LIVE" if gps_data.get("source_type") == "live" else "📡 INGV OV"
+        _gps_cf_col_icon = (
+            "🟢 LIVE" if gps_data.get("source_type") == "live"
+            else "📋 Bollettino INGV" if gps_data.get("source_type") == "bulletin_live"
+            else "⚪ Non verificato"
+        )
         st.metric(
             _gt("sensor_gps_uplift_live"),
-            f"{gps_data['monthly_rate_mm']:+.1f} mm/mese",
-            f"{_gps_cf_col_icon} · {gps_data['station']} · {gps_data['last_date']}",
-            help=gps_data["source"]
+            _format_gps_rate(gps_data),
+            f"{_gps_cf_col_icon} · {gps_data.get('station', 'stazione non disponibile')} · {gps_data.get('last_date') or 'data non disponibile'}",
+            help=gps_data.get("source", "Fonte GNSS non verificata")
         )
         st.metric(
             _gt("sensor_total_uplift"),
-            f"{bulletin['total_uplift_since_2005_cm']} cm",
+            _verified_bulletin_value(bulletin, "total_uplift_since_2005_cm", " cm", 1),
             "📡 INGV OV — sollevamento cumulato dal 2005",
             help=_gt("cumul_uplift_help")
         )
@@ -1932,7 +1920,7 @@ def _show_ischia_tab(df, get_text):
 
     # ── Badge livello allerta ──────────────────────────────────────────────
     alert_level = alert.get("ischia", "NON DISPONIBILE")
-    _bulletin_date = bulletin_isc.get("bulletin_date", datetime.now().strftime("%B %Y"))
+    _bulletin_date = bulletin_isc.get("bulletin_date") or "Data non verificata"
     _render_alert_badge(alert_level, "Ischia", _bulletin_date, alert.get("source", "INGV"))
     _show_swarm_banner(df, "ischia")
 
@@ -1940,8 +1928,8 @@ def _show_ischia_tab(df, get_text):
     _show_gossip_widget("ischia")
 
     # ── Bollettino mensile INGV OV — Ischia ───────────────────────────────
-    _bi_ev  = bulletin_isc.get("seismic_events_month")
-    _bi_md  = bulletin_isc.get("seismic_md_max_month")
+    _bi_ev  = _verified_bulletin_value(bulletin_isc, "seismic_events_month")
+    _bi_md  = _verified_bulletin_value(bulletin_isc, "seismic_md_max_month", decimals=1)
     _bi_12m = bulletin_isc.get("seismic_events_12m")
     _bi_col1, _bi_col2, _bi_col3 = st.columns(3)
     with _bi_col1:
@@ -1949,11 +1937,11 @@ def _show_ischia_tab(df, get_text):
               help_text=bulletin_isc.get("source", "INGV OV — Bollettino Mensile Ischia"))
     with _bi_col2:
         _card("🏝️ Terremoti (mese)",
-              str(_bi_ev) if _bi_ev is not None else "—",
+              _bi_ev,
               help_text="Numero eventi registrati nel mese — Bollettino INGV OV")
     with _bi_col3:
         _card("📏 Mdmax (mese)",
-              f"M {_bi_md:.1f}" if _bi_md is not None else "—",
+              f"M {_bi_md}" if _bi_md != "NON DISPONIBILE" else _bi_md,
               help_text="Magnitudo massima nel mese — Bollettino INGV OV")
 
     # ── Info contestuale Ischia ────────────────────────────────────────────
@@ -1966,12 +1954,16 @@ def _show_ischia_tab(df, get_text):
     )
 
     # ── GPS deformazione Ischia ────────────────────────────────────────────
-    _gps_is_icon = "🟢 LIVE" if gps_is.get("source_type") == "live" else "📡 INGV OV"
+    _gps_is_icon = (
+        "🟢 LIVE" if gps_is.get("source_type") == "live"
+        else "📋 Bollettino INGV" if gps_is.get("source_type") == "bulletin_live"
+        else "⚪ Non verificato"
+    )
     st.metric(
         "📡 Deformazione GPS",
-        f"{gps_is['monthly_rate_mm']:+.1f} mm/mese",
-        f"{_gps_is_icon} · {gps_is['station']} · {gps_is.get('last_date','')}",
-        help=gps_is["source"]
+        _format_gps_rate(gps_is),
+        f"{_gps_is_icon} · {gps_is.get('station', 'stazione non disponibile')} · {gps_is.get('last_date') or 'data non disponibile'}",
+        help=gps_is.get("source", "Fonte GNSS non verificata")
     )
     _render_gps_chart(gps_is, "Ischia")
 
@@ -2165,9 +2157,17 @@ def _render_alert_badge(level, area, bulletin_date, source):
 
 
 def _render_flegrei_sensor_caption(bulletin, gps_data, aq_data):
-    sources = [f"{_gt('bulletin_ingv_ov_short')} ({bulletin['bulletin_date']})"]
-    if gps_data:
-        sources.append(f"{_gt('gps_ngl_updated')} {gps_data['last_date']}")
+    sources = []
+    if bulletin.get("_live"):
+        sources.append(
+            f"{_gt('bulletin_ingv_ov_short')} ({bulletin.get('bulletin_date', 'data non disponibile')})"
+        )
+    else:
+        sources.append("Bollettino INGV non verificato")
+    if gps_data.get("source_type") in ("live", "bulletin_live") and gps_data.get("monthly_rate_mm") is not None:
+        sources.append(f"GPS {gps_data.get('source', 'INGV OV')} · {gps_data.get('last_date', 'data non disponibile')}")
+    else:
+        sources.append("GPS non verificato")
     if aq_data and "so2" in aq_data:
         sources.append(_gt("openaq_live_str"))
     st.caption(_gt("data_sources_label") + ": " + " · ".join(sources))
@@ -2176,29 +2176,28 @@ def _render_flegrei_sensor_caption(bulletin, gps_data, aq_data):
 def _render_sensor_status_vesuvio(vesuvio_data, bulletin, gps_data=None, aq_data=None):
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     ingv_status = _gt("status_online_str") if not vesuvio_data.empty else _gt("status_no_event_str")
-    bul_str = _gt("status_bulletin_str")
-    bul_date = bulletin.get('bulletin_date', 'Aggiornamento live')
-    # GPS dinamico — identico alla logica CF
-    gps_status = _gt('status_online_str') if gps_data else bul_str
-    gps_date   = now_str if gps_data else bul_date
-    gps_src    = f"NGL / INGV RING (dati al {gps_data['last_date']})" if gps_data else "Live / INGV RING"
-    gps_acc    = "±0.5 mm" if gps_data else "—"
-    # Aria / CAMS
-    has_aq = aq_data and isinstance(aq_data, dict) and "so2" in aq_data
-    aq_status = f"{_gt('status_online_str')} (live)" if has_aq else bul_str
-    aq_date   = now_str if has_aq else bul_date
+    unknown = _gt("status_not_avail_str")
+    bul_date = bulletin.get("bulletin_date", "Data non verificata")
+    gps_current = bool(gps_data and gps_data.get("source_type") in ("live", "bulletin_live")
+                       and gps_data.get("monthly_rate_mm") is not None)
+    gps_status = _gt("status_online_str") if gps_current else unknown
+    gps_date = gps_data.get("last_date") if gps_current else "—"
+    gps_src = gps_data.get("source", "Fonte GNSS non verificata") if gps_current else "Misura GNSS non disponibile"
+    has_aq = bool(aq_data and isinstance(aq_data, dict) and "so2" in aq_data)
+    aq_status = f"{_gt('status_online_str')} (live)" if has_aq else unknown
+    aq_date = now_str if has_aq else "—"
     s = _gt("sensor_col_sensor"); st2 = _gt("sensor_col_status")
     upd = _gt("sensor_col_last_update"); src = _gt("sensor_col_source"); acc = _gt("sensor_col_accuracy")
     st.markdown(f"""
     | {s} | {st2} | {upd} | {src} | {acc} |
     |---------|--------|------------|-------|-------------|
     | {_gt('sensor_seismic_net')} | {ingv_status} | {now_str} | INGV FDSNWS API | ±0.1 M |
-    | {_gt('sensor_gps_def')} | {gps_status} | {gps_date} | {gps_src} | {gps_acc} |
+    | {_gt('sensor_gps_def')} | {gps_status} | {gps_date} | {gps_src} | — |
     | SO₂ / aria (CAMS) | {aq_status} | {aq_date} | CAMS Copernicus | ±2 μg/m³ |
-    | {_gt('sensor_co2_so2')} | {bul_str} | {bul_date} | Live / INGV OV | — |
-    | {_gt('sensor_temp_ground')} | {bul_str} | {bul_date} | Live / INGV OV | ±1°C |
-    | {_gt('sensor_tilt_label')} | {bul_str} | {bul_date} | Live / INGV OV | ±0.01° |
-    | {_gt('sensor_alert_level_lbl')} | {_gt('status_online_str')} | {now_str} | INGV OV (live) | — |
+    | {_gt('sensor_co2_so2')} | {unknown} | — | Fonte locale non verificata | — |
+    | {_gt('sensor_temp_ground')} | {unknown} | — | Fonte locale non verificata | — |
+    | Radon / tilt | {unknown} | — | Misure non verificate | — |
+    | {_gt('sensor_alert_level_lbl')} | {unknown} | — | Consultare il badge ufficiale | — |
     """)
     st.caption(f"ℹ️ {_gt('sensor_cap_vesuvio')}")
 
@@ -2206,24 +2205,31 @@ def _render_sensor_status_vesuvio(vesuvio_data, bulletin, gps_data=None, aq_data
 def _render_sensor_status_flegrei(flegrei_data, bulletin, gps_data, aq_data):
     now_str = datetime.now().strftime("%d/%m/%Y %H:%M")
     ingv_status = _gt("status_online_str") if not flegrei_data.empty else _gt("status_no_event_str")
-    gps_status = _gt('status_online_str') if gps_data else _gt("status_unavail_str")
-    gps_acc = "±0.5 mm" if gps_data else "—"
-    gps_src_cf = f"NGL / INGV RING (dati al {gps_data['last_date']})" if gps_data else "NGL / INGV RING"
-    aq_status = f"{_gt('status_online_str')} (live)" if aq_data and "so2" in aq_data else _gt("status_not_avail_str")
-    bul_str = _gt("status_bulletin_str")
+    unknown = _gt("status_not_avail_str")
+    gps_current = bool(gps_data and gps_data.get("source_type") in ("live", "bulletin_live")
+                       and gps_data.get("monthly_rate_mm") is not None)
+    gps_status = _gt("status_online_str") if gps_current else unknown
+    gps_src_cf = gps_data.get("source", "Fonte GNSS non verificata") if gps_current else "Misura GNSS non disponibile"
+    aq_available = bool(aq_data and "so2" in aq_data)
+    aq_status = f"{_gt('status_online_str')} (live)" if aq_available else unknown
+    aq_date = now_str if aq_available else "—"
+    fields = set(bulletin.get("_parsed_fields") or [])
+    def field_status(field):
+        return _gt("status_bulletin_str") if bulletin.get("_live") and field in fields else unknown
+    bul_date = bulletin.get("bulletin_date", "Data non verificata")
     s = _gt("sensor_col_sensor"); st2 = _gt("sensor_col_status")
     upd = _gt("sensor_col_last_update"); src = _gt("sensor_col_source"); acc = _gt("sensor_col_accuracy")
     st.markdown(f"""
     | {s} | {st2} | {upd} | {src} | {acc} |
     |---------|--------|------------|-------|-------------|
     | {_gt('sensor_seismic_net')} | {ingv_status} | {now_str} | INGV FDSNWS API | ±0.1 M |
-    | {_gt('sensor_gps_rite_label')} | {gps_status} | {now_str if gps_data else bulletin['bulletin_date']} | {gps_src_cf} | {gps_acc} |
-    | {_gt('sensor_so2_air')} | {aq_status} | {now_str} | OpenAQ / ARPA Campania | ±2 μg/m³ |
-    | {_gt('sensor_co2_solf')} | {bul_str} | {bulletin.get('bulletin_date','Aggiornamento live')} | Live / INGV OV | ±50 t/g |
-    | {_gt('sensor_temp_fumar')} | {bul_str} | {bulletin.get('bulletin_date','Aggiornamento live')} | Live / INGV OV | ±1°C |
-    | {_gt('sensor_h2s')} | {bul_str} | {bulletin.get('bulletin_date','Aggiornamento live')} | Live / INGV OV | ±5 t/g |
-    | {_gt('sensor_tilt_label')} | {bul_str} | {bulletin.get('bulletin_date','Aggiornamento live')} | Live / INGV OV | ±0.01° |
-    | {_gt('sensor_alert_level_lbl')} | {_gt('status_online_str')} | {now_str} | INGV OV (live) | — |
+    | {_gt('sensor_gps_rite_label')} | {gps_status} | {gps_data.get('last_date', '—') if gps_current else '—'} | {gps_src_cf} | — |
+    | {_gt('sensor_so2_air')} | {aq_status} | {aq_date} | OpenAQ / ARPA Campania | — |
+    | {_gt('sensor_co2_solf')} | {field_status('co2_flux_td')} | {bul_date} | INGV OV | — |
+    | {_gt('sensor_temp_fumar')} | {field_status('fumarole_temp_bocca_grande')} | {bul_date} | INGV OV | — |
+    | {_gt('sensor_h2s')} | {field_status('h2s_flux_td')} | {bul_date} | INGV OV | — |
+    | {_gt('sensor_tilt_label')} | {field_status('ground_tilt_urad')} | {bul_date} | INGV OV | — |
+    | {_gt('sensor_alert_level_lbl')} | {unknown} | — | Consultare il badge ufficiale | — |
     """)
     st.caption(f"ℹ️ {_gt('sensor_cap_flegrei')}")
 
@@ -3091,33 +3097,20 @@ def _fetch_yt_rss(channel_id: str, keyword_filter: str = "") -> list:
 def _show_cf_news() -> None:
     """
     Sezione Campi Flegrei News: monitor sismico live H24 + report terremoti CF.
-    Live: 'Campi Flegrei/Vesuvius Volcano monitoring 24/7' by FiBro (jb3BscOyaQU).
+    The previously embedded third-party live video is no longer available.
     Video RSS: canale Meteo Ariccia (UCSi4cdeEEK2Rsw6AOD1cecg) — post CF-specifici.
     """
     _section_divider("📡 Campi Flegrei News — Live & Solfatara")
 
-    with st.expander("🌋 Monitor LIVE H24 — Campi Flegrei / Vesuvio", expanded=True):
+    with st.expander("🌋 Monitoraggio Campi Flegrei", expanded=True):
+        st.info(
+            "Il live video esterno non è più disponibile. "
+            "Per gli aggiornamenti verificati consulta la pagina ufficiale INGV."
+        )
         st.markdown(
-            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
-            "Monitoraggio vulcanico in diretta — <strong>FiBro</strong> · "
-            "Campi Flegrei &amp; Vesuvio — spettrogrammi e dati sismici H24</p>",
-            unsafe_allow_html=True,
-        )
-        st.components.v1.html(
-            "<style>*{margin:0;padding:0;box-sizing:border-box}"
-            "html,body{width:100%;overflow:hidden;background:transparent}</style>"
-            "<div style='position:relative;width:100%;padding-bottom:56.25%;'>"
-            "<iframe src='https://www.youtube.com/embed/jb3BscOyaQU"
-            "?autoplay=0&rel=0&modestbranding=1&vq=hd1080' "
-            "style='position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-            "border-radius:10px;' "
-            "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
-            "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
-            height=850,
-        )
-        st.caption(
-            "📺 Per la visione ottimale aprire in un'altra scheda · "
-            "[→ Monitor CF/Vesuvio su YouTube](https://www.youtube.com/watch?v=jb3BscOyaQU)"
+            "[Apri monitoraggio ufficiale Campi Flegrei — INGV OV]"
+            "(https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/"
+            "campi-flegrei/campi-flegrei-attivita-recente)"
         )
 
     with st.expander("🎬 Ultimi report — Campi Flegrei / Solfatara", expanded=True):
@@ -3173,33 +3166,19 @@ def _show_vesuvio_news() -> None:
 def _show_ischia_news() -> None:
     """
     Sezione Ischia News: webcam live H24 + ultimi video INGV Terremoti.
-    Webcam: 'Ischia Live Webcam' by Panocam (Hllyp_GlG64).
+    The previously embedded third-party live video is no longer available.
     Video RSS: canale INGVterremoti (UCWcylY2YDfioFmDAULj3vgA).
     """
     _section_divider("📡 Ischia News — Live & INGV")
 
-    with st.expander("📹 Webcam LIVE H24 — Ischia", expanded=True):
+    with st.expander("📡 Monitoraggio Ischia", expanded=True):
+        st.info(
+            "La webcam esterna non è più disponibile. "
+            "Per i dati di monitoraggio aggiornati consulta INGV."
+        )
         st.markdown(
-            "<p style='color:#6B7280;font-size:0.85rem;margin-bottom:8px'>"
-            "Diretta YouTube continua — <strong>Panocam</strong> · "
-            "Telecamera panoramica sull'isola di Ischia</p>",
-            unsafe_allow_html=True,
-        )
-        st.components.v1.html(
-            "<style>*{margin:0;padding:0;box-sizing:border-box}"
-            "html,body{width:100%;overflow:hidden;background:transparent}</style>"
-            "<div style='position:relative;width:100%;padding-bottom:56.25%;'>"
-            "<iframe src='https://www.youtube.com/embed/Hllyp_GlG64"
-            "?autoplay=0&rel=0&modestbranding=1&vq=hd1080' "
-            "style='position:absolute;top:0;left:0;width:100%;height:100%;border:none;"
-            "border-radius:10px;' "
-            "allow='accelerometer; autoplay; clipboard-write; encrypted-media; "
-            "gyroscope; picture-in-picture' allowfullscreen></iframe></div>",
-            height=850,
-        )
-        st.caption(
-            "📺 Per la visione ottimale aprire in un'altra scheda · "
-            "[→ Webcam Ischia su YouTube](https://www.youtube.com/watch?v=Hllyp_GlG64)"
+            "[Apri monitoraggio ufficiale Ischia — INGV OV]"
+            "(https://www.ov.ingv.it/index.php/ischia-stato-attuale)"
         )
 
     with st.expander("🎬 Ultimi video — @INGVterremoti", expanded=True):

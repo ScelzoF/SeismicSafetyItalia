@@ -3,7 +3,7 @@ ingv_monitor.py
 Modulo per il recupero di dati di monitoraggio vulcanologico e ambientale reali.
 
 Fonti:
-- Nevada Geodetic Laboratory (NGL): GPS deformazione stazione RITE (Pozzuoli)
+- INGV OV bollettini e serie NGL recenti: deformazione GPS, quando disponibile
 - OpenAQ API: Qualità dell'aria (SO2) near Pozzuoli/Napoli
 - INGV OV Bollettini: valori ufficiali pubblicati (non casuali)
 - INGV FDSNWS: dati sismici (già in data_service.py)
@@ -14,7 +14,7 @@ import requests
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import io
 import re
 import defusedxml.ElementTree as ET  # sicuro contro XXE/XML-bomb attacks
@@ -31,144 +31,50 @@ def _ingv_get(url: str, timeout: int = 8, **kwargs) -> requests.Response:
 _BULLETIN_LISTING = {
     "campi_flegrei": "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
     "vesuvio": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/vesuvio",
+    "ischia": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/ischia",
 }
 
 def fetch_latest_bulletin_url(area: str) -> str:
     """
-    Restituisce l'URL diretto alla pagina bollettini INGV OV per l'area indicata.
-    URL hardcoded verificati — il sito INGV OV usa Joomla e i link interni cambiano
-    continuamente rendendo lo scraping inaffidabile.
+    Restituisce il percorso INGV più recente scoperto dalla navigazione ufficiale.
+    Se la navigazione non è raggiungibile, usa un link informativo di riserva.
     """
-    DIRECT_URLS = {
-        "campi_flegrei": "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
-        "vesuvio": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/vesuvio",
-    }
-    return DIRECT_URLS.get(area, _BULLETIN_LISTING.get(area, "https://www.ov.ingv.it"))
+    try:
+        category_url, listing_url = _resolve_official_bulletin_pages(area)
+        return listing_url or category_url or _BULLETIN_LISTING.get(area, _INGV_ROOT_URL)
+    except Exception:
+        return _BULLETIN_LISTING.get(area, _INGV_ROOT_URL)
 
 # ─────────────────────────────────────────────────────────────
-# GPS DEFORMAZIONE — INGV OV live (serie temporale mensile)
-# Fonte: https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/
-#        campi-flegrei/campi-flegrei-attivita-recente
-# Stazione RITE: Rione Terra, Pozzuoli
+# GPS DEFORMAZIONE — tasso dal bollettino INGV OV; NGL per serie recenti valide
+# Stazione RITE: Rione Terra, Pozzuoli (serie NGL non attualmente disponibile)
 # ─────────────────────────────────────────────────────────────
-
-_CF_ACTIVITY_URL = (
-    "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/"
-    "campi-flegrei/campi-flegrei-attivita-recente"
-)
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_ingv_cf_gps_timeseries() -> dict:
-    """
-    Scarica la pagina di attività CF di INGV OV e costruisce una serie temporale
-    mensile del sollevamento RITE da gennaio 2023 ad oggi.
-
-    Restituisce:
-        {
-          "dates":  [str YYYY-MM ...],
-          "values": [float mm uplift da nov-2005 ...],
-          "total_cm": float,
-          "since_jan2025_cm": float,
-          "monthly_rate_mm": float,   # tasso corrente
-          "source": str,
-          "ok": bool,
-        }
-    """
-    import re
-    from datetime import date
-
-    FALLBACK = {
-        "dates": [], "values": [],
-        "total_cm": 163.5, "since_jan2025_cm": 25.5,
-        "monthly_rate_mm": 10.0,
-        "source": "INGV OV (fallback statico)", "ok": False,
-    }
-
+    """Restituisce il tasso del bollettino; non ricostruisce serie storiche sintetiche."""
     try:
-        resp = requests.get(
-            _CF_ACTIVITY_URL, timeout=10,
-            headers={"User-Agent": "SeismicSafetyItalia/2.0"},
-        )
-        if resp.status_code != 200:
-            return FALLBACK
-        text = resp.text
-
-        # ── Totale da novembre 2005 ──────────────────────────────
-        m_tot = re.search(
-            r"sollevamento[^è<]*\è[^<]*circa\s+([\d]+[.,]\d*)\s*cm\s*da\s*novembre\s*2005",
-            text, re.IGNORECASE | re.DOTALL,
-        )
-        total_cm = float(m_tot.group(1).replace(",", ".")) if m_tot else 163.5
-
-        # ── Sollevamento da gennaio 2025 ─────────────────────────
-        m_2025 = re.search(
-            r"di cui circa\s+([\d]+[.,]\d*)\s*cm\s*da\s*gennaio\s*2025",
-            text, re.IGNORECASE,
-        )
-        since_jan2025_cm = float(m_2025.group(1).replace(",", ".")) if m_2025 else 25.5
-
-        total_mm    = total_cm * 10
-        jan2025_mm  = total_mm - since_jan2025_cm * 10
-
-        # ── Tassi mensili per periodi ────────────────────────────
-        # Ogni valore (mm/mese) menzionato nel testo, in ordine cronologico
-        rates_raw = re.findall(r"circa\s+([\d]+[.,]?\d*)[^m]*mm/mese", text, re.IGNORECASE)
-        rates = [float(r.replace(",", ".")) for r in rates_raw]
-        current_rate = rates[-1] if rates else 10.0
-
-        # Periodi noti dall'analisi del testo (aggiornati manualmente se la pagina
-        # cambia struttura; il regex cattura sempre l'ultimo tasso come "corrente")
-        rate_periods = [
-            (date(2025,  1,  1), date(2025,  4,  1), rates[0] if len(rates) > 0 else 14.0),
-            (date(2025,  4,  1), date(2025, 10, 10), rates[0] if len(rates) > 0 else 15.0),
-            (date(2025, 10, 10), date(2025, 12, 15), rates[1] if len(rates) > 1 else 25.0),
-            (date(2025, 12, 15), date(2026,  2,  1), rates[2] if len(rates) > 2 else 15.0),
-            (date(2026,  2,  1), date(2099,  1,  1), current_rate),
-        ]
-
-        # ── Punti storici verificati da bollettini INGV OV (2005→2022) ─────────
-        _HIST = [
-            ("2005-11",    0),
-            ("2010-01",  100),
-            ("2015-01",  340),
-            ("2018-01",  550),
-            ("2020-01",  720),
-            ("2022-01",  920),
-            ("2023-01", round(jan2025_mm - 24 * 14.0, 1)),  # stima gen-2023
-            ("2024-01", round(jan2025_mm - 12 * 14.0, 1)),  # stima gen-2024
-        ]
-        dates_out  = [d for d, _ in _HIST]
-        values_out = [v for _, v in _HIST]
-
-        # ── Serie mensile live 2025-01 → mese corrente ───────────────────────
-        now = date.today()
-        val_mm = jan2025_mm
-        cur = date(2025, 1, 1)
-        while cur <= date(now.year, now.month, 1):
-            dates_out.append(cur.strftime("%Y-%m"))
-            values_out.append(round(val_mm, 1))
-            r = current_rate
-            for (s, e, rv) in rate_periods:
-                if s <= cur < e:
-                    r = rv
-                    break
-            val_mm += r
-            if cur.month == 12:
-                cur = date(cur.year + 1, 1, 1)
-            else:
-                cur = date(cur.year, cur.month + 1, 1)
-
+        bulletin = fetch_bulletin_values_live().get("campi_flegrei", {})
+        parsed = set(bulletin.get("_parsed_fields") or [])
+        has_rate = bulletin.get("_live") and "gps_uplift_mm_month" in parsed
         return {
-            "dates": dates_out,
-            "values": values_out,
-            "total_cm": total_cm,
-            "since_jan2025_cm": since_jan2025_cm,
-            "monthly_rate_mm": current_rate,
-            "source": f"INGV OV live — RITE {total_cm} cm da nov-2005",
-            "ok": True,
+            "dates": [],
+            "values": [],
+            "total_cm": (
+                bulletin.get("total_uplift_since_2005_cm")
+                if "total_uplift_since_2005_cm" in parsed else None
+            ),
+            "since_jan2025_cm": None,
+            "monthly_rate_mm": bulletin.get("gps_uplift_mm_month") if has_rate else None,
+            "source": bulletin.get("_source", "Bollettino INGV non verificato"),
+            "ok": False,
         }
     except Exception:
-        return FALLBACK
+        return {
+            "dates": [], "values": [], "total_cm": None,
+            "since_jan2025_cm": None, "monthly_rate_mm": None,
+            "source": "Bollettino INGV non verificato", "ok": False,
+        }
 
 
 # ─────────────────────────────────────────────────────────────
@@ -197,32 +103,28 @@ def _fetch_ngl_tail(station: str, timeout: int = 3, tail_kb: int = 80) -> list:
 
 
 def _bulletin_gps_fallback_cf() -> dict:
-    """GPS CF da bollettino INGV OV corrente — mai None."""
-    bv = _static_bulletin_values()
-    bd = bv["campi_flegrei"]["bulletin_date"]
+    """Dato GPS CF assente: non trasformare un valore storico in una misura attuale."""
     return {
-        "up_total_mm":     bv["campi_flegrei"]["total_uplift_since_2005_cm"] * 10,
-        "monthly_rate_mm": float(bv["campi_flegrei"]["gps_uplift_mm_month"]),
-        "last_date":       bd,
+        "up_total_mm":     None,
+        "monthly_rate_mm": None,
+        "last_date":       None,
         "ts_df":           None,
-        "source":          f"Bollettino INGV OV — {bd}",
+        "source":          "Misura GPS attuale non verificabile",
         "station":         "RITE — Rione Terra, Pozzuoli",
-        "source_type":     "bulletin",
+        "source_type":     "unavailable",
     }
 
 
 def _bulletin_gps_fallback_ves() -> dict:
-    """GPS Vesuvio da bollettino INGV OV corrente — mai None."""
-    bv = _static_bulletin_values()
-    bd = bv["vesuvio"]["bulletin_date"]
+    """Dato GPS Vesuvio assente: non mostrare una stima statica come misura."""
     return {
-        "up_total_mm":     round(bv["vesuvio"]["gps_uplift_mm_month"] * 12, 1),
-        "monthly_rate_mm": float(bv["vesuvio"]["gps_uplift_mm_month"]),
-        "last_date":       bd,
+        "up_total_mm":     None,
+        "monthly_rate_mm": None,
+        "last_date":       None,
         "ts_df":           None,
-        "source":          f"Bollettino INGV OV — {bd}",
+        "source":          "Misura GPS attuale non verificabile",
         "station":         "BKNO/ERAS — area Vesuvio",
-        "source_type":     "bulletin",
+        "source_type":     "unavailable",
     }
 
 
@@ -230,30 +132,26 @@ def _bulletin_gps_fallback_ves() -> dict:
 def fetch_gps_rite():
     """
     GPS stazione RITE (Rione Terra, Pozzuoli).
-    Fonti: NGL → bollettino INGV OV live (scraping) → fallback statico.
+    Fonte primaria: bollettino settimanale ufficiale INGV OV.
+    Il vecchio URL NGL per RITE restituisce 404 e non viene più interrogato.
     Non restituisce mai None.
     """
-    try:
-        lines = _fetch_ngl_tail("RITE", timeout=REQUEST_TIMEOUT, tail_kb=80)
-        result = _parse_ngl_lines("RITE", lines)
-        if result:
-            result["station"]     = "RITE — Rione Terra, Pozzuoli"
-            result["source_type"] = "live"
-            return result
-    except Exception:
-        pass
-    # NGL irraggiungibile → prova bollettino INGV OV live
+    # Usa i dati del PDF corrente: non mostra la serie NGL non disponibile come live.
     try:
         bvlive = fetch_bulletin_values_live()
         cf = bvlive.get("campi_flegrei", {})
-        if cf.get("gps_uplift_mm_month") is not None:
+        if (
+            cf.get("_live")
+            and "gps_uplift_mm_month" in set(cf.get("_parsed_fields") or [])
+            and cf.get("gps_uplift_mm_month") is not None
+        ):
             bd = cf.get("bulletin_date", "")
             return {
-                "up_total_mm":     cf["total_uplift_since_2005_cm"] * 10 if "total_uplift_since_2005_cm" in cf else 0,
+                "up_total_mm":     cf["total_uplift_since_2005_cm"] * 10 if cf.get("total_uplift_since_2005_cm") is not None else None,
                 "monthly_rate_mm": float(cf["gps_uplift_mm_month"]),
                 "last_date":       bd,
                 "ts_df":           None,
-                "source":          cf.get("source", f"INGV OV — {bd}"),
+                "source":          cf.get("_source", cf.get("source", f"INGV OV — {bd}")),
                 "station":         "RITE — Rione Terra, Pozzuoli",
                 "source_type":     "bulletin_live",
             }
@@ -286,6 +184,14 @@ def _parse_ngl_lines(station: str, lines: list):
     if not records:
         return None
     df = pd.DataFrame(records).sort_values("dec_yr")
+    last_date = dec_to_date(float(df["dec_yr"].max()))
+    try:
+        measurement_day = datetime.strptime(last_date, "%Y-%m-%d").date()
+        age_days = (datetime.now(timezone.utc).date() - measurement_day).days
+        if age_days > 90 or age_days < -7:
+            return None
+    except (TypeError, ValueError):
+        return None
     cutoff = df["dec_yr"].max() - 0.5
     recent = df[df["dec_yr"] >= cutoff].copy()
     if len(recent) < 5:
@@ -301,7 +207,7 @@ def _parse_ngl_lines(station: str, lines: list):
     return {
         "up_total_mm":    round(up_end - up_start, 1),
         "monthly_rate_mm": round(monthly_rate, 1),
-        "last_date":      dec_to_date(df["dec_yr"].max()),
+        "last_date":      last_date,
         "ts_df":          ts_df[["date", "up_mm"]],
         "source":         "Nevada Geodetic Laboratory / INGV RING",
         "station":        station,
@@ -339,7 +245,11 @@ def fetch_gps_vesuvio():
     try:
         bvlive = fetch_bulletin_values_live()
         ves = bvlive.get("vesuvio", {})
-        if ves.get("gps_uplift_mm_month") is not None:
+        if (
+            ves.get("_live")
+            and "gps_uplift_mm_month" in set(ves.get("_parsed_fields") or [])
+            and ves.get("gps_uplift_mm_month") is not None
+        ):
             bd = ves.get("bulletin_date", "")
             return {
                 "up_total_mm":     round(float(ves["gps_uplift_mm_month"]) * 12, 1),
@@ -356,16 +266,15 @@ def fetch_gps_vesuvio():
 
 
 def _bulletin_gps_fallback_ischia() -> dict:
-    """GPS Ischia da bollettino INGV OV — fallback statico."""
-    from datetime import datetime as _dt
+    """Ischia non ha un valore GNSS attuale verificabile."""
     return {
-        "up_total_mm":     0.0,
-        "monthly_rate_mm": 0.0,
-        "last_date":       _dt.now().strftime("%B %Y"),
+        "up_total_mm":     None,
+        "monthly_rate_mm": None,
+        "last_date":       None,
         "ts_df":           None,
-        "source":          "Bollettino INGV OV — Ischia",
+        "source":          "Misura GNSS attuale non disponibile",
         "station":         "IOCA — Ischia Osservatorio",
-        "source_type":     "bulletin",
+        "source_type":     "unavailable",
     }
 
 
@@ -400,7 +309,11 @@ def fetch_gps_ischia():
     try:
         bvlive = fetch_bulletin_values_live()
         isc = bvlive.get("ischia", {})
-        if isc.get("gps_uplift_mm_month") is not None:
+        if (
+            isc.get("_live")
+            and "gps_uplift_mm_month" in set(isc.get("_parsed_fields") or [])
+            and isc.get("gps_uplift_mm_month") is not None
+        ):
             bd = isc.get("bulletin_date", "")
             return {
                 "up_total_mm":     round(float(isc["gps_uplift_mm_month"]) * 12, 1),
@@ -417,143 +330,46 @@ def fetch_gps_ischia():
 
 
 # ─────────────────────────────────────────────────────────────
-# GPS SERIE TEMPORALE LIVE — Vesuvio (BKNO) e Ischia (IOCA)
-# Tasso corrente dal bollettino INGV OV live + punti storici
-# verificati INGV OV. Cache 1h → aggiornamento automatico.
+# Serie storiche GNSS scaricate — nessuna curva sintetica.
 # ─────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_ingv_ves_gps_timeseries() -> dict:
-    """
-    Serie temporale mensile GPS Vesuvio (BKNO/ERAS) da gennaio 2019 ad oggi.
-    Tasso corrente estratto dal bollettino INGV OV live.
-    Vesuvio ha lenta subsidenza: ~-0.1÷-0.3 mm/mese.
-    """
-    import re
-    from datetime import date
-
-    FALLBACK = {
-        "dates": [], "values": [],
-        "monthly_rate_mm": -0.1,
-        "source": "INGV OV (fallback statico — Vesuvio)",
-        "ok": False,
-    }
-
-    # --- Tasso live dal bollettino ---
-    try:
-        bvlive = fetch_bulletin_values_live()
-        ves = bvlive.get("vesuvio", {})
-        rate = float(ves.get("gps_uplift_mm_month", -0.1))
-        bd   = ves.get("bulletin_date", "")
-        source = f"INGV OV live — Vesuvio · tasso {rate:+.2f} mm/mese ({bd})"
-    except Exception:
-        rate   = -0.1
-        bd     = ""
-        source = "INGV OV (fallback statico — Vesuvio)"
-
-    # --- Costruzione serie mensile 2019-01 → oggi ---
-    # Punto di riferimento: 0 mm a gennaio 2019
-    from datetime import date as _date
-    now = _date.today()
-    dates_out: list = []
-    values_out: list = []
-    val_mm = 0.0
-    cur = _date(2019, 1, 1)
-
-    while cur <= _date(now.year, now.month, 1):
-        dates_out.append(cur.strftime("%Y-%m"))
-        values_out.append(round(val_mm, 2))
-        val_mm += rate
-        if cur.month == 12:
-            cur = _date(cur.year + 1, 1, 1)
-        else:
-            cur = _date(cur.year, cur.month + 1, 1)
-
+    """Adatta in formato storico solo i punti GNSS NGL recenti realmente scaricati."""
+    data = fetch_gps_vesuvio()
+    series = data.get("ts_df")
+    if data.get("source_type") != "live" or series is None or len(series) < 5:
+        return {
+            "dates": [], "values": [], "monthly_rate_mm": None,
+            "source": data.get("source", "Serie GNSS Vesuvio non disponibile"),
+            "ok": False,
+        }
     return {
-        "dates": dates_out,
-        "values": values_out,
-        "monthly_rate_mm": rate,
-        "source": source,
-        "ok": len(dates_out) >= 5,
+        "dates": series["date"].astype(str).tolist(),
+        "values": series["up_mm"].astype(float).tolist(),
+        "monthly_rate_mm": data.get("monthly_rate_mm"),
+        "source": data.get("source", "NGL / INGV RING"),
+        "ok": True,
     }
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def fetch_ingv_isc_gps_timeseries() -> dict:
-    """
-    Serie temporale mensile GPS Ischia (IOCA/ISAS) da gennaio 2020 ad oggi.
-    Include l'effetto del sisma di Casamicciola (21 nov 2022, M4.0):
-    subsidenza co-sismica ~-25 mm, poi recupero graduale.
-    Tasso corrente dal bollettino INGV OV live.
-    """
-    import re
-    from datetime import date as _date
-
-    FALLBACK = {
-        "dates": [], "values": [],
-        "monthly_rate_mm": 0.0,
-        "source": "INGV OV (fallback statico — Ischia)",
-        "ok": False,
-    }
-
-    # --- Tasso live dal bollettino ---
-    try:
-        bvlive = fetch_bulletin_values_live()
-        isc = bvlive.get("ischia", {})
-        rate = float(isc.get("gps_uplift_mm_month", 0.0))
-        bd   = isc.get("bulletin_date", "")
-        source = f"INGV OV live — Ischia · tasso {rate:+.2f} mm/mese ({bd})"
-    except Exception:
-        rate   = 0.0
-        bd     = ""
-        source = "INGV OV (fallback statico — Ischia)"
-
-    # --- Costruzione serie mensile 2020-01 → oggi ---
-    # Punti noti:
-    #  - Gen 2020 → 0 mm (baseline)
-    #  - Nov 2022 → sisma Casamicciola: subsidenza ~-25 mm in quel mese
-    #  - Dic 2022–Dic 2023 → recupero graduale +2 mm/mese
-    #  - Gen 2024 → ~-5 mm (stabile post-recupero)
-    #  - Feb 2024 → tasso corrente dal bollettino
-    now = _date.today()
-    dates_out: list = []
-    values_out: list = []
-    val_mm = 0.0
-    recovery_rate = 2.0   # mm/mese di recupero post-sisma
-
-    cur = _date(2020, 1, 1)
-    post_quake_months = 0
-    in_recovery = False
-
-    while cur <= _date(now.year, now.month, 1):
-        dates_out.append(cur.strftime("%Y-%m"))
-        values_out.append(round(val_mm, 2))
-
-        if cur == _date(2022, 11, 1):
-            # Sisma Casamicciola — subsidenza co-sismica
-            val_mm -= 25.0
-            in_recovery = True
-            post_quake_months = 0
-        elif in_recovery and post_quake_months < 14:
-            # Recupero graduale per ~14 mesi
-            val_mm += recovery_rate
-            post_quake_months += 1
-            if post_quake_months >= 14:
-                in_recovery = False
-        else:
-            val_mm += rate
-
-        if cur.month == 12:
-            cur = _date(cur.year + 1, 1, 1)
-        else:
-            cur = _date(cur.year, cur.month + 1, 1)
-
+    """Adatta in formato storico solo i punti GNSS NGL recenti realmente scaricati."""
+    data = fetch_gps_ischia()
+    series = data.get("ts_df")
+    if data.get("source_type") != "live" or series is None or len(series) < 5:
+        return {
+            "dates": [], "values": [], "monthly_rate_mm": None,
+            "source": data.get("source", "Serie GNSS Ischia non disponibile"),
+            "ok": False,
+        }
     return {
-        "dates": dates_out,
-        "values": values_out,
-        "monthly_rate_mm": rate,
-        "source": source,
-        "ok": len(dates_out) >= 5,
+        "dates": series["date"].astype(str).tolist(),
+        "values": series["up_mm"].astype(float).tolist(),
+        "monthly_rate_mm": data.get("monthly_rate_mm"),
+        "source": data.get("source", "NGL / INGV RING"),
+        "ok": True,
     }
 
 
@@ -692,17 +508,11 @@ def fetch_air_quality_ischia() -> dict:
 
 def _static_bulletin_values():
     """Valori base da bollettino INGV OV — usati come fallback."""
-    _mesi_it = ["gennaio","febbraio","marzo","aprile","maggio","giugno",
-                "luglio","agosto","settembre","ottobre","novembre","dicembre"]
-    _now = datetime.now()
-    _last_m = (_now.month - 2) % 12
-    _last_y = _now.year if _now.month > 1 else _now.year - 1
-    _last_bulletin_date = f"{_mesi_it[_last_m].capitalize()} {_last_y}"
     return {
         "campi_flegrei": {
-            "alert_level": "GIALLO",
+            "alert_level": "NON DISPONIBILE",
             "alert_since": "11 maggio 2023",
-            "bulletin_date": _last_bulletin_date,
+            "bulletin_date": "Data non verificata",
             "bulletin_url": "https://www.ov.ingv.it/index.php/monitoraggio-sismico-e-vulcanico/campi-flegrei/campi-flegrei-attivita-recente",
             "fumarole_temp_bocca_grande": 173,
             "fumarole_temp_bocca_nuova": 156,
@@ -715,11 +525,11 @@ def _static_bulletin_values():
             "gps_uplift_mm_month": 10,
             "total_uplift_since_2005_cm": 125,
             "seismic_rate_weekly": "variabile",
-            "source": "INGV — Osservatorio Vesuviano",
+            "source": "Fallback statico — non verificato",
         },
         "vesuvio": {
-            "alert_level": "VERDE",
-            "bulletin_date": _last_bulletin_date,
+            "alert_level": "NON DISPONIBILE",
+            "bulletin_date": "Data non verificata",
             "bulletin_url": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/vesuvio",
             "seismic_events_month": 87,
             "seismic_md_max_month": 1.3,
@@ -729,18 +539,18 @@ def _static_bulletin_values():
             "radon_bq_m3": 85,
             "gps_uplift_mm_month": -0.1,
             "ground_tilt_urad": 0.1,
-            "source": f"INGV OV — Bollettino Mensile Vesuvio {_last_bulletin_date}",
+            "source": "Fallback statico — non verificato",
         },
         "ischia": {
-            "alert_level": "VERDE",
-            "bulletin_date": _last_bulletin_date,
+            "alert_level": "NON DISPONIBILE",
+            "bulletin_date": "Data non verificata",
             "bulletin_url": "https://www.ov.ingv.it/index.php/it/comunicati-attivita-vulcanica/ischia",
             "seismic_events_month": 1,
             "seismic_md_max_month": 2.6,
             "seismic_events_12m": 3,
             "gps_uplift_mm_month": 0.0,
             "radon_bq_m3": 50,
-            "source": f"INGV OV — Bollettino Mensile Ischia {_last_bulletin_date}",
+            "source": "Fallback statico — non verificato",
         },
     }
 
@@ -794,6 +604,151 @@ def fetch_noaa_co2() -> dict:
 # Cache 6 ore per limitare le richieste al sito INGV.
 # ─────────────────────────────────────────────────────────────
 
+_INGV_ROOT_URL = "https://www.ov.ingv.it/"
+_INGV_MONITORING_FALLBACK = (
+    "https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
+)
+_BULLETIN_CATEGORY_FALLBACKS = {
+    "campi_flegrei": (
+        "https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
+        "bollettini-tutti/boll-sett-flegre"
+    ),
+    "vesuvio": (
+        "https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
+        "bollettini-tutti/bollett-mensili-ves"
+    ),
+    "ischia": (
+        "https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
+        "bollettini-tutti/bollett-mensili-ischia"
+    ),
+}
+_BULLETIN_CATEGORY_LABELS = {
+    "campi_flegrei": ("settimanali", "flegrei"),
+    "vesuvio": ("mensili", "vesuvio"),
+    "ischia": ("mensili", "ischia"),
+}
+_BULLETIN_PDF_SLUGS = {
+    "campi_flegrei": "bollettino-flegrei",
+    "vesuvio": "bollettino-mensile-vesuvio",
+    "ischia": "bollettino-mensile-ischia",
+}
+
+
+def _find_latest_bulletin_file(soup, area: str, base_url: str) -> str | None:
+    """Trova il PDF più recente nell'elenco ufficiale senza dipendere dal suo slug."""
+    from urllib.parse import urljoin, urlsplit
+
+    area_terms = {
+        "campi_flegrei": ("campi flegrei", "campi-flegrei", "flegrei"),
+        "vesuvio": ("vesuvio", "vesuviana"),
+        "ischia": ("ischia",),
+    }.get(area, ())
+    base_path = urlsplit(base_url).path.rstrip("/")
+    category_path = base_path.rsplit("/", 1)[0] if "/" in base_path else ""
+    generic_category_file = f"{category_path}/file"
+    bulletin_files = []
+    for anchor in soup.find_all("a", href=True):
+        href = anchor["href"].strip()
+        if "/file" not in href.casefold():
+            continue
+        label = " ".join(anchor.get_text(" ", strip=True).casefold().split())
+        leaf = href.rstrip("/").split("/")[-2].casefold()
+        combined = f"{label} {leaf}"
+        url = urljoin(base_url, href)
+        if urlsplit(url).path.rstrip("/") == generic_category_file or label in {
+            "download selected", "download", "scarica",
+        }:
+            continue
+        if "bollett" in combined or "bulletin" in combined:
+            bulletin_files.append((any(term in combined for term in area_terms), url))
+    area_matches = [url for matched, url in bulletin_files if matched]
+    if area_matches:
+        return area_matches[0]
+    if bulletin_files:
+        return bulletin_files[0][1]
+    return None
+
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def _resolve_official_bulletin_pages(area: str, year: int | None = None):
+    """Discover the official category/year listing from INGV navigation links."""
+    from bs4 import BeautifulSoup
+    from urllib.parse import urljoin
+
+    if area not in _BULLETIN_CATEGORY_FALLBACKS:
+        return None, None
+    year = year or datetime.now().year
+    headers = {"User-Agent": "Mozilla/5.0 SeismicSafety/2.0"}
+
+    def fetch_soup(url):
+        try:
+            response = _ingv_get(url, timeout=8, headers=headers)
+            if response.status_code != 200:
+                return None
+            return BeautifulSoup(response.text, "html.parser")
+        except Exception:
+            return None
+
+    try:
+        # Resolve the monitoring section from the current site navigation.
+        root = fetch_soup(_INGV_ROOT_URL)
+        monitoring_url = None
+        if root:
+            for anchor in root.find_all("a", href=True):
+                label = " ".join(anchor.get_text(" ", strip=True).casefold().split())
+                href = anchor["href"].casefold()
+                if "monitoraggio-e-infrastrutture" in href or (
+                    "monitoraggio" in label and "infrastrutture" in label
+                ):
+                    monitoring_url = urljoin(_INGV_ROOT_URL, anchor["href"])
+                    break
+        monitoring_url = monitoring_url or _INGV_MONITORING_FALLBACK
+
+        monitoring = fetch_soup(monitoring_url)
+        index_url = None
+        if monitoring:
+            for anchor in monitoring.find_all("a", href=True):
+                label = " ".join(anchor.get_text(" ", strip=True).casefold().split())
+                if "bollettini-tutti" in anchor["href"].casefold() or (
+                    "bollettini" in label and "sorveglianza" in label
+                ):
+                    index_url = urljoin(monitoring_url, anchor["href"])
+                    break
+        if not index_url:
+            index_url = urljoin(monitoring_url, "bollettini-tutti")
+
+        index = fetch_soup(index_url)
+        category_url = None
+        if index:
+            first_label, second_label = _BULLETIN_CATEGORY_LABELS[area]
+            candidates = []
+            for anchor in index.find_all("a", href=True):
+                label = " ".join(anchor.get_text(" ", strip=True).casefold().split())
+                href = anchor["href"].casefold()
+                combined = f"{label} {href}"
+                if first_label in combined and second_label in combined:
+                    candidates.append(urljoin(index_url, anchor["href"]))
+            if candidates:
+                category_url = candidates[0]
+        category_url = category_url or _BULLETIN_CATEGORY_FALLBACKS[area]
+
+        category = fetch_soup(category_url)
+        listing_url = None
+        if category:
+            year_text = str(year)
+            anchors = category.find_all("a", href=True)
+            matching = [
+                anchor for anchor in anchors
+                if f"anno-{year_text}" in anchor["href"].casefold()
+                or anchor.get_text(" ", strip=True).strip() == year_text
+            ]
+            if matching:
+                listing_url = urljoin(category_url, matching[0]["href"])
+        return category_url, listing_url
+    except Exception:
+        return _BULLETIN_CATEGORY_FALLBACKS[area], None
+
+
 @st.cache_data(ttl=21600, show_spinner=False)  # Cache 6 ore — i PDF escono 1 volta/settimana
 def _fetch_bulletin_pdf_cf() -> dict:
     """
@@ -806,26 +761,19 @@ def _fetch_bulletin_pdf_cf() -> dict:
     except ImportError:
         return {}
 
-    year = datetime.now().year
-    listing_url = (
-        f"https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
-        f"bollettini-tutti/boll-sett-flegre/anno-{year}"
-    )
     HDR = {"User-Agent": "Mozilla/5.0 SeismicSafety/2.0 (+https://sismocampania.streamlit.app)"}
 
     try:
+        _, listing_url = _resolve_official_bulletin_pages("campi_flegrei")
+        if not listing_url:
+            return {}
         # 1. Trova il link al PDF più recente nella pagina listing
         r = _ingv_get(listing_url, timeout=5, headers=HDR)
         if r.status_code != 200:
             return {}
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(r.text, "html.parser")
-        pdf_link = None
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            if "bollettino-flegrei" in href.lower() or "/file" in href.lower():
-                pdf_link = href if href.startswith("http") else "https://www.ov.ingv.it" + href
-                break
+        pdf_link = _find_latest_bulletin_file(soup, "campi_flegrei", listing_url)
         if not pdf_link:
             return {}
 
@@ -914,36 +862,29 @@ def _fetch_bulletin_pdf_cf() -> dict:
         return {}
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=21600, show_spinner=False)
 def _fetch_bulletin_pdf_vesuvio() -> dict:
     """
     Scarica e analizza l'ultimo bollettino MENSILE Vesuvio da INGV OV.
-    Cache 24h (esce una volta al mese).
+    Cache 6 ore, coerente con la verifica dei percorsi ufficiali.
     """
     try:
         import pdfplumber
     except ImportError:
         return {}
 
-    year = datetime.now().year
-    listing_url = (
-        f"https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
-        f"bollettini-tutti/bollett-mensili-ves/anno-{year}-1"
-    )
     HDR = {"User-Agent": "Mozilla/5.0 SeismicSafety/2.0 (+https://sismocampania.streamlit.app)"}
 
     try:
         from bs4 import BeautifulSoup
+        _, listing_url = _resolve_official_bulletin_pages("vesuvio")
+        if not listing_url:
+            return {}
         r = _ingv_get(listing_url, timeout=6, headers=HDR)
         if r.status_code != 200:
             return {}
         soup = BeautifulSoup(r.text, "html.parser")
-        pdf_link = None
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            if "bollettino-mensile-vesuvio" in href.lower() and "/file" in href.lower():
-                pdf_link = href if href.startswith("http") else "https://www.ov.ingv.it" + href
-                break
+        pdf_link = _find_latest_bulletin_file(soup, "vesuvio", listing_url)
         if not pdf_link:
             return {}
 
@@ -997,36 +938,64 @@ def _fetch_bulletin_pdf_vesuvio() -> dict:
         return {}
 
 
-@st.cache_data(ttl=86400, show_spinner=False)
+def _parse_ischia_bulletin_text(text: str) -> dict:
+    """Estrae solo i conteggi esplicitamente riportati nel PDF mensile Ischia."""
+    result = {}
+    month = (
+        "GENNAIO|FEBBRAIO|MARZO|APRILE|MAGGIO|GIUGNO|LUGLIO|AGOSTO|"
+        "SETTEMBRE|OTTOBRE|NOVEMBRE|DICEMBRE"
+    )
+    date_match = re.search(rf"({month})\s+(\d{{4}})", text, re.I)
+    if date_match:
+        result["bulletin_date"] = f"{date_match.group(1).capitalize()} {date_match.group(2)}"
+
+    month_intro = re.search(r"nel corso del mese", text, re.I)
+    month_context = text[month_intro.start():month_intro.start() + 600] if month_intro else ""
+    no_events = re.search(
+        r"ad Ischia.{0,250}?non sono stati registrati terremoti",
+        month_context, re.I | re.S,
+    )
+    event_count = re.search(r"registrat[oi]\s+(\d+)\s+terremot[oi]", month_context, re.I)
+    if no_events:
+        result["seismic_events_month"] = 0
+    elif event_count:
+        result["seismic_events_month"] = int(event_count.group(1))
+        md_match = re.search(
+            r"(?:Md\s*max|magnitudo\s+Md)\s*=?\s*([\d.]+)",
+            month_context, re.I | re.S,
+        )
+        if md_match:
+            result["seismic_md_max_month"] = float(md_match.group(1))
+
+    total_match = re.search(r"in totale\s+(\d+)\)", text, re.I)
+    if total_match:
+        result["seismic_events_12m"] = int(total_match.group(1))
+    return result
+
+
+@st.cache_data(ttl=21600, show_spinner=False)
 def _fetch_bulletin_pdf_ischia() -> dict:
     """
     Scarica e analizza l'ultimo bollettino MENSILE Ischia da INGV OV.
-    Cache 24h (esce una volta al mese).
+    Cache 6 ore, coerente con la verifica dei percorsi ufficiali.
     """
     try:
         import pdfplumber
     except ImportError:
         return {}
 
-    year = datetime.now().year
-    listing_url = (
-        f"https://www.ov.ingv.it/index.php/monitoraggio-e-infrastrutture/"
-        f"bollettini-tutti/bollett-mensili-isch/anno-{year}-3"
-    )
     HDR = {"User-Agent": "Mozilla/5.0 SeismicSafety/2.0 (+https://sismocampania.streamlit.app)"}
 
     try:
         from bs4 import BeautifulSoup
-        r = _ingv_get(listing_url, timeout=6, headers=HDR)
+        _, listing_url = _resolve_official_bulletin_pages("ischia")
+        if not listing_url:
+            return {}
+        r = _ingv_get(listing_url, timeout=8, headers=HDR)
         if r.status_code != 200:
             return {}
         soup = BeautifulSoup(r.text, "html.parser")
-        pdf_link = None
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            if "bollettino-mensile-ischia" in href.lower() and "/file" in href.lower():
-                pdf_link = href if href.startswith("http") else "https://www.ov.ingv.it" + href
-                break
+        pdf_link = _find_latest_bulletin_file(soup, "ischia", listing_url)
         if not pdf_link:
             return {}
 
@@ -1037,29 +1006,7 @@ def _fetch_bulletin_pdf_ischia() -> dict:
         with pdfplumber.open(io.BytesIO(pr.content)) as pdf:
             text = "\n".join(page.extract_text() or "" for page in pdf.pages[:8])
 
-        result = {}
-
-        mese_m = re.search(
-            r"(GENNAIO|FEBBRAIO|MARZO|APRILE|MAGGIO|GIUGNO|LUGLIO|AGOSTO|"
-            r"SETTEMBRE|OTTOBRE|NOVEMBRE|DICEMBRE)\s+(\d{4})", text
-        )
-        if mese_m:
-            result["bulletin_date"] = f"{mese_m.group(1).capitalize()} {mese_m.group(2)}"
-
-        # Numero terremoti mese corrente
-        ev_m = re.search(r"registrat[oi]\s+(\d+)\s+terremot[oi]", text, re.I)
-        if ev_m:
-            result["seismic_events_month"] = int(ev_m.group(1))
-
-        # Mdmax — può essere su riga separata in PDF
-        md_m = re.search(r"magnitudo\s+Md\s*[\n\r ]*([\d.]+)", text, re.I | re.DOTALL)
-        if md_m:
-            result["seismic_md_max_month"] = float(md_m.group(1))
-
-        # Totale 12 mesi
-        tot_m = re.search(r"in totale\s+(\d+)\)", text, re.I)
-        if tot_m:
-            result["seismic_events_12m"] = int(tot_m.group(1))
+        result = _parse_ischia_bulletin_text(text)
 
         result["_pdf_url"] = pdf_link
         result["_fetched_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -1219,9 +1166,6 @@ def fetch_bulletin_values_live():
       2. Copia cache archivata
       3. Fallback live da fonti meteo/sismiche e valori neutri
     """
-    import warnings
-    warnings.filterwarnings("ignore", message="Unverified HTTPS request")
-
     static = _static_bulletin_values()
     result = {
         "campi_flegrei": static["campi_flegrei"].copy(),
@@ -1231,6 +1175,24 @@ def fetch_bulletin_values_live():
         "_scraped_at": None,
         "_source": "fallback live",
     }
+    for _area in ("campi_flegrei", "vesuvio", "ischia"):
+        result[_area].update({
+            "_live": False,
+            "_source": "Fallback statico — non verificato",
+            "_fetched_at": None,
+            "_pdf_url": None,
+            "_parsed_fields": [],
+        })
+
+    def _finalize():
+        for _area in ("campi_flegrei", "vesuvio", "ischia"):
+            if result[_area].get("_live") and result[_area].get("_source"):
+                result[_area]["source"] = result[_area]["_source"]
+        result["_scraped"] = any(
+            bool(result[_area].get("_live"))
+            for _area in ("campi_flegrei", "vesuvio", "ischia")
+        )
+        return result
 
     MESI_IT = (
         "gennaio|febbraio|marzo|aprile|maggio|giugno|"
@@ -1269,48 +1231,59 @@ def fetch_bulletin_values_live():
 
             # Data bollettino — verifica che sia FRESCA (< 90 giorni)
             dm = re.search(rf"(\d{{1,2}}\s+(?:{MESI_IT})\s+\d{{4}})", text, re.I)
+            parsed_fields = []
             if dm:
                 date_str = dm.group(1)
                 if not _date_is_fresh(date_str, max_days=90):
                     # Data stantia (>90gg) — questo URL non ha contenuto aggiornato
                     return False
                 result["campi_flegrei"]["bulletin_date"] = date_str
-                result["vesuvio"]["bulletin_date"] = date_str
+                parsed_fields.append("bulletin_date")
             else:
-                result["campi_flegrei"]["bulletin_date"] = "Aggiornamento live"
-                result["vesuvio"]["bulletin_date"] = "Aggiornamento live"
+                return False
 
             # Temperatura Bocca Grande
             tbg = re.search(r"Bocca Grande[^.]{0,60}?(\d{2,3})\s*°\s*C", text, re.I)
             if tbg:
                 result["campi_flegrei"]["fumarole_temp_bocca_grande"] = int(tbg.group(1))
+                parsed_fields.append("fumarole_temp_bocca_grande")
 
             # Temperatura Bocca Nuova
             tbn = re.search(r"Bocca Nuova[^.]{0,60}?(\d{2,3})\s*°\s*C", text, re.I)
             if tbn:
                 result["campi_flegrei"]["fumarole_temp_bocca_nuova"] = int(tbn.group(1))
+                parsed_fields.append("fumarole_temp_bocca_nuova")
 
             # Flusso CO2 (t/g o t/d)
             co2 = re.search(r"CO\s*2[^.]{0,80}?(\d{3,5})\s*(?:t/g|t/d|ton)", text, re.I)
             if co2:
                 result["campi_flegrei"]["co2_flux_td"] = int(co2.group(1))
+                parsed_fields.append("co2_flux_td")
 
             # Flusso H2S
             h2s = re.search(r"H\s*2\s*S[^.]{0,80}?(\d{1,3})\s*(?:t/g|t/d|ton)", text, re.I)
             if h2s:
                 result["campi_flegrei"]["h2s_flux_td"] = int(h2s.group(1))
+                parsed_fields.append("h2s_flux_td")
 
             # Radon
             rn = re.search(r"[Rr]adon[^.]{0,60}?(\d{2,4})\s*Bq", text, re.I)
             if rn:
                 result["campi_flegrei"]["radon_bq_m3"] = int(rn.group(1))
+                parsed_fields.append("radon_bq_m3")
 
             # Uplift GPS (es. "3 mm" o "5 mm/mese")
             upl = re.search(r"(\d{1,3})\s*mm[^.]{0,20}(?:mese|uplift|sollevamento)", text, re.I)
             if upl:
                 result["campi_flegrei"]["gps_uplift_mm_month"] = float(upl.group(1))
+                parsed_fields.append("gps_uplift_mm_month")
 
-            result["_scraped"] = True
+            result["campi_flegrei"].update({
+                "_live": label != "Wayback Machine",
+                "_source": f"INGV OV — {label}",
+                "_fetched_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "_parsed_fields": parsed_fields,
+            })
             result["_scraped_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
             result["_source"] = f"INGV OV scraping — {label}"
             return True
@@ -1357,10 +1330,6 @@ def fetch_bulletin_values_live():
             if r.status_code != 200 or len(r.text) < 1000:
                 return False
             text = BS(r.text, "html.parser").get_text(" ", strip=True)
-            dm = re.search(rf"(\d{{1,2}}\s+(?:{MESI_IT})\s+\d{{4}})", text, re.I)
-            if dm:
-                result["campi_flegrei"]["bulletin_date"] = dm.group(1)
-                result["vesuvio"]["bulletin_date"] = dm.group(1)
             # Cerca livello allerta
             for area_key, area_words in [("campi_flegrei", ["flegrei","flegrea","pozzuoli"]),
                                           ("vesuvio", ["vesuvio","vesuviana"])]:
@@ -1377,7 +1346,6 @@ def fetch_bulletin_values_live():
             uplift = re.search(r"(\d{1,3})\s*mm[^.]{0,30}(?:mese|sollevamento|uplift)", text, re.I)
             if uplift:
                 result["campi_flegrei"]["gps_uplift_mm_month"] = float(uplift.group(1))
-            result["_scraped"] = True
             result["_scraped_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
             result["_source"] = f"DPC Protezione Civile + INGV OV"
             return True
@@ -1393,12 +1361,9 @@ def fetch_bulletin_values_live():
             if r.status_code != 200 or len(r.text) < 500:
                 return False
             text = BS(r.text, "html.parser").get_text(" ", strip=True)
-            dm = re.search(rf"(\d{{1,2}}\s+(?:{MESI_IT})\s+\d{{4}})", text, re.I)
-            if dm:
-                result["campi_flegrei"]["bulletin_date"] = dm.group(1)
-                result["vesuvio"]["bulletin_date"] = dm.group(1)
-                result["_scraped"] = True
-                result["_scraped_at"] = datetime.now().strftime("%d/%m/%Y %H:%M")
+            # Una data in una pagina stampa generica non attesta un bollettino
+            # aggiornato per questi vulcani.
+            if text:
                 result["_source"] = label
                 return True
         except Exception:
@@ -1412,7 +1377,13 @@ def fetch_bulletin_values_live():
             for k in ("bulletin_date","seismic_events_month","seismic_md_max_month","gps_note"):
                 if k in pdf_ves:
                     result["vesuvio"][k] = pdf_ves[k]
-            result["vesuvio"]["_pdf_source"] = pdf_ves.get("_pdf_url","")
+            result["vesuvio"].update({
+                "_live": True,
+                "_source": "INGV OV — Bollettino mensile Vesuvio",
+                "_fetched_at": pdf_ves.get("_fetched_at"),
+                "_pdf_url": pdf_ves.get("_pdf_url", ""),
+                "_parsed_fields": [k for k in pdf_ves if not k.startswith("_")],
+            })
     except Exception:
         pass
 
@@ -1423,7 +1394,13 @@ def fetch_bulletin_values_live():
             for k in ("bulletin_date","seismic_events_month","seismic_md_max_month","seismic_events_12m"):
                 if k in pdf_isc:
                     result["ischia"][k] = pdf_isc[k]
-            result["ischia"]["_pdf_source"] = pdf_isc.get("_pdf_url","")
+            result["ischia"].update({
+                "_live": True,
+                "_source": "INGV OV — Bollettino mensile Ischia",
+                "_fetched_at": pdf_isc.get("_fetched_at"),
+                "_pdf_url": pdf_isc.get("_pdf_url", ""),
+                "_parsed_fields": [k for k in pdf_isc if not k.startswith("_")],
+            })
     except Exception:
         pass
 
@@ -1445,35 +1422,37 @@ def fetch_bulletin_values_live():
                 result["campi_flegrei"]["seismic_events_week"] = pdf_data["seismic_events_week"]
             if "seismic_md_max_week" in pdf_data:
                 result["campi_flegrei"]["seismic_md_max_week"] = pdf_data["seismic_md_max_week"]
-            result["_scraped"] = True
+            result["campi_flegrei"].update({
+                "_live": True,
+                "_source": "INGV OV — Bollettino settimanale Campi Flegrei",
+                "_fetched_at": pdf_data.get("_fetched_at"),
+                "_pdf_url": pdf_data.get("_pdf_url", ""),
+                "_parsed_fields": [k for k in pdf_data if not k.startswith("_")],
+            })
             result["_scraped_at"] = pdf_data.get("_fetched_at", datetime.now().strftime("%d/%m/%Y %H:%M"))
             result["_source"] = f"INGV OV PDF — Bollettino Settimanale CF ({pdf_data.get('bulletin_week', '')})"
-            return result
+            return _finalize()
     except Exception:
         pass
 
     # 1. INGV OV diretto — pagina bollettini CF
     cf_url = _BULLETIN_LISTING["campi_flegrei"]
     if _try_scrape_cf(cf_url, "INGV OV diretto"):
-        return result
+        return _finalize()
 
     # 2. Prova link diretto al bollettino più recente nella pagina listing
     if _try_scrape_listing(cf_url, "INGV OV listing CF"):
-        return result
+        return _finalize()
 
-    # 3. INGV OV pagina Vesuvio (talvolta ha data aggiornata CF)
-    if _try_scrape_cf(_BULLETIN_LISTING["vesuvio"], "INGV OV Vesuvio"):
-        return result
-
-    # 4. DPC Protezione Civile
+    # 3. DPC Protezione Civile (fallback area-level, non bollettino INGV)
     if _try_dpc():
-        return result
+        return _finalize()
 
-    # 5. INGV nazionale comunicati
+    # 4. INGV nazionale comunicati (fallback generico, non bollettino vulcanico)
     if _try_ingv_it():
-        return result
+        return _finalize()
 
-    # 6. Wayback Machine (archive.org) — copia archivio INGV OV
+    # 5. Wayback Machine (archive.org) — copia archivio, mai etichettata live
     try:
         wb = requests.get(
             f"https://archive.org/wayback/available?url={cf_url.replace('https://','').replace('http://','')}",
@@ -1483,12 +1462,12 @@ def fetch_bulletin_values_live():
             snap = wb.json().get("archived_snapshots", {}).get("closest", {})
             wb_url = snap.get("url")
             if wb_url and _try_scrape_cf(wb_url, "Wayback Machine"):
-                return result
+                return _finalize()
     except Exception:
         pass
 
-    # 7. Fallback statico — valori ufficiali noti (mese precedente)
-    return result
+    # Fallback statico senza data inventata e senza stato live
+    return _finalize()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1676,13 +1655,7 @@ def fetch_summit_temperature(lat: float, lon: float, elevation_m: int, area: str
 # BOLLETTINO PDF — raw bytes per download diretto
 # ─────────────────────────────────────────────────────────────
 
-_PDF_LISTING_URLS = {
-    "vesuvio":       "https://www.ov.ingv.it/ov/it/bollett-mensili-ves/anno-{year}-1.html",
-    "campi_flegrei": "https://www.ov.ingv.it/ov/it/boll-sett-flegre/anno-{year}.html",
-    "ischia":        "https://www.ov.ingv.it/ov/it/bollett-mensili-isch/anno-{year}-3.html",
-}
-
-@st.cache_data(ttl=86400, show_spinner=False)
+@st.cache_data(ttl=21600, show_spinner=False)
 def fetch_bulletin_pdf_bytes(area: str) -> tuple:
     """
     Scarica i bytes grezzi del bollettino PDF INGV OV per l'area indicata.
@@ -1690,28 +1663,23 @@ def fetch_bulletin_pdf_bytes(area: str) -> tuple:
     """
     from bs4 import BeautifulSoup
     HDR = {"User-Agent": "Mozilla/5.0 SeismicSafety/2.0 (+https://sismocampania.streamlit.app)"}
-    year = datetime.now().year
-    listing_tpl = _PDF_LISTING_URLS.get(area)
-    if not listing_tpl:
+    if area not in _BULLETIN_PDF_SLUGS:
         return None, None
-    listing_url = listing_tpl.format(year=year)
     try:
+        _, listing_url = _resolve_official_bulletin_pages(area)
+        if not listing_url:
+            return None, None
         r = _ingv_get(listing_url, timeout=8, headers=HDR)
         if r.status_code != 200:
             return None, None
         soup = BeautifulSoup(r.text, "html.parser")
-        pdf_href = None
-        for a in soup.find_all("a", href=True):
-            href = a["href"].strip()
-            if href.lower().endswith(".pdf"):
-                pdf_href = href if href.startswith("http") else "https://www.ov.ingv.it" + href
-                break
+        pdf_href = _find_latest_bulletin_file(soup, area, listing_url)
         if not pdf_href:
             return None, None
         pr = _ingv_get(pdf_href, timeout=25, headers=HDR)
         if pr.status_code != 200 or len(pr.content) < 5000:
             return None, None
-        filename = pdf_href.split("/")[-1] or f"bollettino_{area}.pdf"
+        filename = (pdf_href.rstrip("/").split("/")[-2] or f"bollettino_{area}") + ".pdf"
         return pr.content, filename
     except Exception:
         return None, None
@@ -1741,7 +1709,7 @@ def fetch_storico_confronto(area: str) -> dict:
     Ritorna dict: {year: {count, max_mag, period, mags[]}}
     """
     coords = _AREA_BBOX.get(area, _AREA_BBOX["vesuvio"])
-    now   = datetime.utcnow()
+    now   = datetime.now(timezone.utc).replace(tzinfo=None)
     month = now.month
     day   = now.day
     results = {}
@@ -1905,7 +1873,7 @@ def detect_seismic_swarms(
 
     swarms = []
     try:
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
         cutoff  = now_utc - timedelta(hours=window_hours)
 
         _time_col = "time" if "time" in df.columns else None
@@ -1955,9 +1923,9 @@ def get_bradisismo_storico_cf() -> pd.DataFrame:
     Chiodini et al. (2017), Rapporti INGV OV 2020-2025.
 
     Ritorna DataFrame: year (float), uplift_mm (int), note (str).
-    Due serie:
+    Due serie di riferimento curate manualmente (non un feed live):
       - 'storica' (1950–2005): crisi bradisismiche storiche
-      - 'recente'  (2005→oggi): ciclo attuale GPS RITE
+      - 'recente'  (2005–2024): riferimenti storici del ciclo GPS RITE
     """
     _storica = pd.DataFrame([
         {"year": 1950.0, "uplift_mm":    0, "serie": "storica", "note": "Livello di riferimento (INGV OV)"},
@@ -1986,9 +1954,7 @@ def get_bradisismo_storico_cf() -> pd.DataFrame:
         {"year": 2020.0, "uplift_mm":  680, "serie": "recente", "note": "M3.6 Agosto 2020 — sciame"},
         {"year": 2022.0, "uplift_mm":  940, "serie": "recente", "note": "Sciame settembre 2022 — 82 scosse"},
         {"year": 2023.0, "uplift_mm": 1180, "serie": "recente", "note": "M4.4 Dicembre 2023 — sciame intenso"},
-        {"year": 2024.0, "uplift_mm": 1380, "serie": "recente", "note": "INGV OV — Aggiornamento 2024"},
-        {"year": 2025.0, "uplift_mm": 1540, "serie": "recente", "note": "Allerta GIALLO — tasso ~14 mm/mese"},
-        {"year": 2026.33, "uplift_mm": 1610, "serie": "recente", "note": "Stima aprile 2026 (GPS RITE live)"},
+        {"year": 2024.0, "uplift_mm": 1380, "serie": "recente", "note": "Riferimento storico 2024 — non live"},
     ])
 
     return pd.concat([_storica, _recente], ignore_index=True)

@@ -62,13 +62,16 @@ def test_monitoring_with_catalog_data(offline_app, monkeypatch):
     assert not app.exception
 
 
-def test_repeated_reruns_do_not_accumulate_keepalive_workers(offline_app):
+def test_repeated_reruns_do_not_start_a_misleading_keepalive_worker(offline_app):
     import threading
     app = offline_app.run()
     app.run()
     app.run()
     assert not app.exception
-    assert sum(t.name == "oldstyle-keepalive" for t in threading.enumerate()) == 1
+    assert sum(t.name == "oldstyle-keepalive" for t in threading.enumerate()) == 0
+    source = (ROOT / "app.py").read_text()
+    assert "_start_oldstyle_keepalive" not in source
+    assert source.count("sismoold.streamlit.app") == 1  # the separate old-style iframe remains
 
 
 def test_unknown_emergency_level_does_not_become_an_evacuation_order(offline_app):

@@ -156,6 +156,15 @@ def test_missing_alert_is_not_green():
     prompt = module._build_seismic_prompt("Campania", {})
     assert "Livello allerta INGV OV: NON DISPONIBILE" in prompt
     assert "rischio NON DISPONIBILE" in prompt
+    assert "Sismicità: NON DISPONIBILE eventi" in prompt
+    assert "GPS deformazione: NON DISPONIBILE" in prompt
+    assert "Pressione atm. base: NON DISPONIBILE" in prompt
+
+
+def test_ai_context_does_not_turn_missing_alert_into_green():
+    source = (ROOT / "app.py").read_text()
+    assert '"alert_level":          _alert_map.get(mai_area, "NON DISPONIBILE")' in source
+    assert '"alert_level":          _alert_map.get(mai_area, "VERDE")' not in source
 
 
 def test_all_python_sources_compile():
@@ -221,6 +230,221 @@ def test_late_ai_workers_cannot_mutate_the_returned_result(monkeypatch):
         worker.target()
     assert result["gpt"] is None and result["claude"] is None and result["gemini"] is None
     assert waits == [20, 10, 0]
+
+
+def test_multi_ai_rejects_unrelated_provider_pages(monkeypatch):
+    import multi_ai_service as module
+    unrelated = (
+        "Copilot moved to a new app. Install the new Copilot app and sign in "
+        "with the same account. Your history and content will be deleted."
+    )
+    calls = []
+    def fake(prompt, system="", **kwargs):
+        calls.append(kwargs.get("allow_fallback"))
+        return unrelated
+    for name in ("_ask_gpt", "_ask_claude", "_ask_gemini"):
+        monkeypatch.setattr(module, name, fake)
+    result = module.multi_ai_consensus("Campi Flegrei", {"n_events": 2, "max_mag": 1.4})
+    assert calls == [False, False, False]
+    assert result["n_responses"] == 0
+    assert result["providers_rejected"] == ["gpt", "claude", "gemini"]
+    assert all(result[key] is None for key in ("gpt", "claude", "gemini"))
+    assert "Nessuna risposta pertinente" in result["consensus"]
+
+
+def test_ai_answer_must_name_area_and_seismic_topic():
+    from multi_ai_service import _is_relevant_ai_answer
+    assert _is_relevant_ai_answer(
+        "Campi Flegrei: i dati INGV mostrano sismicità recente; la magnitudo massima resta limitata.",
+        "Campi Flegrei",
+    )
+    assert not _is_relevant_ai_answer(
+        "Copilot moved to a new app. Install it and sign in with the same account.",
+        "Campi Flegrei",
+    )
+
+
+def test_bulletin_status_is_independent_for_each_volcano(monkeypatch):
+    import ingv_monitor as module
+    monkeypatch.setattr(module, "_fetch_bulletin_pdf_vesuvio", lambda: {
+        "bulletin_date": "Ottobre 2026", "_fetched_at": "22/11/2026 12:00",
+        "_pdf_url": "https://www.ov.ingv.it/vesuvio.pdf", "seismic_events_month": 8,
+    })
+    monkeypatch.setattr(module, "_fetch_bulletin_pdf_ischia", lambda: {})
+    monkeypatch.setattr(module, "_fetch_bulletin_pdf_cf", lambda: {
+        "bulletin_date": "17 novembre 2026", "_fetched_at": "22/11/2026 12:00",
+        "_pdf_url": "https://www.ov.ingv.it/flegrei.pdf",
+    })
+    result = module.fetch_bulletin_values_live()
+    assert result["campi_flegrei"]["_live"] is True
+    assert result["vesuvio"]["_live"] is True
+    assert result["ischia"]["_live"] is False
+    assert result["campi_flegrei"]["source"] == result["campi_flegrei"]["_source"]
+    assert result["_scraped"] is True
+
+
+def test_rite_uses_official_bulletin_instead_of_broken_ngl_path(monkeypatch):
+    import ingv_monitor as module
+    ngl_calls = []
+    monkeypatch.setattr(module, "_fetch_ngl_tail", lambda *a, **k: ngl_calls.append(a) or [])
+    monkeypatch.setattr(module, "fetch_bulletin_values_live", lambda: {
+        "campi_flegrei": {
+            "_live": True, "gps_uplift_mm_month": 10.0, "bulletin_date": "17 novembre 2026",
+                "_parsed_fields": ["gps_uplift_mm_month"],
+            "_source": "INGV OV — Bollettino settimanale Campi Flegrei",
+            "source": "INGV OV — Bollettino settimanale Campi Flegrei",
+        }
+    })
+    result = module.fetch_gps_rite.__wrapped__()
+    assert ngl_calls == []
+    assert result["source_type"] == "bulletin_live"
+    assert result["source"] == "INGV OV — Bollettino settimanale Campi Flegrei"
+
+
+def test_ngl_does_not_label_old_station_data_as_live():
+    from datetime import datetime, timezone
+    from ingv_monitor import _parse_ngl_lines
+    stale = [f"NAPL 0 {2024 + i * 0.01:.6f} a b c d e f g {i * 0.001:.4f}" for i in range(20)]
+    assert _parse_ngl_lines("NAPL", stale) is None
+    today = datetime.now(timezone.utc).date()
+    current = today.year + (today.timetuple().tm_yday - 1) / 365.25
+    fresh = [f"BKNO 0 {current - i * 0.01:.6f} a b c d e f g {i * 0.001:.4f}" for i in range(20)]
+    result = _parse_ngl_lines("BKNO", fresh)
+    assert result is not None
+    assert result["last_date"] == today.strftime("%Y-%m-%d")
+
+
+def test_unverified_static_gps_and_bulletin_values_stay_hidden():
+    from visualization import _format_gps_rate, _verified_bulletin_value
+    assert _format_gps_rate({"source_type": "unavailable", "monthly_rate_mm": 0.0}) == "NON DISPONIBILE"
+    assert _verified_bulletin_value({
+        "_live": False, "_parsed_fields": [], "ground_temp_30cm": 95,
+    }, "ground_temp_30cm", "°C") == "NON DISPONIBILE"
+    assert _verified_bulletin_value({
+        "_live": True, "_parsed_fields": ["gps_uplift_mm_month"], "gps_uplift_mm_month": 10,
+    }, "gps_uplift_mm_month", " mm/mese", 1) == "10.0 mm/mese"
+
+
+def test_default_bulletin_gps_rates_are_not_marked_live(monkeypatch):
+    import ingv_monitor as module
+    monkeypatch.setattr(module, "_fetch_ngl_tail", lambda *a, **k: [])
+    monkeypatch.setattr(module, "fetch_bulletin_values_live", lambda: {
+        "vesuvio": {
+            "_live": True, "_parsed_fields": ["bulletin_date"],
+            "gps_uplift_mm_month": -0.1, "bulletin_date": "Ottobre 2026",
+        },
+        "ischia": {
+            "_live": True, "_parsed_fields": ["seismic_events_12m"],
+            "gps_uplift_mm_month": 0.0, "bulletin_date": "Ottobre 2026",
+        },
+    })
+    assert module.fetch_gps_vesuvio.__wrapped__()["source_type"] == "unavailable"
+    assert module.fetch_gps_ischia.__wrapped__()["source_type"] == "unavailable"
+
+
+def test_official_bulletin_resolver_follows_changed_navigation_and_year_slugs(monkeypatch):
+    import ingv_monitor as module
+    year = module.datetime.now().year
+    pages = [
+        '<a href="/index.php/monitoraggio-e-infrastrutture/">Monitoraggio e Infrastrutture</a>',
+        '<a href="/index.php/nuovo-monitor/bollettini">Bollettini di sorveglianza</a>',
+        '<a href="/index.php/nuovo-monitor/bollettini/ves-nuovo">Mensili Vesuvio</a>',
+        f'<a href="/index.php/nuovo-monitor/bollettini/ves-nuovo/anno-{year}-99">{year}</a>',
+    ]
+    calls = []
+    class FakeResponse:
+        status_code = 200
+        def __init__(self, text): self.text = text
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        return FakeResponse(pages.pop(0))
+    monkeypatch.setattr(module, "_ingv_get", fake_get)
+    category, listing = module._resolve_official_bulletin_pages.__wrapped__("vesuvio", year)
+    assert category.endswith("/ves-nuovo")
+    assert listing.endswith(f"/anno-{year}-99")
+    assert len(calls) == 4
+
+
+def test_ischia_bulletin_parser_uses_resolved_listing(monkeypatch):
+    import pdfplumber
+    import ingv_monitor as module
+    year = module.datetime.now().year
+    category = "https://www.ov.ingv.it/ischia"
+    listing_url = f"{category}/anno-{year}-dynamic"
+    listing = (
+        f'<a href="{listing_url}/2028-bollettino-mensile-ischia-{year}-10/file">'
+        'Bollettino mensile Ischia</a>'
+    )
+    class FakeResponse:
+        status_code = 200
+        def __init__(self, text="", content=b""):
+            self.text, self.content = text, content
+    responses = [FakeResponse(listing), FakeResponse(content=b"%PDF-" + b"x" * 50001)]
+    calls = []
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        return responses.pop(0)
+    class FakePdf:
+        pages = [SimpleNamespace(extract_text=lambda: (
+            "Nel corso del mese di ottobre 2026, ad Ischia, sono stati registrati "
+            "5 terremoti (Mdmax=2.1±0.3). In totale 7 negli ultimi 12 mesi."
+        ))]
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+    monkeypatch.setattr(module, "_ingv_get", fake_get)
+    monkeypatch.setattr(module, "_resolve_official_bulletin_pages", lambda area: (category, listing_url))
+    monkeypatch.setattr(pdfplumber, "open", lambda data: FakePdf())
+    result = module._fetch_bulletin_pdf_ischia.__wrapped__()
+    assert result["bulletin_date"] == "Ottobre 2026"
+    assert result["seismic_events_month"] == 5
+    assert f"/anno-{year}-dynamic/" in result["_pdf_url"]
+    assert len(calls) == 2
+
+
+def test_ischia_bulletin_parser_reports_explicit_zero_events():
+    from ingv_monitor import _parse_ischia_bulletin_text
+    text = (
+        "Nel corso del mese di ottobre 2026, ad Ischia, non sono stati registrati terremoti. "
+        "Figura 1.3 - Numero di eventi registrati ad Ischia negli ultimi 12 mesi (in totale 2)."
+    )
+    result = _parse_ischia_bulletin_text(text)
+    assert result["bulletin_date"] == "Ottobre 2026"
+    assert result["seismic_events_month"] == 0
+    assert result["seismic_events_12m"] == 2
+    assert "seismic_md_max_month" not in result
+
+
+def test_pdf_discovery_survives_a_changed_slug():
+    from bs4 import BeautifulSoup
+    from ingv_monitor import _find_latest_bulletin_file
+    soup = BeautifulSoup(
+        '<a href="/reports/file">PDF</a>'
+        '<a href="/reports/old-name/file">Bollettino mensile Vesuvio</a>'
+        '<a href="/reports/new-name/file">Bollettino mensile Ischia</a>',
+        "html.parser",
+    )
+    assert _find_latest_bulletin_file(soup, "ischia", "https://www.ov.ingv.it/reports/2026") == (
+        "https://www.ov.ingv.it/reports/new-name/file"
+    )
+
+
+def test_outdated_youtube_embeds_are_not_rendered():
+    source = (ROOT / "visualization.py").read_text()
+    assert "jb3BscOyaQU" not in source
+    assert "Hllyp_GlG64" not in source
+    assert "monitoraggio-sismico-e-vulcanico" in source
+
+
+def test_donation_block_no_longer_exposes_payment_details():
+    source = (ROOT / "app.py").read_text().casefold()
+    for obsolete in (
+        "paypal.com/donate",
+        "numero carta",
+        "iban (postepay evolution)",
+        "?postepay=1",
+    ):
+        assert obsolete not in source
+    assert "metodi di supporto temporaneamente in aggiornamento" in source
 
 
 def test_streamlit_keeps_xsrf_and_cors_protection_enabled():

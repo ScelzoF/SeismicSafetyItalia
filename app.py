@@ -1,5 +1,6 @@
 import os
 import logging
+import html
 import streamlit as st
 import time
 from datetime import datetime, timedelta
@@ -46,29 +47,8 @@ import ai_analysis
 import ai_chat
 import ingv_monitor
 
-# ── Keep-alive: un solo worker per processo, non uno per ogni rerun ──
-import threading as _threading
-
-def _keep_oldstyle_alive():
-    import time as _time
-    import requests as _req
-    _time.sleep(30)  # attendi avvio app
-    while True:
-        try:
-            _req.get("https://sismoold.streamlit.app/", timeout=15, allow_redirects=True)
-        except Exception:
-            pass
-        _time.sleep(30 * 60)  # ogni 30 minuti
-
-@st.cache_resource(show_spinner=False)
-def _start_oldstyle_keepalive():
-    thread = _threading.Thread(
-        target=_keep_oldstyle_alive, daemon=True, name="oldstyle-keepalive"
-    )
-    thread.start()
-    return thread
-
-_start_oldstyle_keepalive()
+# Streamlit Community Cloud sospende le app senza traffico per 12 ore.
+# Un thread interno che richiama un vecchio dominio non impedisce l'ibernazione.
 
 # Impostiamo la localizzazione italiana per i nomi dei giorni
 try:
@@ -90,37 +70,7 @@ giorni_settimana = {
     'Sunday': 'Domenica'
 }
 
-@st.dialog("💳 Dati per donazione PostePay")
-def _show_postepay_dialog():
-    st.markdown(
-        """
-<div style="font-size:14px;line-height:2.2;">
-<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px;">
-  <span style="color:#888;font-size:12px;min-width:110px;">👤 Intestatario</span>
-  <span style="font-size:16px;font-weight:700;">Andrea Scelzo</span>
-</div>
-<hr style="border:none;border-top:1px solid rgba(128,128,128,0.2);margin:6px 0;">
-<div style="margin-bottom:4px;">
-  <span style="color:#888;font-size:12px;">💳 Numero Carta</span><br>
-  <span style="font-family:monospace;font-size:22px;font-weight:700;
-  letter-spacing:.18em;color:#f7971e;">5333 1759 3373 3088</span>
-</div>
-<hr style="border:none;border-top:1px solid rgba(128,128,128,0.2);margin:6px 0;">
-<div style="margin-bottom:4px;">
-  <span style="color:#888;font-size:12px;">🏦 IBAN (PostePay Evolution)</span><br>
-  <span style="font-family:monospace;font-size:16px;font-weight:700;
-  letter-spacing:.1em;color:#f7971e;">IT30 B360 8105 1382 9282 0692 842</span>
-</div>
-</div>
-<div style="margin-top:14px;padding:10px 12px;background:rgba(247,151,30,0.1);
-border-radius:8px;border-left:3px solid #f7971e;font-size:12px;color:#aaa;">
-📌 <b>Nessun codice fiscale</b> richiesto online.<br>
-Ricarica <b>mensile automatica</b>: attivabile dall'app Postepay/Poste Italiane.<br>
-Bonifico <b>gratuito</b> da altra PostePay Evolution.
-</div>""",
-        unsafe_allow_html=True,
-    )
-
+# I dati finanziari non vengono conservati nel codice sorgente.
 
 # Configure page settings
 st.set_page_config(
@@ -167,11 +117,6 @@ if 'alert_level_cache' not in st.session_state:
     st.session_state.alert_level_cache = None
 if 'bulletin_live_cache' not in st.session_state:
     st.session_state.bulletin_live_cache = None
-
-# === Apertura dialog PostePay via query param ===
-if st.query_params.get("postepay") == "1":
-    st.query_params.clear()
-    _show_postepay_dialog()
 
 # === CONTATORE VISITE (una sola volta per sessione) ===
 from security import read_visit_counter, increment_visit_counter
@@ -478,30 +423,8 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
         unsafe_allow_html=True,
     )
 
-    # ── Sostieni il progetto ───────────────────────────────────────────────
-    st.markdown("---")
-    _support = get_text('support_project')
-    _coffee = get_text('buy_coffee')
-    st.markdown(
-        f"""<div style="background:rgba(255,255,255,0.08);padding:12px 14px;
-border-radius:10px;border:1px solid #e8a800;margin-top:4px;">
-<p style="color:#f1faee;font-size:11px;margin:0 0 8px 0;text-align:center;letter-spacing:.05em;">
-☕ {_support}</p>
-<a href="https://www.paypal.com/donate/?business=meteotorre@gmail.com" target="_blank"
-style="display:block;text-align:center;background:linear-gradient(135deg,#f7971e,#ffd200);
-padding:9px 14px;text-decoration:none;border-radius:8px;
-box-shadow:0 3px 10px rgba(255,210,0,.4);margin-bottom:8px;">
-<span style="color:#1a1a1a;font-size:14px;font-weight:800;letter-spacing:.03em;">☕ {_coffee}</span>
-</a>
-<a href="?postepay=1" target="_self"
-style="display:block;text-align:center;background:rgba(255,255,255,0.10);
-border:1px solid rgba(255,255,255,0.30);padding:8px 14px;text-decoration:none;
-border-radius:8px;cursor:pointer;">
-<span style="color:#f1faee;font-size:13px;font-weight:700;">💳 Dona con PostePay</span>
-</a>
-</div>""",
-        unsafe_allow_html=True,
-    )
+    # I metodi di supporto sono in aggiornamento: nessun dato finanziario nel sorgente.
+    st.caption("🎁 Metodi di supporto temporaneamente in aggiornamento.")
 
 # Main content area
 st.title("🌋 " + get_text('title'))
@@ -678,6 +601,7 @@ elif page == "ai_assistant":
     bulletin_live = st.session_state.bulletin_live_cache or ingv_monitor.fetch_bulletin_values_live()
     bulletin_cf   = bulletin_live.get("campi_flegrei", _static_bv.get("campi_flegrei", {}))
     bulletin_ves  = bulletin_live.get("vesuvio",       _static_bv.get("vesuvio", {}))
+    bulletin_isch = bulletin_live.get("ischia",        _static_bv.get("ischia", {}))
     alert         = st.session_state.alert_level_cache or ingv_monitor.fetch_ingv_alert_level() or {}
     gps           = st.session_state.gps_rite or ingv_monitor.fetch_gps_rite()
     gps_ves       = st.session_state.gps_vesuvio or {}
@@ -702,10 +626,14 @@ elif page == "ai_assistant":
         else:
             gps_val, gps_src, gps_live = None, None, False
 
-        bl_scraped = bulletin_live.get("_scraped", False)
-        _bl_map    = {"Campi Flegrei": bulletin_cf, "Vesuvio": bulletin_ves}
-        _bl_cur    = _bl_map.get(area_label, bulletin_cf)
-        bl_date    = _bl_cur.get("bulletin_date") or "—"
+        _bl_map    = {
+            "Campi Flegrei": bulletin_cf,
+            "Vesuvio": bulletin_ves,
+            "Ischia": bulletin_isch,
+        }
+        _bl_cur    = _bl_map.get(area_label, {})
+        bl_date    = html.escape(str(_bl_cur.get("bulletin_date") or "data non verificata"))
+        bl_live    = bool(_bl_cur.get("_live"))
         alert_src  = alert.get("_source", "INGV OV") if alert else "INGV OV"
 
         # Componi badge
@@ -720,9 +648,9 @@ elif page == "ai_assistant":
                  if gps_val is not None else "")
         alert_b = _b(f"Allerta INGV OV  {alert_src}", "#198754" if alert_src != "INGV OV" else "#fd7e14")
         bulletin_b = (
-            _b(f"Bollettino INGV OV  {bl_date} (live)", "#198754")
-            if bl_scraped else
-            _b(f"Bollettino INGV OV  {bl_date} (fallback)", "#6c757d")
+            _b(f"Bollettino INGV OV · {bl_date} (aggiornato)", "#198754")
+            if bl_live else
+            _b(f"Bollettino INGV OV · {bl_date} (non verificato)", "#6c757d")
         )
         st.markdown(
             f"<div style='background:#f0f2f6;border-radius:8px;padding:8px 12px;"
@@ -827,6 +755,11 @@ elif page == "ai_assistant":
 
                 # Determina sorgenti live dal dataframe SISMAI
                 _src_active = set(sismai_df["source"].unique()) if "source" in sismai_df.columns else set()
+                _bulletin_by_area = {
+                    "Campi Flegrei": bulletin_cf,
+                    "Vesuvio": bulletin_ves,
+                    "Ischia": bulletin_isch,
+                }
                 _meteo_live = abs(p_base - 1013.25) > 0.5  # Open-Meteo ha risposto se diverso dal default
 
                 def _src_badge(name: str, is_live: bool, n: int = 0) -> str:
@@ -848,7 +781,10 @@ elif page == "ai_assistant":
                     + _src_badge("GOSSIP-OV", "GOSSIP-OV" in _src_active, _n("GOSSIP-OV"))
                     + _src_badge("EMSC", "EMSC" in _src_active, _n("EMSC"))
                     + _src_badge("Open-Meteo", _meteo_live)
-                    + _src_badge("Bollettino OV", bool((st.session_state.get("bulletin_live_cache") or {}).get("_scraped")))
+                    + _src_badge(
+                        "Bollettino OV",
+                        bool(_bulletin_by_area.get(sismai_area, {}).get("_live")),
+                    )
                     + "</div>"
                 )
                 st.markdown(
@@ -944,10 +880,10 @@ border-radius:10px;padding:10px 4px;background:#fff;">
 
     # ── MULTI-AI CONSENSUS ────────────────────────────────────────────────────
     with tab_multiAI:
-        st.markdown("### 🧠 Analisi Multi-AI — Consenso GPT + Claude + Gemini")
+        st.markdown("### 🧠 Analisi AI sperimentale — confronto tra provider")
         st.markdown(
-            "Interroga in parallelo **OpenAI GPT-5**, **Anthropic Claude** e **Google Gemini** "
-            "con lo stesso contesto sismico live. Genera un consenso scientifico da 3 AI distinte."
+            "Interroga i provider configurati con lo stesso contesto sismico. "
+            "Le risposte sono sperimentali: non costituiscono un consenso né una valutazione scientifica."
         )
 
         prov_status = multi_ai_service.providers_status()
@@ -972,36 +908,48 @@ border-radius:10px;padding:10px 4px;background:#fff;">
         _df90_map = {"Campi Flegrei": cf_df90, "Vesuvio": ves_df90, "Ischia": isc_df90}
 
         # GPS live: usa NGL/RITE per CF, NGL/Vesuvio per Vesuvio (session_state-backed)
-        def _live_gps_uplift(area_key: str) -> float:
+        def _live_gps_uplift(area_key: str):
             if area_key == "Campi Flegrei":
-                v = (gps.get("uplift_mm_month") or gps.get("gps_uplift_mm_month")
-                     or bulletin_cf.get("gps_uplift_mm_month", 0.0))
+                candidates = (
+                    gps.get("uplift_mm_month"), gps.get("gps_uplift_mm_month"),
+                    bulletin_cf.get("gps_uplift_mm_month"),
+                )
             elif area_key == "Vesuvio":
-                v = (gps_ves.get("uplift_mm_month") or gps_ves.get("gps_uplift_mm_month")
-                     or bulletin_ves.get("gps_uplift_mm_month", 0.0))
+                candidates = (
+                    gps_ves.get("uplift_mm_month"), gps_ves.get("gps_uplift_mm_month"),
+                    bulletin_ves.get("gps_uplift_mm_month"),
+                )
             else:
-                v = 0.0
-            return float(v or 0.0)
+                return None
+            for value in candidates:
+                if value is not None:
+                    try:
+                        return float(value)
+                    except (TypeError, ValueError):
+                        continue
+            return None
 
         _alert_map = {
-            "Campi Flegrei": (alert or {}).get("campi_flegrei") or bulletin_cf.get("alert_level", "GIALLO"),
-            "Vesuvio":       (alert or {}).get("vesuvio")       or bulletin_ves.get("alert_level", "VERDE"),
-            "Ischia":        "VERDE",
+            "Campi Flegrei": (alert or {}).get("campi_flegrei") or "NON DISPONIBILE",
+            "Vesuvio":       (alert or {}).get("vesuvio")       or "NON DISPONIBILE",
+            "Ischia":        (alert or {}).get("ischia")        or "NON DISPONIBILE",
         }
 
         mai_df = _df90_map.get(mai_area)
-        n_events_mai  = len(mai_df) if mai_df is not None and not mai_df.empty else 0
-        max_mag_mai   = float(mai_df["magnitude"].max())  if n_events_mai > 0 else 0.0
-        avg_mag_mai   = float(mai_df["magnitude"].mean()) if n_events_mai > 0 else 0.0
-        emsc_n_mai    = int(mai_df[mai_df["source"] == "EMSC"].shape[0]) if (
-            mai_df is not None and not mai_df.empty and "source" in mai_df.columns) else 0
+        mai_has_data = mai_df is not None and not mai_df.empty
+        n_events_mai  = len(mai_df) if mai_has_data else None
+        max_mag_mai   = float(mai_df["magnitude"].max())  if mai_has_data else None
+        avg_mag_mai   = float(mai_df["magnitude"].mean()) if mai_has_data else None
+        emsc_count = int(mai_df[mai_df["source"] == "EMSC"].shape[0]) if (
+            mai_has_data and "source" in mai_df.columns) else 0
+        emsc_n_mai = emsc_count if emsc_count > 0 else None
 
         if st.button(f"🚀 Avvia analisi Multi-AI per {mai_area}", type="primary", key="btn_multi_ai"):
-            with st.spinner("🧠 Calcolo SISMAI + interrogazione GPT-5 · Claude · Gemini in parallelo..."):
+            with st.spinner("🧠 Calcolo SISMAI + interrogazione dei provider configurati..."):
                 atm_live = ml_forecast_service.fetch_atmospheric_features(mai_area)
 
                 # Pre-calcola SISMAI per avere il forecast label reale
-                sismai_label = "BASSO"
+                sismai_label = "NON DISPONIBILE"
                 if mai_df is not None and not mai_df.empty:
                     try:
                         _fc_pre = ml_forecast_service.run_ml_forecast(
@@ -1016,21 +964,25 @@ border-radius:10px;padding:10px 4px;background:#fff;">
                     "n_events":             n_events_mai,
                     "max_mag":              max_mag_mai,
                     "avg_mag":              avg_mag_mai,
-                    "alert_level":          _alert_map.get(mai_area, "VERDE"),
+                    "alert_level":          _alert_map.get(mai_area, "NON DISPONIBILE"),
                     "gps_uplift_mm_month":  _live_gps_uplift(mai_area),
-                    "pressure_base":        atm_live.get("pressure_base", 1013.0),
-                    "temp_base":            atm_live.get("temp_base", 15.0),
-                    "temp_vetta":           atm_live.get("temp_vetta"),
+                    "pressure_base":        (atm_live or {}).get("pressure_base"),
+                    "temp_base":            (atm_live or {}).get("temp_base"),
+                    "temp_vetta":           (atm_live or {}).get("temp_vetta"),
                     "sismai_forecast_label": sismai_label,
                     "emsc_n_events":        emsc_n_mai,
-                    "isc_n_events":         0,
+                    "isc_n_events":         None,
                     "period_days":          90,
+                    "seismic_data_status":  "disponibile" if mai_has_data else "non disponibile",
                 }
                 mai_result = multi_ai_service.multi_ai_consensus(mai_area, data_ctx)
 
-            st.success(f"✅ Analisi completata in {mai_result['elapsed_s']}s")
+            if mai_result.get("n_responses", 0):
+                st.success(f"✅ Ricevute {mai_result['n_responses']} risposte pertinenti in {mai_result['elapsed_s']}s")
+            else:
+                st.warning("Nessuna risposta AI pertinente o disponibile. Consulta i dati e i bollettini ufficiali.")
 
-            st.markdown("#### 📊 Contesto dati inviato ai 3 AI")
+            st.markdown("#### 📊 Contesto dati inviato ai provider")
             with st.expander("Vedi prompt inviato"):
                 st.code(mai_result.get("prompt", ""), language=None)
 
@@ -1038,13 +990,15 @@ border-radius:10px;padding:10px 4px;background:#fff;">
             col_g, col_c, col_gem = st.columns(3)
 
             def _ai_card(label, txt, color, bg, sep):
+                safe_label = html.escape(str(label))
+                safe_text = html.escape(str(txt)).replace("\n", "<br>")
                 return (
                     "<div style='border-radius:10px;padding:16px 18px;"
                     "border-left:4px solid " + color + ";background:" + bg + ";"
                     "min-height:160px;font-size:14px;line-height:1.65;color:#222;'>"
-                    "<b style='color:" + color + ";font-size:15px;'>" + label + "</b>"
+                    "<b style='color:" + color + ";font-size:15px;'>" + safe_label + "</b>"
                     "<hr style='margin:10px 0 12px;border:none;border-top:1px solid " + sep + ";'>"
-                    + txt + "</div>"
+                    + safe_text + "</div>"
                 )
 
             with col_g:
@@ -1060,20 +1014,22 @@ border-radius:10px;padding:10px 4px;background:#fff;">
                 st.markdown(_ai_card("🟢 Gemini (Google)", _txt, "#198754", "#e8fdf0", "#b8f0d0"), unsafe_allow_html=True)
 
             st.markdown("---")
-            st.markdown("#### 🎯 Consenso Scientifico Multi-AI")
-            consensus = mai_result.get("consensus") or "Consenso non disponibile."
+            st.markdown("#### 🎯 Sintesi AI sperimentale")
+            consensus = html.escape(
+                str(mai_result.get("consensus") or "Sintesi non disponibile.")
+            ).replace("\n", "<br>")
             st.markdown(
                 f"<div style='background:linear-gradient(135deg,#f8f0ff 0%,#fff 100%);"
                 f"border:2px solid #6f42c1;border-radius:12px;padding:20px;"
                 f"font-size:15px;line-height:1.7;color:#333;'>"
-                f"<b style='color:#6f42c1;'>🧠 Sintesi consensuale (GPT-4o su {mai_result.get('n_responses', 3)} pareri):</b><br><br>"
+                f"<b style='color:#6f42c1;'>🧠 Riepilogo su {mai_result.get('n_responses', 0)} risposte pertinenti:</b><br><br>"
                 f"{consensus}</div>",
                 unsafe_allow_html=True,
             )
             st.caption(
                 f"Analisi generata il {mai_result.get('timestamp','—')} · "
-                f"Dati: INGV/GOSSIP-OV/EMSC · AI: OpenAI + Anthropic + Google · "
-                f"Nessuna risposta è una previsione scientifica certificata."
+                f"Dati: INGV/GOSSIP-OV/EMSC · "
+                f"Non è un bollettino ufficiale né una previsione scientifica."
             )
         else:
             st.info(

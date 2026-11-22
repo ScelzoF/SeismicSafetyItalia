@@ -1,67 +1,59 @@
-# Aggiornamento e riavvio manuale di Sismocampania
+# Stato e riavvio manuale di Sismocampania
 
-Il sito online e il database di produzione NON sono stati modificati durante
-questa verifica. Le modifiche al codice sono proposte in un ramo separato.
-Il riavvio da Streamlit resta manuale, a cura del proprietario.
+La prima correzione del contatore è già stata integrata; l'utente ha riferito
+“Success” per entrambi gli script SQL e per il controllo della funzione. Non
+serve rieseguire SQL per le correzioni descritte qui: sono modifiche al codice.
+Il proprietario continua a gestire manualmente il riavvio Streamlit.
 
-## Prima di integrare il codice
+Le correzioni aggiuntive descritte nell'audit non sono ancora pubblicate. Finché
+la relativa proposta GitHub non viene integrata, il sito online continua a
+eseguire il codice precedente.
 
-1. Conservare un backup del database e annotare il totale attualmente confermato
-   nella riga `public.visit_stats` con `id = 1`, se la tabella esiste.
-   Un numero già perduto non può essere ricostruito dal nuovo codice.
-2. Fermare temporaneamente la vecchia app da Streamlit, per evitare che vecchi
-   processi continuino a riscrivere valori assoluti durante l'aggiornamento.
-3. Nel SQL Editor del progetto Supabase corretto, eseguire
-   `sql/visit_counter.sql`. Lo script conserva il totale esistente e può essere
-   ripetuto. Non sostituisce un totale esistente con zero.
-4. Se le tabelle community esistono, eseguire `sql/community_permissions.sql`.
-   Per una nuova installazione usare prima `SUPABASE_SETUP.sql`.
-   Entrambi gli script lasciano invariati i messaggi esistenti.
-5. Verificare nel database che la funzione `public.register_visit(UUID)` esista
-   e che la riga del contatore abbia mantenuto il totale annotato.
-   Le migrazioni sono state testate su PostgreSQL locale, non sul progetto reale:
-   se uno script segnala un errore, non proseguire senza controllarlo.
+## Dopo l'integrazione del codice
 
-Non è disponibile in questa conversazione un'integrazione Supabase: gli script
-non sono stati eseguiti sul database reale. Non incollare chiavi o password in chat.
+1. In GitHub, verificare che la proposta sia stata integrata nel ramo di
+   produzione del repository `ScelzoF/SeismicSafetyItalia`.
+2. Aprire Streamlit Cloud, selezionare l'app Sismocampania e premere **Reboot**.
+   Il riavvio resta manuale; non lo eseguiremo al posto tuo.
+3. Attendere che l'app torni accessibile e controllare i log di avvio. Se il
+   riavvio fallisce, non ripetere SQL: verificare il primo errore nei log e
+   mantenere il database intatto.
 
-## Pubblicazione e riavvio
+## Verifiche rapide sul sito
 
-1. Verificare in Streamlit la configurazione del repository:
-   `ScelzoF/SeismicSafetyItalia`, ramo di produzione e file di avvio `app.py`.
-   La configurazione effettivamente pubblicata non è stata ispezionata.
-2. Controllare che `SUPABASE_URL` e `SUPABASE_KEY` siano configurate in
-   Streamlit Secrets oppure nell'ambiente. Non cambiare credenziali funzionanti
-   solo per questo aggiornamento.
-3. Integrare la proposta GitHub solo dopo l'aggiornamento SQL.
-   Streamlit può rilevare automaticamente una modifica al ramo collegato:
-   l'approvazione della proposta non va quindi anticipata rispetto al database.
-4. Riavviare manualmente da Streamlit e controllare i log di avvio.
-   Non è stato modificato il file di avvio e non sono state aggiunte dipendenze
-   di produzione. `requirements-test.txt` serve soltanto ai test.
+- Aprire **Monitoraggio**: la mappa deve caricare OpenStreetMap.
+- Aprire i bollettini di Campi Flegrei, Vesuvio e Ischia: ciascuna area deve
+  mostrare data e stato propri; scaricare un PDF per confermare che il link
+  funzioni. I percorsi ufficiali vengono scoperti dalla navigazione INGV e la
+  cache può ritardare il riconoscimento di un nuovo bollettino fino a sei ore.
+- Se una fonte non è raggiungibile o non è leggibile, la UI deve indicare
+  “NON DISPONIBILE”/“non verificato”; non considerare quel valore come verde,
+  assenza di rischio o dato aggiornato.
+- Aprire **Assistente AI**: rifiutare risposte palesemente fuori tema e
+  considerare ogni commento sperimentale, non un consenso o un'allerta ufficiale.
+- Aprire le pagine vulcaniche: Campi Flegrei e Ischia devono rimandare alle
+  pagine ufficiali INGV, senza mostrare i vecchi video non disponibili.
+- Il contatore delle sessioni deve restare persistente tra i riavvii. Il totale
+  misura sessioni, non persone uniche; i rerun della stessa sessione non devono
+  aggiungere una nuova visita.
+- Il supporto/donazione è temporaneamente disattivato in attesa di un nuovo link
+  pubblico scelto dal proprietario.
 
-## Controlli subito dopo il riavvio
+## Sospensione automatica
 
-- Aprire la pagina di monitoraggio: lo sfondo stradale deve mostrare OpenStreetMap,
-  non un messaggio di richiesta chiave. Controllare anche le mappe di emergenza.
-- Verificare il conteggio visite: deve partire dal totale conservato nel database.
-  I rerun della stessa sessione non devono aggiungere visite; una nuova sessione
-  ne aggiunge una. È un conteggio di sessioni, non di persone uniche.
-- Se il database non risponde, deve comparire “temporaneamente non disponibili”.
-  Non deve essere mostrato uno zero sostitutivo.
-- Verificare tutte le voci del menu, anche da iPhone, e la selezione dell'area
-  nella pagina emergenza. Non sono stati eseguiti test su un iPhone fisico.
-- Confrontare i livelli di allerta con le pagine ufficiali della Protezione Civile.
-  “NON DISPONIBILE” indica un dato non verificato, non un livello verde.
+Streamlit Community Cloud sospende un'app dopo 12 ore senza traffico; una visita
+la riattiva. Il vecchio thread del codice pingava il sito `sismoold`, non
+Sismocampania. L'auto-refresh nel browser opera soltanto mentre la pagina di un
+visitatore è attiva e non costituisce un servizio always-on. Per disponibilità
+continua serve un piano o hosting senza ibernazione; un ping nel codice non può
+garantirla né sostituire tale servizio.
 
-## Se il contatore non torna disponibile
+## Avviso sicurezza
 
-Controllare configurazione, esito della migrazione e accesso alla funzione RPC.
-Non ripristinare il vecchio meccanismo che copia un file locale sul totale remoto.
-Una richiesta scaduta può essere già stata registrata: il nuovo identificatore
-di sessione rende sicuro il tentativo successivo.
-
-Il rollback del codice alla vecchia versione del contatore non è sicuro:
-può reintrodurre gli azzeramenti. Non rimuovere le protezioni database per far
-funzionare una versione precedente. In caso di errore, fermare l'app e correggere
-la configurazione mantenendo intatto il totale persistente.
+Un commit precedente conteneva dati finanziari in chiaro. Sono stati tolti dal
+codice corrente, ma restano nella cronologia Git finché questa non viene
+riscritta. Considera esposti i dati, contatta subito l'emittente per bloccare o
+sostituire la carta e non riutilizzarli. La riscrittura della cronologia è
+un'operazione distruttiva e non verrà eseguita senza autorizzazione esplicita.
+Non inserire numeri di carta, coordinate bancarie o chiavi in chat o nel
+repository.
