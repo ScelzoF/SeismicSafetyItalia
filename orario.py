@@ -1,9 +1,9 @@
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 def get_italy_dst_offset(now=None):
     if not now:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
     year = now.year
     march_last = datetime(year, 3, 31)
     while march_last.weekday() != 6:
@@ -14,7 +14,7 @@ def get_italy_dst_offset(now=None):
     return 2 if march_last < now < october_last else 1
 
 def get_orario():
-    utc_now = datetime.utcnow()
+    utc_now = datetime.now(timezone.utc).replace(tzinfo=None)
     offset = get_italy_dst_offset(utc_now)
     italy_now = utc_now + timedelta(hours=offset)
     return {

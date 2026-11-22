@@ -3,7 +3,7 @@ import re
 import json
 import pandas as pd
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import streamlit as st
 import defusedxml.ElementTree as ET  # sicuro contro XXE/XML-bomb attacks
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -11,6 +11,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 INGV_API_URL = "https://webservices.ingv.it/fdsnws/event/1/query"
 USGS_API_URL = "https://earthquake.usgs.gov/fdsnws/event/1/query"
 REQUEST_TIMEOUT = 6
+
+
+def _utc_now_naive():
+    """UTC timestamp senza tzinfo per compatibilità con i DataFrame esistenti."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _utc_fromtimestamp(timestamp):
+    """Converte epoch in UTC naive, mantenendo il formato storico dei cataloghi."""
+    return datetime.fromtimestamp(timestamp, timezone.utc).replace(tzinfo=None)
 
 
 def _retry_get(url, params=None, headers=None, timeout=REQUEST_TIMEOUT, max_retries=3):
@@ -71,7 +81,7 @@ def _load_fallback():
 
 def _fetch_ingv_raw():
     """Fetch INGV data — 7 giorni — Italia."""
-    end_time = datetime.utcnow().replace(second=0, microsecond=0)
+    end_time = _utc_now_naive().replace(second=0, microsecond=0)
     start_time = end_time - timedelta(days=7)
     params = {
         "starttime": start_time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -96,7 +106,7 @@ def _fetch_ingv_raw():
         coords = (event.get("geometry") or {}).get("coordinates", [0, 0, 0])
         time_val = props.get("time", "")
         if isinstance(time_val, (int, float)):
-            time_str = datetime.utcfromtimestamp(time_val / 1000).strftime("%Y-%m-%dT%H:%M:%S")
+            time_str = _utc_fromtimestamp(time_val / 1000).strftime("%Y-%m-%dT%H:%M:%S")
         else:
             time_str = str(time_val)
         earthquakes.append({
@@ -113,7 +123,7 @@ def _fetch_ingv_raw():
 
 def _fetch_usgs_raw():
     """Fetch USGS data — 7 giorni — Campania ±100km."""
-    end_time = datetime.utcnow().replace(second=0, microsecond=0)
+    end_time = _utc_now_naive().replace(second=0, microsecond=0)
     start_time = end_time - timedelta(days=7)
     params = {
         "format": "geojson",
@@ -139,7 +149,7 @@ def _fetch_usgs_raw():
         coords = f["geometry"].get("coordinates", [0, 0, 0])
         t = f["properties"].get("time", 0)
         rows.append({
-            "time": datetime.utcfromtimestamp((t or 0) / 1000).strftime("%Y-%m-%dT%H:%M:%S"),
+            "time": _utc_fromtimestamp((t or 0) / 1000).strftime("%Y-%m-%dT%H:%M:%S"),
             "magnitude": float(f["properties"].get("mag") or 0),
             "depth": float(coords[2]) if len(coords) > 2 else 0.0,
             "latitude": float(coords[1]) if len(coords) > 1 else 0.0,
@@ -169,7 +179,7 @@ def fetch_earthquake_data_for_ml(days: int = 30) -> "pd.DataFrame":
     Cache separata (TTL 1 ora) per non appesantire il refresh normale (15 min).
     """
     try:
-        end_time = datetime.utcnow().replace(second=0, microsecond=0)
+        end_time = _utc_now_naive().replace(second=0, microsecond=0)
         start_time = end_time - timedelta(days=days)
         params = {
             "starttime": start_time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -191,7 +201,7 @@ def fetch_earthquake_data_for_ml(days: int = 30) -> "pd.DataFrame":
             coords = (event.get("geometry") or {}).get("coordinates", [0, 0, 0])
             time_val = props.get("time", "")
             if isinstance(time_val, (int, float)):
-                time_str = datetime.utcfromtimestamp(time_val / 1000).strftime("%Y-%m-%dT%H:%M:%S")
+                time_str = _utc_fromtimestamp(time_val / 1000).strftime("%Y-%m-%dT%H:%M:%S")
             else:
                 time_str = str(time_val)
             rows.append({
@@ -239,7 +249,7 @@ def fetch_earthquake_data_for_ml_area(area_key: str, days: int = 90) -> "pd.Data
 
     def _fetch_ingv_area() -> pd.DataFrame:
         try:
-            end_time   = datetime.utcnow().replace(second=0, microsecond=0)
+            end_time   = _utc_now_naive().replace(second=0, microsecond=0)
             start_time = end_time - timedelta(days=days)
             params = {
                 "starttime": start_time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -261,7 +271,7 @@ def fetch_earthquake_data_for_ml_area(area_key: str, days: int = 90) -> "pd.Data
                 props  = ev.get("properties", {})
                 coords = (ev.get("geometry") or {}).get("coordinates", [0, 0, 0])
                 tv = props.get("time", "")
-                ts = (datetime.utcfromtimestamp(tv / 1000).strftime("%Y-%m-%dT%H:%M:%S")
+                ts = (_utc_fromtimestamp(tv / 1000).strftime("%Y-%m-%dT%H:%M:%S")
                       if isinstance(tv, (int, float)) else str(tv))
                 rows.append({
                     "time":      ts,
@@ -292,7 +302,7 @@ def fetch_earthquake_data_for_ml_area(area_key: str, days: int = 90) -> "pd.Data
     def _fetch_emsc_area() -> pd.DataFrame:
         """EMSC 7 giorni filtrato per bounding box area."""
         try:
-            end_time   = datetime.utcnow().replace(second=0, microsecond=0)
+            end_time   = _utc_now_naive().replace(second=0, microsecond=0)
             start_time = end_time - timedelta(days=7)
             params = {
                 "format": "json",
@@ -391,7 +401,7 @@ def fetch_usgs_data():
 
 def _fetch_emsc_raw():
     """Fetch EMSC data — 7 giorni — Italia (European Mediterranean Seismological Centre)."""
-    end_time = datetime.utcnow().replace(second=0, microsecond=0)
+    end_time = _utc_now_naive().replace(second=0, microsecond=0)
     start_time = end_time - timedelta(days=7)
     params = {
         "format": "json",

@@ -10,6 +10,7 @@ Produce un'analisi simica consensuale da 3 prospettive AI distinte.
 """
 
 import os
+import math
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -169,12 +170,19 @@ def _ask_g4f_free(prompt: str, system: str = "") -> str:
 # SINGLE-PROVIDER CALLS
 # ─────────────────────────────────────────────────────────────
 
-def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-4o") -> str:
+def _ask_gpt(
+    prompt: str,
+    system: str = "",
+    model: str = "gpt-4o",
+    allow_fallback: bool = True,
+) -> str | None:
     """Chiama OpenAI GPT via Replit proxy, API diretta o OpenRouter.
     Fallback finale: g4f (gratuito, nessuna API key)."""
     base, key, effective_model = _get_openai_creds()
     if not (base and key):
-        return _ask_g4f_free(prompt, system) or "GPT non disponibile (env vars mancanti)."
+        if allow_fallback:
+            return _ask_g4f_free(prompt, system) or "GPT non disponibile (env vars mancanti)."
+        return None
     try:
         return _openai_compat_call(base, key, effective_model, prompt, system)
     except Exception as e:
@@ -182,10 +190,14 @@ def _ask_gpt(prompt: str, system: str = "", model: str = "gpt-4o") -> str:
         if "402" in err or "Payment Required" in err:
             if "openrouter" in base:
                 _mark_openrouter_down()
+            if not allow_fallback:
+                return None
             result = _ask_g4f_free(prompt, system)
             if result:
                 return result
             return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
+        if not allow_fallback:
+            return None
         return f"[GPT errore: {err[:120]}]"
 
 
@@ -216,7 +228,12 @@ def _openai_compat_call(base: str, key: str, model: str, prompt: str, system: st
     return r.choices[0].message.content.strip()
 
 
-def _ask_claude(prompt: str, system: str = "", model: str = "claude-haiku-4-5") -> str:
+def _ask_claude(
+    prompt: str,
+    system: str = "",
+    model: str = "claude-haiku-4-5",
+    allow_fallback: bool = True,
+) -> str | None:
     """Chiama Claude: nativo Anthropic → OpenRouter → GPT-4o fallback."""
     cb, ck, cm, provider = _get_claude_creds()
     if cb and ck:
@@ -233,11 +250,15 @@ def _ask_claude(prompt: str, system: str = "", model: str = "claude-haiku-4-5") 
             else:
                 return _openai_compat_call(cb, ck, cm, prompt, system)
         except Exception as e:
+            if not allow_fallback:
+                return None
             if "402" in str(e) or "Payment Required" in str(e):
                 result = _ask_g4f_free(prompt, system or _CLAUDE_FALLBACK_SYSTEM)
                 if result:
                     return result
                 return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
+    if not allow_fallback:
+        return None
     # Fallback GPT-4o con prospettiva statistica
     base, key, mdl = _get_openai_creds()
     if not (base and key):
@@ -254,7 +275,12 @@ def _ask_claude(prompt: str, system: str = "", model: str = "claude-haiku-4-5") 
         return f"[Claude errore: {err[:120]}]"
 
 
-def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") -> str:
+def _ask_gemini(
+    prompt: str,
+    system: str = "",
+    model: str = "gemini-2.5-flash",
+    allow_fallback: bool = True,
+) -> str | None:
     """Chiama Gemini: nativo Google → OpenRouter → GPT-4o fallback."""
     gb, gk, gm, provider = _get_gemini_creds()
     if gb and gk:
@@ -276,11 +302,15 @@ def _ask_gemini(prompt: str, system: str = "", model: str = "gemini-2.5-flash") 
                 parts = d.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
                 return (parts[0].get("text") or "").strip()
         except Exception as e:
+            if not allow_fallback:
+                return None
             if "402" in str(e) or "Payment Required" in str(e):
                 result = _ask_g4f_free(prompt, system or _GEMINI_FALLBACK_SYSTEM)
                 if result:
                     return result
                 return "⚠️ Commento AI temporaneamente non disponibile (credito esaurito)."
+    if not allow_fallback:
+        return None
     # Fallback GPT-4o con prospettiva protezione civile
     base, key, mdl = _get_openai_creds()
     if not (base and key):
@@ -305,6 +335,7 @@ _SYSTEM_PROMPT = """Sei un esperto di sismologia vulcanica con specializzazione 
 (Campi Flegrei, Vesuvio, Ischia). Rispondi in italiano, in modo chiaro e accessibile.
 Fornisci un'analisi concisa (3-5 frasi) basata solo sui dati forniti.
 Non inventare dati. I dati assenti sono sconosciuti, non indicano assenza di rischio.
+Nomina l'area analizzata e cita almeno un indicatore presente nel contesto.
 Non prevedere terremoti e non dichiarare allerte, evacuazioni o assenza di pericolo.
 La risposta è sperimentale e non è un comunicato ufficiale.
 Per comportamenti di sicurezza rimanda a INGV e Protezione Civile."""
@@ -312,32 +343,82 @@ Per comportamenti di sicurezza rimanda a INGV e Protezione Civile."""
 
 def _build_seismic_prompt(area: str, data_ctx: dict) -> str:
     """Costruisce il prompt con il contesto sismico attuale."""
-    n_events   = data_ctx.get("n_events", 0)
-    max_mag    = data_ctx.get("max_mag", 0.0)
-    avg_mag    = data_ctx.get("avg_mag", 0.0)
+    def fmt(value, decimals=1, signed=False):
+        if value is None:
+            return "NON DISPONIBILE"
+        try:
+            number = float(value)
+            if not math.isfinite(number):
+                return "NON DISPONIBILE"
+            return f"{number:+.{decimals}f}" if signed else f"{number:.{decimals}f}"
+        except (TypeError, ValueError):
+            return "NON DISPONIBILE"
+
+    n_events = data_ctx.get("n_events")
+    n_events_text = "NON DISPONIBILE" if n_events is None else str(n_events)
+    max_mag    = fmt(data_ctx.get("max_mag"))
+    avg_mag    = fmt(data_ctx.get("avg_mag"))
     alert      = data_ctx.get("alert_level") or "NON DISPONIBILE"
-    gps        = data_ctx.get("gps_uplift_mm_month", 0.0)
-    pressure   = data_ctx.get("pressure_base", 1013.0)
-    temp_base  = data_ctx.get("temp_base", 15.0)
+    gps        = fmt(data_ctx.get("gps_uplift_mm_month"), signed=True)
+    pressure   = fmt(data_ctx.get("pressure_base"))
+    temp_base  = fmt(data_ctx.get("temp_base"))
     temp_vetta = data_ctx.get("temp_vetta", None)
     sismai_risk= data_ctx.get("sismai_forecast_label") or "NON DISPONIBILE"
-    emsc_n     = data_ctx.get("emsc_n_events", 0)
-    isc_n      = data_ctx.get("isc_n_events", 0)
+    emsc_n     = data_ctx.get("emsc_n_events")
+    isc_n      = data_ctx.get("isc_n_events")
     period     = data_ctx.get("period_days", 90)
 
-    temp_info = f", Temp. vetta: {temp_vetta:.1f}°C" if temp_vetta is not None else ""
-    emsc_info = f" (confermati da EMSC: {emsc_n})" if emsc_n > 0 else ""
-    isc_info  = f" (ISC: {isc_n} nel catalogo storico)" if isc_n > 0 else ""
+    temp_info = f", Temp. vetta: {fmt(temp_vetta)}°C"
+    emsc_info = (
+        f" (eventi segnalati da EMSC: {emsc_n})" if emsc_n is not None
+        else " (dati EMSC: NON DISPONIBILI)"
+    )
+    isc_info = (
+        f" (ISC: {isc_n} nel catalogo storico)" if isc_n is not None and isc_n > 0
+        else " (dati ISC: NON DISPONIBILI)" if isc_n is None
+        else ""
+    )
 
     return (
         f"Analisi sismica {area} — {datetime.now().strftime('%d/%m/%Y %H:%M')} UTC\n\n"
         f"DATI ULTIMI {period} GIORNI (INGV/USGS{emsc_info}{isc_info}):\n"
-        f"- Sismicità: {n_events} eventi, Md max {max_mag:.1f}, Md media {avg_mag:.1f}\n"
+        f"- Stato del catalogo: {data_ctx.get('seismic_data_status', 'non verificato')}\n"
+        f"- Sismicità: {n_events_text} eventi, Md max {max_mag}, Md media {avg_mag}\n"
         f"- Livello allerta INGV OV: {alert}\n"
-        f"- GPS deformazione: {gps:+.1f} mm/mese\n"
-        f"- Pressione atm. base: {pressure:.1f} hPa, Temp. base: {temp_base:.1f}°C{temp_info}\n"
+        f"- GPS deformazione: {gps} mm/mese\n"
+        f"- Pressione atm. base: {pressure} hPa, Temp. base: {temp_base}°C{temp_info}\n"
         f"- Previsione SISMAI (prossimi 7 giorni): rischio {sismai_risk}\n\n"
         f"Fornisci la tua analisi esperta di questo scenario."
+    )
+
+
+def _is_relevant_ai_answer(text: str, area: str) -> bool:
+    """Reject empty, provider-error, or clearly off-topic output before display."""
+    if not isinstance(text, str) or len(text.strip()) < 40:
+        return False
+    normalized = text.casefold()
+    off_topic_markers = (
+        "copilot moved to a new app",
+        "install the new copilot",
+        "sign in with the same account",
+        "history and content will be deleted",
+        "microsoft copilot",
+    )
+    if any(marker in normalized for marker in off_topic_markers):
+        return False
+    area_markers = {
+        "campi flegrei": ("campi flegrei", "flegrei", "pozzuoli", "solfatara"),
+        "vesuvio": ("vesuvio", "vesuviana", "vesuviano"),
+        "ischia": ("ischia", "ischitano", "ischitana"),
+    }
+    markers = area_markers.get(area.casefold(), (area.casefold(),))
+    scientific_markers = (
+        "sismic", "terremot", "magnitudo", "bradisism", "vulcan",
+        "eruzione", "allerta", "ingv", "gps", "eventi",
+    )
+    return (
+        any(marker in normalized for marker in markers)
+        and any(marker in normalized for marker in scientific_markers)
     )
 
 
@@ -359,13 +440,13 @@ def multi_ai_consensus(area: str, data_ctx: dict) -> dict:
     provider_results = {}
 
     def _run_gpt():
-        provider_results["gpt"] = _ask_gpt(prompt, system=system)
+        provider_results["gpt"] = _ask_gpt(prompt, system=system, allow_fallback=False)
 
     def _run_claude():
-        provider_results["claude"] = _ask_claude(prompt, system=system)
+        provider_results["claude"] = _ask_claude(prompt, system=system, allow_fallback=False)
 
     def _run_gemini():
-        provider_results["gemini"] = _ask_gemini(prompt, system=system)
+        provider_results["gemini"] = _ask_gemini(prompt, system=system, allow_fallback=False)
 
     threads = [
         threading.Thread(target=_run_gpt),
@@ -396,31 +477,37 @@ def multi_ai_consensus(area: str, data_ctx: dict) -> dict:
         if results[key]:
             results[key] = _clean(results[key])
 
-    # Filtra risposte valide (non messaggi di errore)
-    _err_prefixes = ("[", "GPT non", "Claude non", "Gemini non", "non disponibile")
+    # Non sostituire provider mancanti con GPT/g4f: i pareri devono essere distinti.
+    rejected = []
+    for key in ("gpt", "claude", "gemini"):
+        candidate = _clean(results.get(key) or "")
+        if candidate and _is_relevant_ai_answer(candidate, area):
+            results[key] = candidate
+        else:
+            if candidate:
+                rejected.append(key)
+            results[key] = None
+    results["providers_rejected"] = rejected
     responses_available = [
-        r for r in [results["gpt"], results["claude"], results["gemini"]]
-        if r and len(r) > 30 and not any(r.startswith(p) for p in _err_prefixes)
+        results[key] for key in ("gpt", "claude", "gemini") if results[key]
     ]
     results["n_responses"] = len(responses_available)
 
     if len(responses_available) >= 2:
-        consensus_prompt = (
-            f"Questi sono {len(responses_available)} pareri di esperti AI sull'area sismica {area}:\n\n"
-            + "\n\n---\n\n".join(
-                [f"Parere {i+1}: {r}" for i, r in enumerate(responses_available)]
-            )
-            + "\n\nSintetizza in 3-4 frasi le risposte dei modelli, "
-            "indicando accordi, divergenze e limiti dei dati. "
-            "L'accordo fra modelli non è validazione scientifica. "
-            "Scrivi in italiano e dichiara che non è un comunicato ufficiale. "
-            "NON usare titoli, elenchi puntati o formattazione markdown."
+        results["consensus"] = (
+            f"Sono disponibili {len(responses_available)} risposte pertinenti separate. "
+            "Confrontale qui sopra: la loro eventuale convergenza non è validazione scientifica."
         )
-        results["consensus"] = _ask_gpt(consensus_prompt, system=_SYSTEM_PROMPT)
     elif responses_available:
-        results["consensus"] = responses_available[0]
+        results["consensus"] = (
+            "È disponibile una sola risposta pertinente: non costituisce un confronto "
+            "tra provider né un consenso scientifico."
+        )
     else:
-        results["consensus"] = "Nessun provider AI disponibile al momento."
+        results["consensus"] = (
+            "Nessuna risposta pertinente dai provider configurati. "
+            "Consulta le fonti ufficiali INGV e Protezione Civile."
+        )
 
     return results
 
@@ -472,9 +559,10 @@ def ask_all_providers(question: str, system: str = "") -> dict:
 # ─────────────────────────────────────────────────────────────
 
 def providers_status() -> dict:
-    """Ritorna lo stato di ogni provider AI."""
+    """Ritorna quali provider hanno credenziali configurate, non la loro salute live."""
+    configured = _providers_status()
     return {
-        "gpt":    {"available": _PROVIDERS_OK["gpt"],    "model": "GPT-5.1 (OpenAI)"},
-        "claude": {"available": _PROVIDERS_OK["claude"],  "model": "Claude Haiku 4.5 (Anthropic)"},
-        "gemini": {"available": _PROVIDERS_OK["gemini"],  "model": "Gemini 2.5 Flash (Google)"},
+        "gpt":    {"available": configured["gpt"],    "model": "OpenAI (chiave configurata)"},
+        "claude": {"available": configured["claude"], "model": "Anthropic (chiave configurata)"},
+        "gemini": {"available": configured["gemini"], "model": "Gemini (chiave configurata)"},
     }
