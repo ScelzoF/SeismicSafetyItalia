@@ -424,7 +424,7 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
     )
 
     # I metodi di supporto sono in aggiornamento: nessun dato finanziario nel sorgente.
-    st.caption("🎁 Metodi di supporto temporaneamente in aggiornamento.")
+    st.link_button("🎁 Sostieni Sismocampania via PayPal.Me", "https://paypal.me/police73")
 
 # Main content area
 st.title("🌋 " + get_text('title'))
