@@ -407,6 +407,14 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
         "[🛡️ Protezione Civile](https://www.protezionecivile.gov.it/)"
     )
 
+    with st.container(border=True):
+        st.markdown("**🎁 Sostieni Sismocampania**")
+        st.caption("Contributo volontario tramite PayPal.Me.")
+        st.link_button("Apri PayPal.Me", "https://paypal.me/police73", type="primary", width="stretch")
+
+    st.markdown("---")
+
+
     # ── App correlata: SOS Italia ──────────────────────────────────────────
     st.markdown(
         "<div style='background:rgba(230,57,70,0.18);border:1px solid #e63946;"
@@ -423,8 +431,6 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
         unsafe_allow_html=True,
     )
 
-    # I metodi di supporto sono in aggiornamento: nessun dato finanziario nel sorgente.
-    st.link_button("🎁 Sostieni Sismocampania via PayPal.Me", "https://paypal.me/police73")
 
 # Main content area
 st.title("🌋 " + get_text('title'))
