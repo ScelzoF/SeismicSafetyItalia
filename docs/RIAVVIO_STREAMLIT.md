@@ -36,7 +36,6 @@ eseguire il codice precedente.
 - Il contatore delle sessioni deve restare persistente tra i riavvii. Il totale
   misura sessioni, non persone uniche; i rerun della stessa sessione non devono
   aggiungere una nuova visita.
-- Il supporto/donazione è temporaneamente disattivato in attesa di un nuovo link
   pubblico scelto dal proprietario.
 
 ## Sospensione automatica

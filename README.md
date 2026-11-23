@@ -21,11 +21,6 @@ streamlit run app.py
 - App: https://sismocampania.streamlit.app
 - Landing page: https://scelzof.github.io/SeismicSafetyItalia/
 
-## 🙌 Supporto
-
-Puoi supportare il progetto con una donazione:
-👉 [PayPal - meteotorre@gmail.com](https://www.paypal.com/donate/?business=meteotorre@gmail.com)
-
 ---
 
 **Ideato da Fabio Scelzo**  

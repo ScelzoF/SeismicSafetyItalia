@@ -34,10 +34,6 @@
 }
 [data-testid="stSidebar"] [data-testid="stSelectbox"] label { color: #a8dadc !important; }
 
-/* ── 4. Pulsante donazione — testo scuro su oro ─────────── */
-.stApp .donate-btn,
-.stApp .donate-btn * { color: #1a1a1a !important; }
-
 /* ── 5. Titoli ──────────────────────────────────────────── */
 .stApp h1 { color: #a8dadc !important; font-weight: 700 !important; }
 .stApp h2 { color: #a8dadc !important; font-weight: 600 !important; }
