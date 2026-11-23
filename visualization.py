@@ -472,82 +472,45 @@ def show_monitoring_page(earthquake_data, get_text):
 
     # ── Pre-fetch PARALLELO di tutti i dati pesanti prima dei tab ──────────
     # Riscalda la cache in una sola finestra così ogni tab è istantaneo
-    if not st.session_state.get("_cache_warmed"):
-        from concurrent.futures import ThreadPoolExecutor
-        _all_fetches = [
-            fetch_bulletin_values_live,
-            fetch_ingv_alert_level,
-            fetch_gps_rite,
-            fetch_gps_vesuvio,
-            fetch_air_quality_campania,
-            fetch_air_quality_vesuvio,
-            fetch_air_quality_ischia,
-            fetch_gossip_events,
-            fetch_noaa_co2,
-        ]
-        def _warm(fn):
-            try:
-                fn()
-            except Exception:
-                pass
-        with st.spinner("⏳ Caricamento dati live…"):
-            with ThreadPoolExecutor(max_workers=len(_all_fetches)) as ex:
-                futs = [ex.submit(_warm, fn) for fn in _all_fetches]
-                # Aspetta max 5s — chi finisce prima popola la cache
-                from concurrent.futures import wait as _wait
-                _wait(futs, timeout=5)
-        st.session_state["_cache_warmed"] = True
+    # I feed live vengono caricati solo nella sezione selezionata, senza bloccare la mappa.
 
-    st.markdown("""
-        <style>
-        .stTabs [data-baseweb="tab-list"] button:nth-of-type(1) [data-testid="stMarkdownContainer"] p::before {
-            content: "";
-            display: inline-block;
-            width: 22px;
-            height: 15px;
-            margin-right: 8px;
-            vertical-align: middle;
-            background-image: url("https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/72x72/1f1ee-1f1f9.png");
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-        }
-        </style>
-    """, unsafe_allow_html=True)
     _italia_label = _gt("tab_italia").replace("🌍", "").strip()
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    _monitoring_sections = [
         _italia_label,
         _gt("tab_vesuvio"),
         _gt("tab_flegrei"),
         "🏝️ Ischia",
         _gt("tab_data_table"),
-    ])
-
-    with tab1:
+    ]
+    _selected_section = st.radio(
+        "Sezione monitoraggio",
+        options=range(len(_monitoring_sections)),
+        format_func=lambda i: _monitoring_sections[i],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="monitoring_area_selection",
+    )
+    if _selected_section == 0:
         try:
             _show_italia_tab(earthquake_data, get_text)
         except Exception as _e:
             st.error(f"Errore tab Italia: {_e}")
-
-    with tab2:
+    elif _selected_section == 1:
         try:
             _show_vesuvio_tab(earthquake_data, get_text)
         except Exception as _e:
             st.error(f"Errore tab Vesuvio: {_e}")
-
-    with tab3:
+    elif _selected_section == 2:
         try:
             _show_flegrei_tab(earthquake_data, get_text)
         except Exception as _e:
             st.error(f"Errore tab Campi Flegrei: {_e}")
-
-    with tab4:
+    elif _selected_section == 3:
         try:
             _show_ischia_tab(earthquake_data, get_text)
         except Exception as _e:
             st.error(f"Errore tab Ischia: {_e}")
-
-    with tab5:
+    else:
         show_earthquake_table(earthquake_data, get_text)
 
 

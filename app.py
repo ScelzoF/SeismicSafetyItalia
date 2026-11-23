@@ -407,10 +407,8 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
         "[🛡️ Protezione Civile](https://www.protezionecivile.gov.it/)"
     )
 
-    with st.container(border=True):
-        st.markdown("**🎁 Sostieni Sismocampania**")
-        st.caption("Contributo volontario tramite PayPal.Me.")
-        st.link_button("Apri PayPal.Me", "https://paypal.me/police73", type="primary", width="stretch")
+    st.markdown("**🎁 Sostieni Sismocampania**")
+    st.link_button("PayPal.Me", "https://paypal.me/police73", type="secondary")
 
     st.markdown("---")
 
@@ -436,36 +434,13 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
 st.title("🌋 " + get_text('title'))
 st.subheader(get_text('subtitle'))
 
-# Check if we need to fetch data
+# Load the core earthquake catalog first; secondary feeds load when their section is opened.
 if st.session_state.earthquake_data is None or (
-    st.session_state.last_data_fetch and 
+    st.session_state.last_data_fetch and
     datetime.now() - st.session_state.last_data_fetch > timedelta(minutes=15)
 ):
     with st.spinner(get_text('updating')):
-        from concurrent.futures import ThreadPoolExecutor as _TPE
-        import ingv_monitor as _im
-        # ── Prefetch parallelo: sismicità + INGV OV + GPS + AQ ──────────────
-        with _TPE(max_workers=8) as _ex:
-            _feq   = _ex.submit(data_service.fetch_earthquake_data)
-            _fbv   = _ex.submit(_im.fetch_bulletin_values_live)
-            _fal   = _ex.submit(_im.fetch_ingv_alert_level)
-            _fgps  = _ex.submit(_im.fetch_gps_rite)
-            _fgpsv = _ex.submit(_im.fetch_gps_vesuvio)
-            _faq   = _ex.submit(_im.fetch_air_quality_campania)
-            _faqv  = _ex.submit(_im.fetch_air_quality_vesuvio)
-            _fst   = _ex.submit(_im.fetch_summit_temperature, 40.821, 14.126, 1281, "Vesuvio")
-            st.session_state.earthquake_data = _feq.result()
-            try: st.session_state.bulletin_live_cache = _fbv.result()
-            except Exception: pass
-            try: st.session_state.alert_level_cache   = _fal.result()
-            except Exception: pass
-            try: st.session_state.gps_rite    = _fgps.result()
-            except Exception: pass
-            try: st.session_state.gps_vesuvio = _fgpsv.result()
-            except Exception: pass
-            for _fut in (_faq, _faqv, _fst):
-                try: _fut.result()
-                except Exception: pass
+        st.session_state.earthquake_data = data_service.fetch_earthquake_data()
         st.session_state.last_data_fetch = datetime.now()
         st.rerun()
 
