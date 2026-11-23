@@ -407,8 +407,6 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
         "[🛡️ Protezione Civile](https://www.protezionecivile.gov.it/)"
     )
 
-    st.markdown("**🎁 Sostieni Sismocampania**")
-    st.link_button("PayPal.Me", "https://paypal.me/police73", type="secondary")
 
     st.markdown("---")
 

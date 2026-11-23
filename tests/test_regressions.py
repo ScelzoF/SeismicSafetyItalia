@@ -435,16 +435,14 @@ def test_outdated_youtube_embeds_are_not_rendered():
     assert "monitoraggio-sismico-e-vulcanico" in source
 
 
-def test_donation_block_no_longer_exposes_payment_details():
+def test_donation_links_are_removed_from_the_site():
     source = (ROOT / "app.py").read_text().casefold()
-    for obsolete in (
-        "paypal.com/donate",
-        "numero carta",
-        "iban (postepay evolution)",
-        "?postepay=1",
-    ):
-        assert obsolete not in source
-    assert "metodi di supporto temporaneamente in aggiornamento" in source
+    assert "paypal.me" not in source
+    assert "sostieni sismocampania" not in source
+    readme = (ROOT / "README.md").read_text().casefold()
+    assert "paypal.com/donate" not in readme
+    translations = (ROOT / "translations_lib.py").read_text().casefold()
+    assert "support_project" not in translations
 
 
 def test_streamlit_keeps_xsrf_and_cors_protection_enabled():
