@@ -446,3 +446,36 @@ p, li, span, label, .stMarkdown p, .stMarkdown li,
 /* ── div con color:#ffffff inline — non sovrascrivere ─── */
 [data-testid="stMarkdownContainer"] div[style*="color:#ffffff"] { color: #ffffff !important; }
 
+/* PayPal sidebar CTA: contrasto esplicito e leggibile anche sul tema scuro */
+[data-testid="stSidebar"] [data-testid="stLinkButton"],
+[data-testid="stSidebar"] [data-testid="stLinkButton"] a,
+[data-testid="stSidebar"] a[data-testid="stLinkButton"] {
+    width: 100% !important;
+    min-height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background-color: #FFC439 !important;
+    color: #003087 !important;
+    border: 1px solid #DDAA22 !important;
+    border-radius: 7px !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.22) !important;
+}
+[data-testid="stSidebar"] [data-testid="stLinkButton"] *,
+[data-testid="stSidebar"] a[data-testid="stLinkButton"] * {
+    color: #003087 !important;
+    font-weight: 700 !important;
+}
+[data-testid="stSidebar"] [data-testid="stLinkButton"] a:hover,
+[data-testid="stSidebar"] a[data-testid="stLinkButton"]:hover {
+    background-color: #FFD76A !important;
+    border-color: #B88B16 !important;
+}
+[data-testid="stSidebar"] [data-testid="stLinkButton"] a:focus-visible,
+[data-testid="stSidebar"] a[data-testid="stLinkButton"]:focus-visible {
+    outline: 2px solid #FFFFFF !important;
+    outline-offset: 2px !important;
+}
+
