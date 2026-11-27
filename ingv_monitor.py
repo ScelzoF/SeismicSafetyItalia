@@ -1157,6 +1157,7 @@ def fetch_gossip_fdsnws(area: str, lat: float, lon: float,
         return []
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def fetch_bulletin_values_live():
     """
     Recupera i valori aggiornati dai bollettini INGV OV.

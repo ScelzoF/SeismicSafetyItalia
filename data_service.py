@@ -31,14 +31,16 @@ def _retry_get(url, params=None, headers=None, timeout=REQUEST_TIMEOUT, max_retr
         try:
             resp = requests.get(url, params=params, headers=headers, timeout=timeout)
             if resp.status_code in (429, 500, 502, 503, 504):
-                _time.sleep(0.8 * (2 ** attempt))
+                if attempt + 1 < max_retries:
+                    _time.sleep(0.8 * (2 ** attempt))
                 continue
             return resp
         except (requests.exceptions.ConnectionError,
                 requests.exceptions.Timeout,
                 requests.exceptions.ChunkedEncodingError) as exc:
             last_exc = exc
-            _time.sleep(0.8 * (2 ** attempt))
+            if attempt + 1 < max_retries:
+                _time.sleep(0.8 * (2 ** attempt))
     if last_exc:
         raise last_exc
     return resp
@@ -93,7 +95,7 @@ def _fetch_ingv_raw():
         "limit": 500
     }
     headers = {"Accept": "application/json", "User-Agent": "SeismicSafetyItalia/2.0"}
-    resp = _retry_get(INGV_API_URL, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
+    resp = _retry_get(INGV_API_URL, params=params, headers=headers, timeout=3, max_retries=2)
     if resp.status_code != 200 or not resp.text:
         return pd.DataFrame()
     try:
@@ -135,7 +137,7 @@ def _fetch_usgs_raw():
         "limit": 500
     }
     headers = {"Accept": "application/json", "User-Agent": "SeismicSafetyItalia/2.0"}
-    resp = _retry_get(USGS_API_URL, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
+    resp = _retry_get(USGS_API_URL, params=params, headers=headers, timeout=3, max_retries=2)
     if resp.status_code != 200 or not resp.text:
         return pd.DataFrame()
     data = resp.json()
@@ -416,7 +418,7 @@ def _fetch_emsc_raw():
     try:
         resp = _retry_get(
             "https://www.seismicportal.eu/fdsnws/event/1/query",
-            params=params, headers=headers, timeout=REQUEST_TIMEOUT
+            params=params, headers=headers, timeout=3, max_retries=2
         )
         if resp.status_code != 200 or not resp.text:
             return pd.DataFrame()
