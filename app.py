@@ -287,7 +287,6 @@ div[data-testid="stSidebarContent"] [data-baseweb="select"] {
         with st.spinner(get_text('updating')):
             st.session_state.earthquake_data = data_service.fetch_earthquake_data()
             st.session_state.last_data_fetch = datetime.now()
-            st.rerun()
 
     # Notification toggle
     st.checkbox(
@@ -440,7 +439,6 @@ if st.session_state.earthquake_data is None or (
     with st.spinner(get_text('updating')):
         st.session_state.earthquake_data = data_service.fetch_earthquake_data()
         st.session_state.last_data_fetch = datetime.now()
-        st.rerun()
 
 if getattr(st.session_state.earthquake_data, "attrs", {}).get("data_status") == "stale":
     st.warning(
@@ -1160,6 +1158,15 @@ elif page == "oldstyle":
         )
 
     st.markdown(
+        '<a href="https://sismoold.streamlit.app/" target="_blank" rel="noopener noreferrer" '
+        'style="display:inline-block;background:#1e3c5a;color:#fff;padding:9px 14px;'
+        'border-radius:8px;text-decoration:none;font-weight:700;">'
+        'Apri Old Style in una nuova scheda ↗</a>',
+        unsafe_allow_html=True,
+    )
+    st.caption("Se appare la schermata Zzz, premi ‘Yes, get this app back up!’ nel nuovo tab.")
+
+    st.markdown(
         '<iframe src="https://sismoold.streamlit.app/?embed=true"'
         ' width="100%" height="900"'
         ' style="border:none;"'
@@ -1309,16 +1316,3 @@ if st.session_state.notification_enabled and st.session_state.earthquake_data is
                 st.session_state.swarm_notified_areas.add(_sw_key)
     except Exception:
         pass
-
-# === AUTO-REFRESH DATI ===
-# Forza il refresh dei dati sismici ogni 15 minuti anche senza interazione
-import time as _time
-if 'last_auto_refresh' not in st.session_state:
-    st.session_state.last_auto_refresh = _time.time()
-
-_auto_elapsed = _time.time() - st.session_state.last_auto_refresh
-if _auto_elapsed > 900:  # 15 minuti
-    st.session_state.last_auto_refresh = _time.time()
-    st.session_state.earthquake_data = None
-    st.rerun()
-

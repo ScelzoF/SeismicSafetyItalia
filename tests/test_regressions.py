@@ -264,6 +264,50 @@ def test_ai_answer_must_name_area_and_seismic_topic():
     )
 
 
+def test_core_catalog_fetches_use_bounded_retry_budget(monkeypatch):
+    import data_service as module
+
+    calls = []
+
+    class EmptyResponse:
+        status_code = 200
+        text = "{}"
+
+        def json(self):
+            return {"features": []}
+
+    def fake_get(*args, **kwargs):
+        calls.append(kwargs)
+        return EmptyResponse()
+
+    monkeypatch.setattr(module, "_retry_get", fake_get)
+    module._fetch_ingv_raw()
+    module._fetch_usgs_raw()
+    module._fetch_emsc_raw()
+
+    assert len(calls) == 3
+    assert all(call["timeout"] == 3 for call in calls)
+    assert all(call["max_retries"] == 2 for call in calls)
+
+
+def test_retry_get_does_not_backoff_after_final_failure(monkeypatch):
+    import time
+    import data_service as module
+
+    sleeps = []
+
+    def fail_request(*args, **kwargs):
+        raise module.requests.exceptions.Timeout()
+
+    monkeypatch.setattr(module.requests, "get", fail_request)
+    monkeypatch.setattr(time, "sleep", sleeps.append)
+
+    with pytest.raises(module.requests.exceptions.Timeout):
+        module._retry_get("https://example.invalid", timeout=0.1, max_retries=1)
+
+    assert sleeps == []
+
+
 def test_bulletin_status_is_independent_for_each_volcano(monkeypatch):
     import ingv_monitor as module
     monkeypatch.setattr(module, "_fetch_bulletin_pdf_vesuvio", lambda: {
@@ -275,7 +319,7 @@ def test_bulletin_status_is_independent_for_each_volcano(monkeypatch):
         "bulletin_date": "17 novembre 2026", "_fetched_at": "22/11/2026 12:00",
         "_pdf_url": "https://www.ov.ingv.it/flegrei.pdf",
     })
-    result = module.fetch_bulletin_values_live()
+    result = module.fetch_bulletin_values_live.__wrapped__()
     assert result["campi_flegrei"]["_live"] is True
     assert result["vesuvio"]["_live"] is True
     assert result["ischia"]["_live"] is False
